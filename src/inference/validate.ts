@@ -15,7 +15,6 @@ const UNSUPPORTED = new Set([
   'store',
   'metadata',
   'service_tier',
-  'stream_options',
   'prediction',
   'web_search_options',
 ]);
@@ -44,6 +43,8 @@ export type ChatMessage = {
 export type ChatRequest = {
   model: string;
   messages: ChatMessage[];
+  stream: boolean;
+  includeUsage: boolean;
   optional: Record<string, unknown>;
 };
 
@@ -61,17 +62,17 @@ export function validateChatRequest(body: unknown): ChatRequest {
     throw invalidRequest('body', 'invalid_request', 'The request body must be a JSON object.');
   }
 
+  let stream = false;
   if ('stream' in body) {
-    if (body.stream === true) {
-      throw invalidRequest('stream', 'unsupported_parameter', 'Streaming is not supported.');
-    }
-    if (body.stream !== false) {
+    if (body.stream === true) stream = true;
+    else if (body.stream !== false) {
       throw invalidRequest('stream', 'invalid_parameter', 'stream must be false when it is set.');
     }
   }
+  const includeUsage = parseStreamOptions(body, stream);
 
   for (const key of Object.keys(body)) {
-    if (key === 'model' || key === 'messages' || key === 'stream') continue;
+    if (key === 'model' || key === 'messages' || key === 'stream' || key === 'stream_options') continue;
     if (UNSUPPORTED.has(key)) {
       throw invalidRequest(key, 'unsupported_parameter', `${key} is not supported.`);
     }
@@ -94,7 +95,37 @@ export function validateChatRequest(body: unknown): ChatRequest {
     optional[key] = parseOptional(key, body[key]);
   }
 
-  return { model: body.model, messages, optional };
+  return { model: body.model, messages, stream, includeUsage, optional };
+}
+
+function parseStreamOptions(body: Record<string, unknown>, stream: boolean): boolean {
+  if (!('stream_options' in body)) return false;
+  if (!stream) {
+    throw invalidRequest('stream_options', 'unsupported_parameter', 'stream_options is not supported.');
+  }
+  const value = body.stream_options;
+  if (!isRecord(value)) {
+    throw invalidRequest('stream_options', 'invalid_parameter', 'stream_options must be an object.');
+  }
+  const keys = Object.keys(value);
+  if (keys.some((key) => key !== 'include_usage')) {
+    throw invalidRequest('stream_options', 'unsupported_parameter', 'stream_options is not supported.');
+  }
+  if (value.include_usage === undefined) return false;
+  if (typeof value.include_usage !== 'boolean') {
+    throw invalidRequest('stream_options.include_usage', 'invalid_parameter', 'include_usage must be a boolean.');
+  }
+  return value.include_usage;
+}
+
+export function assertStreamAllowed(
+  request: ChatRequest,
+  route: { provider: string; streamingEnabled: boolean },
+  tenantStreamingEnabled: boolean,
+): void {
+  if (!request.stream) return;
+  if (route.provider === 'openai' && tenantStreamingEnabled && route.streamingEnabled) return;
+  throw invalidRequest('stream', 'unsupported_parameter', 'Streaming is not supported.');
 }
 
 function parseMessage(value: unknown, index: number): ChatMessage {

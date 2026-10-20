@@ -1,0 +1,22 @@
+# Backpressure
+
+Node 24. Real PostgreSQL. Mock OpenAI. Shipped app.
+
+Focused file: test/stream-integration.test.ts
+Test: aborts a stalled downstream consumer
+Focused result: passed. INTEGRATION_EXIT:0.
+Full suite: the same test passed. NPM_TEST_EXIT:0. See vitest.txt.
+
+The deployment backpressure timeout in that test is 300 ms. The client pauses the response and does not read. The mock writes one small frame, then 256 KiB frames, up to 24. The test then observes:
+
+- HTTP status 200
+- content type text/event-stream
+- the body does not contain [DONE]
+- one upstream hit
+- the upstream request was aborted
+- stream_status slow_consumer
+- attempt status failed
+- error_code slow_consumer
+- bytes_written greater than 0 and less than the bytes the mock attempted
+
+The writer waits for drain. It does not buffer the rest of the upstream body into the response.

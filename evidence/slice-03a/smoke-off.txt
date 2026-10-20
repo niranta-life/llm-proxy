@@ -1,0 +1,2 @@
+OpenAI stream smoke test is off. Set OPENAI_STREAM_SMOKE=1 to send one streaming chat.
+SMOKE_EXIT:0

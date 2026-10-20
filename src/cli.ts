@@ -9,10 +9,12 @@ import {
   registerProviderDeployment,
   replaceAnthropicCredential,
   replaceOpenAiCredential,
+  setDeploymentStreaming,
   setModelAlias,
   setModelDeploymentEnabled,
   setOpenAiConnectionEnabled,
   setProviderConnectionEnabled,
+  setTenantStreamingEnabled,
 } from './db/inference-admin.js';
 import { createPool } from './db/pools.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
@@ -53,6 +55,10 @@ type Flags = {
   'workspace-id'?: string;
   provider?: string;
   'default-max-output-tokens'?: string;
+  'connect-timeout-ms'?: string;
+  'idle-timeout-ms'?: string;
+  'total-timeout-ms'?: string;
+  'backpressure-timeout-ms'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -64,6 +70,14 @@ function parseEnabled(value: string | undefined): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function parseTimeout(value: string | undefined): number | null | undefined {
+  if (value === undefined) return null;
+  if (!/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  if (parsed < 100 || parsed > 600000) return undefined;
+  return parsed;
 }
 
 function parseCapabilities(value: string | undefined): string[] | undefined {
@@ -114,6 +128,10 @@ async function main(): Promise<void> {
         'workspace-id': { type: 'string' },
         provider: { type: 'string' },
         'default-max-output-tokens': { type: 'string' },
+        'connect-timeout-ms': { type: 'string' },
+        'idle-timeout-ms': { type: 'string' },
+        'total-timeout-ms': { type: 'string' },
+        'backpressure-timeout-ms': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -311,6 +329,53 @@ async function main(): Promise<void> {
       }
       const aliasId = await setModelAlias(pool, tenantId, alias, deployment);
       process.stdout.write(`${JSON.stringify({ tenantId, alias, deployment, aliasId })}\n`);
+      return;
+    }
+
+    if (command === 'set-tenant-streaming') {
+      const tenantId = requireTenant(values);
+      const enabled = parseEnabled(values.enabled);
+      if (tenantId === undefined || enabled === undefined) {
+        logger.error('tenant-id and enabled are required');
+        process.exitCode = 1;
+        return;
+      }
+      const streamingEnabled = await setTenantStreamingEnabled(pool, tenantId, enabled);
+      process.stdout.write(`${JSON.stringify({ tenantId, streamingEnabled })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-streaming') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const enabled = parseEnabled(values.enabled);
+      const connectTimeoutMs = parseTimeout(values['connect-timeout-ms']);
+      const idleTimeoutMs = parseTimeout(values['idle-timeout-ms']);
+      const totalTimeoutMs = parseTimeout(values['total-timeout-ms']);
+      const backpressureTimeoutMs = parseTimeout(values['backpressure-timeout-ms']);
+      if (
+        tenantId === undefined ||
+        name.length === 0 ||
+        enabled === undefined ||
+        connectTimeoutMs === undefined ||
+        idleTimeoutMs === undefined ||
+        totalTimeoutMs === undefined ||
+        backpressureTimeoutMs === undefined
+      ) {
+        logger.error('deployment streaming arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const configVersion = await setDeploymentStreaming(pool, {
+        tenantId,
+        name,
+        enabled,
+        connectTimeoutMs,
+        idleTimeoutMs,
+        totalTimeoutMs,
+        backpressureTimeoutMs,
+      });
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, streamingEnabled: enabled, configVersion })}\n`);
       return;
     }
 

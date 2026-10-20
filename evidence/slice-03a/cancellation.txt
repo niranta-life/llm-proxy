@@ -1,0 +1,18 @@
+# Cancellation
+
+Node 24. Real PostgreSQL. Mock OpenAI. Shipped app.
+
+Focused file: test/stream-integration.test.ts
+Test: cancels the upstream stream when the client disconnects
+Focused result: passed. INTEGRATION_EXIT:0. 15 tests.
+Full suite: the same test passed. NPM_TEST_EXIT:0. 89 tests. See vitest.txt.
+
+The test destroys the client response after the headers. It then observes:
+
+- attempt status failed
+- error_code request_cancelled
+- one upstream hit for that call
+- the mock recorded the upstream request as aborted
+- no second upstream call
+
+The route removes the abort and close listeners in a finally block. The OpenAI stream generator aborts its fetch and cancels the reader when the generator closes.

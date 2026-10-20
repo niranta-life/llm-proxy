@@ -29,13 +29,22 @@ describe('configuration lookup', () => {
     );
     expect(enabled).toMatchObject({ enabled: true });
     const listing = runCli(db, ['list-inference', '--tenant-id', tenant.tenantId], cliEnv()) as {
+      streamingEnabled?: boolean;
       connections?: unknown;
-      deployments?: Array<{ name: string; upstreamModel: string; enabled: boolean; configVersion: number }>;
+      deployments?: Array<{
+        name: string;
+        upstreamModel: string;
+        enabled: boolean;
+        configVersion: number;
+        streamingEnabled?: boolean;
+      }>;
       aliases?: Array<{ alias: string }>;
     };
     const text = JSON.stringify(listing);
     expect(text).not.toContain(apiKey);
     expect(text).not.toContain('aes-256-gcm$');
+    expect(listing.streamingEnabled).toBe(false);
+    expect(listing.deployments?.[0]?.streamingEnabled).toBe(false);
     expect(listing.aliases?.map((alias) => alias.alias)).toEqual(['auto']);
     expect(listing.deployments?.[0]?.upstreamModel).toBe('gpt-lookup');
     expect(listing.deployments?.[0]?.enabled).toBe(true);
@@ -84,6 +93,8 @@ describe('configuration lookup', () => {
       serviceEnv(db, { INFERENCE_ENABLED: 'true', PROVIDER_CREDENTIAL_KEY: credentialKeyText }),
     );
     expect(configured.inferenceEnabled).toBe(true);
+    expect(loadConfig(serviceEnv(db)).maxActiveStreams).toBe(32);
+    expect(() => loadConfig(serviceEnv(db, { MAX_ACTIVE_STREAMS: '0' }))).toThrow(/MAX_ACTIVE_STREAMS/);
     expect(configured.providerCredentialKey?.equals(Buffer.from(credentialKeyText, 'base64'))).toBe(true);
   });
 });

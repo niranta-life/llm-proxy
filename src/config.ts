@@ -41,6 +41,7 @@ export type Config = {
   inferenceEnabled: boolean;
   providerCredentialKey: Buffer | null;
   openAiBaseUrl: string;
+  maxActiveStreams: number;
   database: {
     host: string;
     port: number;
@@ -101,6 +102,20 @@ function readRequired(env: NodeJS.ProcessEnv, key: string): string | undefined {
   return value.trim();
 }
 
+function readMaxActiveStreams(env: NodeJS.ProcessEnv, errors: string[]): number {
+  const text = readRequired(env, 'MAX_ACTIVE_STREAMS') ?? '32';
+  if (!/^\d+$/.test(text)) {
+    errors.push('MAX_ACTIVE_STREAMS must be an integer from 1 to 10000');
+    return 32;
+  }
+  const value = Number(text);
+  if (value < 1 || value > 10_000) {
+    errors.push('MAX_ACTIVE_STREAMS must be an integer from 1 to 10000');
+    return 32;
+  }
+  return value;
+}
+
 function readPort(value: string, label: string, errors: string[]): number | undefined {
   if (!/^\d+$/.test(value)) {
     errors.push(`${label} must be an integer from 1 to 65535`);
@@ -141,6 +156,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const inferenceEnabled = readInferenceEnabled(env, errors);
   const openAiBaseUrl = readOpenAiBaseUrl(env, errors);
   const providerCredentialKey = readCredentialKey(env, inferenceEnabled, errors);
+  const maxActiveStreams = readMaxActiveStreams(env, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -168,6 +184,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     inferenceEnabled,
     providerCredentialKey,
     openAiBaseUrl,
+    maxActiveStreams,
     database: {
       host: databaseHost,
       port: databasePort,

@@ -1318,7 +1318,7 @@ async function runLocalChecks() {
         `GRANT UPDATE (
            status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
            provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
-           cache_read_input_tokens
+           cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written
          )
          ON model_attempts TO llm_runtime;`,
       );
@@ -1484,7 +1484,7 @@ async function cleanup() {
        GRANT UPDATE (
          status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
          provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
-         cache_read_input_tokens
+         cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written
        ) ON model_attempts TO llm_runtime;
        REVOKE UPDATE (label, tenant_id) ON tenant_api_keys FROM llm_runtime;`,
     );

@@ -5,10 +5,12 @@ import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
 import type { ProviderAdapter } from './contract.js';
+import { runOpenAiStream, type StreamHttp } from './execute-stream.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode } from './errors.js';
 import { resolveModel } from './resolve.js';
 import { finishAttempt, insertPending, loadCatalog } from './store.js';
-import { assertCapabilities, validateChatRequest } from './validate.js';
+import type { StreamGate } from './stream.js';
+import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './validate.js';
 
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
@@ -34,22 +36,44 @@ export async function executeChat(input: {
   tenantId: string;
   body: unknown;
   signal: AbortSignal;
-}): Promise<UpstreamCompletion['response']> {
+  reply: StreamHttp;
+  gate: StreamGate;
+}): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
     throw proxyError(503, 'server_error', 'inference_disabled', null, 'Inference is not enabled.');
   }
 
-  const route = await withTenant(input.runtimePool, input.tenantId, async (client) => {
+  const loaded = await withTenant(input.runtimePool, input.tenantId, async (client) => {
     const catalog = await loadCatalog(client);
-    return resolveModel(request.model, catalog.deployments, catalog.aliases);
+    return {
+      route: resolveModel(request.model, catalog.deployments, catalog.aliases),
+      streamingEnabled: catalog.streamingEnabled,
+    };
   });
+  const route = loaded.route;
   if (route === null) {
     throw proxyError(404, 'invalid_request_error', 'model_not_found', 'model', 'The model is not available.');
   }
+  assertStreamAllowed(request, route, loaded.streamingEnabled);
   assertCapabilities(request, route.capabilities);
   const adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
+  if (request.stream) {
+    await runOpenAiStream({
+      runtimePool: input.runtimePool,
+      logger: input.logger,
+      upstreamBaseUrl: input.upstreamBaseUrl,
+      store: input.store,
+      tenantId: input.tenantId,
+      request,
+      route,
+      signal: input.signal,
+      reply: input.reply,
+      gate: input.gate,
+    });
+    return undefined;
+  }
   const baseURL = route.provider === 'anthropic' ? route.endpoint ?? '' : input.upstreamBaseUrl;
 
   let requestId = '';

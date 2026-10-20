@@ -1,0 +1,16 @@
+# Database records from the throwaway proof database
+
+The two flag columns are the tenant and deployment values at query time, after both had been enabled. `list-inference` before that change is in rollback.txt. Both flags were false, and `stream=true` was HTTP 400 `unsupported_parameter` with param `stream`.
+
+Columns:
+tenantStreaming, deploymentStreaming, streamStatus, attemptStatus, chunkCount, bytesWritten, firstTextDeltaMs, promptTokens, completionTokens, totalTokens, privateTextPresent
+
+t,t,,succeeded,,,,1,1,2,f
+t,t,completed,succeeded,4,549,184,2,1,3,f
+t,t,completed,succeeded,5,740,9,2,1,3,f
+
+The first row is the JSON completion taken while streaming was off. `stream_status` is null. Usage is 1, 1, 2.
+The second row is the `curl -N` stream. `chunk_count` 4 counts the role chunk, the text chunk, the finish chunk, and `[DONE]`. The curl summary counts 3 JSON chunks and one `[DONE]`.
+The third row is the official SDK stream with `stream_options.include_usage`. `chunk_count` 5 adds the usage chunk. The SDK summary counts 4 chunks and does not count `[DONE]`. Usage is 2, 1, 3.
+`privateTextPresent` is false on every row. The check looks for the prompt marker and for `data:`.
+No row stores generated text.

@@ -15,6 +15,11 @@ export type DeploymentCandidate = {
   endpoint: string | null;
   workspaceId: string | null;
   defaultMaxOutputTokens: number | null;
+  streamingEnabled: boolean;
+  streamConnectTimeoutMs: number | null;
+  streamIdleTimeoutMs: number | null;
+  streamTotalTimeoutMs: number | null;
+  streamBackpressureTimeoutMs: number | null;
 };
 
 export type AliasCandidate = {
@@ -36,6 +41,11 @@ export type ResolvedRoute = {
   endpoint: string | null;
   workspaceId: string | null;
   defaultMaxOutputTokens: number | null;
+  streamingEnabled: boolean;
+  streamConnectTimeoutMs: number | null;
+  streamIdleTimeoutMs: number | null;
+  streamTotalTimeoutMs: number | null;
+  streamBackpressureTimeoutMs: number | null;
 };
 
 export function resolveModel(
@@ -62,5 +72,10 @@ export function resolveModel(
     endpoint: deployment.endpoint,
     workspaceId: deployment.workspaceId,
     defaultMaxOutputTokens: deployment.defaultMaxOutputTokens,
+    streamingEnabled: deployment.streamingEnabled,
+    streamConnectTimeoutMs: deployment.streamConnectTimeoutMs,
+    streamIdleTimeoutMs: deployment.streamIdleTimeoutMs,
+    streamTotalTimeoutMs: deployment.streamTotalTimeoutMs,
+    streamBackpressureTimeoutMs: deployment.streamBackpressureTimeoutMs,
   };
 }

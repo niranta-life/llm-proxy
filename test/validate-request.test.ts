@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readTokenUsage, validateCompletion } from '../src/inference/adapter.js';
 import { normalizeUpstreamError } from '../src/inference/errors.js';
 import { resolveModel, type DeploymentCandidate } from '../src/inference/resolve.js';
-import { assertCapabilities, validateChatRequest } from '../src/inference/validate.js';
+import { assertCapabilities, assertStreamAllowed, validateChatRequest } from '../src/inference/validate.js';
 import { parseMetricsWindow } from '../src/inference/window.js';
 import { APIConnectionTimeoutError, APIError } from 'openai';
 
@@ -19,8 +19,24 @@ describe('request validation', () => {
     expect(parsed.optional.temperature).toBe(0.2);
   });
 
-  it('rejects stream=true instead of dropping it', () => {
-    expect(() => validateChatRequest({ ...textRequest, stream: true })).toThrow(/streaming is not supported/i);
+  it('keeps stream=true and rejects it until an OpenAI deployment allows streaming', () => {
+    const parsed = validateChatRequest({ ...textRequest, stream: true, stream_options: { include_usage: true } });
+    expect(parsed.stream).toBe(true);
+    expect(parsed.includeUsage).toBe(true);
+    expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: false }, false)).toThrow(
+      /streaming is not supported/i,
+    );
+    expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: true }, false)).toThrow(
+      /streaming is not supported/i,
+    );
+    expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: true }, true)).toThrow(
+      /streaming is not supported/i,
+    );
+    expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: true }, true)).not.toThrow();
+    expect(() => validateChatRequest({ ...textRequest, stream: 'yes' })).toThrow(/stream must be false/i);
+    expect(() => validateChatRequest({ ...textRequest, stream_options: { include_usage: true } })).toThrow(
+      /stream_options is not supported/i,
+    );
   });
 
   it('rejects tools, images, audio, and unknown parameters', () => {
@@ -64,6 +80,11 @@ describe('static routing', () => {
     endpoint: null,
     workspaceId: null,
     defaultMaxOutputTokens: null,
+    streamingEnabled: false,
+    streamConnectTimeoutMs: null,
+    streamIdleTimeoutMs: null,
+    streamTotalTimeoutMs: null,
+    streamBackpressureTimeoutMs: null,
   };
   const alpha: DeploymentCandidate = {
     ...shared,
@@ -111,6 +132,11 @@ describe('alias resolution', () => {
       endpoint: null,
       workspaceId: null,
       defaultMaxOutputTokens: null,
+      streamingEnabled: false,
+      streamConnectTimeoutMs: null,
+      streamIdleTimeoutMs: null,
+      streamTotalTimeoutMs: null,
+      streamBackpressureTimeoutMs: null,
     };
     const resolved = resolveModel('auto', [deployment], [{ alias: 'auto', deploymentId: deployment.id }]);
     expect(resolved?.upstreamModel).toBe('gpt-4o-mini');

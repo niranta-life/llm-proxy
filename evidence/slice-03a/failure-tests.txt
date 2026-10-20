@@ -1,0 +1,77 @@
+# Failure tests
+
+Node 24. Real PostgreSQL. Mock OpenAI. Shipped app.
+File: test/stream-integration.test.ts
+Full suite: 17 files, 91 tests, NPM_TEST_EXIT:0. See vitest.txt and integration-tests.txt.
+
+Provider error before the first event:
+- HTTP 502 upstream_error
+- body is JSON and does not contain [DONE]
+- one upstream hit
+- stream_status provider_failed
+- attempt status failed
+
+Provider error after partial output:
+- HTTP status stays 200
+- content type stays text/event-stream
+- body does not contain [DONE]
+- one upstream hit
+- stream_status provider_failed
+- bytes_written greater than 0
+
+Missing [DONE]:
+- HTTP 200
+- zero [DONE] events
+- stream_status stream_truncated
+- attempt status failed
+- error_code stream_truncated
+
+Missing usage:
+- no usage object on the chunks
+- stream_status completed
+- prompt, completion, and total token columns stay null
+
+Unicode split across socket writes:
+- the joined text deltas equal the original character
+- stream_status completed
+
+Parallel tenants:
+- two upstream calls
+- each call uses that tenant's own bearer credential
+- a tenant query does not see the other tenant's rows
+
+Database failure before the call:
+- HTTP 503 service_unavailable
+- upstream hit count unchanged
+
+Telemetry failure after bytes were sent:
+- the caller still receives chunks
+- one upstream hit
+- a critical log says the attempt result was not recorded
+- the row can stay pending with stream_status streaming
+- no second upstream call
+
+Connect, idle, and total timeouts:
+- connect and total return HTTP 504 timeout before SSE when no byte was sent
+- idle returns HTTP 200 with no [DONE] after a partial frame
+- stream_status timed_out in each case
+
+Stalled downstream write, total timeout 500 ms, backpressure timeout 3000 ms, then the same stall with idle timeout 500 ms:
+- The client pauses and does not read.
+- The upstream sends one small frame and one large frame, then stays open.
+- HTTP status stays 200.
+- The body does not contain [DONE].
+- The attempt finishes in under 2 seconds.
+- stream_status timed_out
+- error_code timeout
+- bytes_written greater than 0
+- one upstream hit, and that upstream request is aborted
+- The backpressure timer does not win.
+- Full suite: "ends a stalled downstream write on the total and idle deadlines" passed.
+- Unit test of writeFrame: "settles a stalled write on a stream deadline before the backpressure timer" passed in 42 ms.
+
+Active stream bound:
+- the held stream is visible as connecting
+- one more stream is HTTP 503 stream_capacity
+- that rejection is not text/event-stream
+- the held stream later completes with one [DONE]

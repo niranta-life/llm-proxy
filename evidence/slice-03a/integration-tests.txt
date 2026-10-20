@@ -1,0 +1,18 @@
+Node 24 full suite excerpts. NPM_TEST_EXIT:0. Tests 91 passed.
+
+ ✓ test/stream-integration.test.ts > OpenAI streaming > streams a chat completion the official SDK can read 283ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > frames one done marker and keeps stream=false as JSON 276ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > rejects streaming until both the tenant and the deployment allow it 1125ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > cancels the upstream stream when the client disconnects 140ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > aborts a stalled downstream consumer 1073ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends a stalled downstream write on the total and idle deadlines 3120ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > returns a normal HTTP error when the provider fails before the first event 151ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps the HTTP status and omits done when the provider fails after partial output 168ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not complete a stream that never sends done 137ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > completes when the provider omits usage 262ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > reassembles unicode split across upstream bytes 200ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps parallel tenants on their own credentials 476ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not call upstream when persistence fails before the stream 99ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not retry when telemetry fails after bytes were sent 134ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends the stream on connect, idle, and total timeouts 3406ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > shows connecting and rejects one more stream at the active limit 5680ms

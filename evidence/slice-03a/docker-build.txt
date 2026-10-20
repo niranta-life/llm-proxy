@@ -1,0 +1,94 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 454B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+#2 DONE 0.2s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 102B 0.0s done
+#3 DONE 0.2s
+
+#4 [internal] load build context
+#4 transferring context: 38.38kB 0.1s done
+#4 DONE 0.1s
+
+#5 [build 1/6] FROM docker.io/library/node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 0.1s done
+#5 DONE 0.1s
+
+#6 [build 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [build 3/6] COPY package.json package-lock.json tsconfig.json ./
+#7 CACHED
+
+#8 [build 4/6] COPY src ./src
+#8 DONE 0.4s
+
+#9 [build 5/6] RUN npm ci
+#9 33.18 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#9 41.46 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#9 42.28 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#9 61.45 
+#9 61.45 added 321 packages, and audited 322 packages in 57s
+#9 61.45 
+#9 61.45 65 packages are looking for funding
+#9 61.45   run `npm fund` for details
+#9 61.50 
+#9 61.50 7 vulnerabilities (5 moderate, 2 critical)
+#9 61.50 
+#9 61.50 To address all issues (including breaking changes), run:
+#9 61.50   npm audit fix --force
+#9 61.50 
+#9 61.50 Run `npm audit` for details.
+#9 61.51 npm warn install-scripts 3 packages have install scripts not yet covered by allowScripts:
+#9 61.51 npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+#9 61.51 npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+#9 61.51 npm warn install-scripts   ssh2@1.17.0 (install: node install.js)
+#9 61.51 npm warn install-scripts
+#9 61.51 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#9 61.52 npm notice
+#9 61.52 npm notice New major version of npm available! 11.19.1 -> 12.2.0
+#9 61.52 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+#9 61.52 npm notice To update run: npm install -g npm@12.2.0
+#9 61.52 npm notice
+#9 DONE 65.8s
+
+#10 [build 6/6] RUN npm run build
+#10 3.052 
+#10 3.052 > llm-proxy@0.0.0 build
+#10 3.052 > tsc -p tsconfig.json
+#10 3.052 
+#10 DONE 20.7s
+
+#11 [stage-1 3/6] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [stage-1 4/6] RUN npm ci --omit=dev && npm cache clean --force
+#12 CACHED
+
+#13 [stage-1 5/6] COPY --from=build /app/dist ./dist
+#13 DONE 0.2s
+
+#14 [stage-1 6/6] COPY migrations ./migrations
+#14 DONE 0.1s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 0.2s done
+#15 exporting manifest sha256:fe897ff05420636eeb4e2148a18abbb1584f0d3c9cd14897aaf4073de084109d 0.0s done
+#15 exporting config sha256:c5ff92ad40bbee24e15d4c2f7fe27002097d601bb31c8d9e5eb24513aa9b5417 0.0s done
+#15 exporting attestation manifest sha256:ad2b4da102bbfa89065ef7f9943251dd367b63bb5595f8fcde4c927612bb683f 0.0s done
+#15 exporting manifest list sha256:3aa7561a38c592174edb432901064c36e40bc28246bc6d51cff798b98720d9d0 0.0s done
+#15 naming to docker.io/library/llm-proxy:slice-03a
+#15 naming to docker.io/library/llm-proxy:slice-03a done
+#15 unpacking to docker.io/library/llm-proxy:slice-03a 0.1s done
+#15 DONE 0.5s
+
+What's Next?
+  View a summary of image vulnerabilities and recommendations → docker scout quickview
+DOCKER_BUILD_EXIT:0

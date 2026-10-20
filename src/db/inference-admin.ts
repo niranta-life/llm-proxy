@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 
 export type InferenceListing = {
+  streamingEnabled: boolean;
   connections: Array<{
     id: string;
     provider: string;
@@ -20,6 +21,11 @@ export type InferenceListing = {
     enabled: boolean;
     configVersion: number;
     defaultMaxOutputTokens: number | null;
+    streamingEnabled: boolean;
+    streamConnectTimeoutMs: number | null;
+    streamIdleTimeoutMs: number | null;
+    streamTotalTimeoutMs: number | null;
+    streamBackpressureTimeoutMs: number | null;
     createdAt: string;
   }>;
   aliases: Array<{
@@ -198,6 +204,45 @@ export async function setModelAlias(
   const aliasId = result.rows[0]?.alias_id;
   if (aliasId === undefined) throw new Error('alias was not saved');
   return aliasId;
+}
+
+export async function setTenantStreamingEnabled(pool: Pool, tenantId: string, enabled: boolean): Promise<boolean> {
+  const result = await pool.query<{ enabled: boolean }>(
+    'SELECT set_tenant_streaming_enabled($1::uuid, $2) AS enabled',
+    [tenantId, enabled],
+  );
+  const value = result.rows[0]?.enabled;
+  if (value === undefined) throw new Error('tenant streaming was not updated');
+  return value;
+}
+
+export async function setDeploymentStreaming(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    name: string;
+    enabled: boolean;
+    connectTimeoutMs: number | null;
+    idleTimeoutMs: number | null;
+    totalTimeoutMs: number | null;
+    backpressureTimeoutMs: number | null;
+  },
+): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    `SELECT set_deployment_streaming($1::uuid, $2, $3, $4, $5, $6, $7) AS version`,
+    [
+      input.tenantId,
+      input.name,
+      input.enabled,
+      input.connectTimeoutMs,
+      input.idleTimeoutMs,
+      input.totalTimeoutMs,
+      input.backpressureTimeoutMs,
+    ],
+  );
+  const version = result.rows[0]?.version;
+  if (version === undefined) throw new Error('deployment streaming was not updated');
+  return version;
 }
 
 export async function listTenantInference(pool: Pool, tenantId: string): Promise<InferenceListing> {

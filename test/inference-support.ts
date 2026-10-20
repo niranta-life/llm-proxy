@@ -125,6 +125,37 @@ export function registerInference(
   );
 }
 
+export function enableStreaming(
+  db: TestDatabase,
+  input: {
+    tenantId: string;
+    deployment: string;
+    connectTimeoutMs?: number;
+    idleTimeoutMs?: number;
+    totalTimeoutMs?: number;
+    backpressureTimeoutMs?: number;
+  },
+): void {
+  const env = cliEnv();
+  runCli(db, ['set-tenant-streaming', '--tenant-id', input.tenantId, '--enabled', 'true'], env);
+  const args = [
+    'set-deployment-streaming',
+    '--tenant-id',
+    input.tenantId,
+    '--deployment',
+    input.deployment,
+    '--enabled',
+    'true',
+  ];
+  if (input.connectTimeoutMs !== undefined) args.push('--connect-timeout-ms', String(input.connectTimeoutMs));
+  if (input.idleTimeoutMs !== undefined) args.push('--idle-timeout-ms', String(input.idleTimeoutMs));
+  if (input.totalTimeoutMs !== undefined) args.push('--total-timeout-ms', String(input.totalTimeoutMs));
+  if (input.backpressureTimeoutMs !== undefined) {
+    args.push('--backpressure-timeout-ms', String(input.backpressureTimeoutMs));
+  }
+  runCli(db, args, env);
+}
+
 export function adminPool(db: TestDatabase): pg.Pool {
   const pool = new pg.Pool({
     host: db.host,

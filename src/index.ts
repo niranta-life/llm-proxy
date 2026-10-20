@@ -72,6 +72,7 @@ async function main(): Promise<void> {
     inferenceEnabled: config.inferenceEnabled,
     upstreamBaseUrl: config.openAiBaseUrl,
     credentialKey: config.providerCredentialKey,
+    maxActiveStreams: config.maxActiveStreams,
   });
 
   let shuttingDown = false;

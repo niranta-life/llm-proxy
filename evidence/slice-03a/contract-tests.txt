@@ -1,0 +1,12 @@
+Node 24 full suite excerpts. NPM_TEST_EXIT:0. Tests 91 passed.
+
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > keeps one completion id, the assistant role, and ordered text deltas 2ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > maps finish reasons and omits usage that was not requested or not reported 0ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > rejects tools, a non-assistant role, and a bad finish reason 1ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > reassembles a UTF-8 character split across decoder writes 1ms
+ ✓ test/stream-unit.test.ts > stream state transitions > moves through connecting and streaming and completes only after finish and done 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > does not complete when the provider terminal event or done marker is missing 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > records each terminal status and each timeout 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > writes ordered frames and one done marker after a finish event 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > aborts a stalled consumer and removes the abort listener 31ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > settles a stalled write on a stream deadline before the backpressure timer 42ms

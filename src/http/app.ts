@@ -4,8 +4,10 @@ import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
+import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { listVisibleModels, summarizeMetrics } from '../inference/store.js';
+import { createStreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
 import type { Logger } from '../logger.js';
 
@@ -17,16 +19,44 @@ export type AppDeps = {
   inferenceEnabled: boolean;
   upstreamBaseUrl: string;
   credentialKey: Buffer | null;
+  maxActiveStreams: number;
 };
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
 }
 
+function streamReply(reply: FastifyReply): StreamHttp {
+  return {
+    write(chunk: string): boolean {
+      return reply.raw.write(chunk);
+    },
+    once(event: 'drain', listener: () => void): void {
+      reply.raw.once(event, listener);
+    },
+    off(event: 'drain', listener: () => void): void {
+      reply.raw.off(event, listener);
+    },
+    hijack(): void {
+      reply.hijack();
+    },
+    writeHead(status: number, headers: Record<string, string>): void {
+      reply.raw.writeHead(status, headers);
+    },
+    end(): void {
+      reply.raw.end();
+    },
+    headersSent(): boolean {
+      return reply.raw.headersSent;
+    },
+  };
+}
+
 export function buildApp(deps: AppDeps): FastifyInstance {
   const app = Fastify({ logger: false });
   const credentialStore: ProviderCredentialStore | null =
     deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
+  const streamGate = createStreamGate(deps.maxActiveStreams);
 
   async function rejectUnauthenticated(request: FastifyRequest, reply: FastifyReply): Promise<string | null> {
     try {
@@ -127,14 +157,22 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const abortUpstream = (): void => {
       if (!controller.signal.aborted) controller.abort();
     };
+    const onClose = (): void => {
+      if (!reply.raw.writableEnded) abortUpstream();
+    };
     // The request stream also closes after a normal body read. Abort only
     // when the response is still open, which means the caller went away.
+    // Injected sockets use a fake setTimeout that rejects a missing callback.
+    if (!('isLightMyRequest' in request.raw) && typeof request.raw.setTimeout === 'function') {
+      request.raw.setTimeout(0);
+    }
+    if (!('isLightMyRequest' in reply.raw) && typeof reply.raw.setTimeout === 'function') {
+      reply.raw.setTimeout(0);
+    }
     request.raw.on('aborted', abortUpstream);
-    reply.raw.on('close', () => {
-      if (!reply.raw.writableEnded) abortUpstream();
-    });
+    reply.raw.on('close', onClose);
     try {
-      return await executeChat({
+      const result = await executeChat({
         runtimePool: deps.runtimePool,
         logger: deps.logger,
         inferenceEnabled: deps.inferenceEnabled,
@@ -143,13 +181,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         tenantId,
         body: request.body,
         signal: controller.signal,
+        reply: streamReply(reply),
+        gate: streamGate,
       });
+      if (reply.sent || reply.raw.headersSent) return;
+      return result;
     } catch (error) {
+      if (reply.sent || reply.raw.headersSent) return;
       if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
       deps.logger.error('chat request failed', { message: errorMessage(error) });
       return reply
         .code(500)
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    } finally {
+      request.raw.off('aborted', abortUpstream);
+      reply.raw.off('close', onClose);
     }
   });
 

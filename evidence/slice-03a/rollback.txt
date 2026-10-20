@@ -1,0 +1,50 @@
+images
+slice-03a sha256:3aa7561a38c592174edb432901064c36e40bc28246bc6d51cff798b98720d9d0
+slice-02 sha256:616db9bd9c30810d4c786d91ea1b4e8f6a7f9d0a2d953935ce14c8d2a9cfc828
+
+slice-03a ready
+slice-03a-ready {"status":"ready","database":"ready"}
+
+streaming left off
+{"aliases":[{"id":"d7ad0d7b-b0cf-40ee-92ee-8685123b9b99","alias":"auto","createdAt":"2026-10-20T21:43:42.139977+00:00","deploymentId":"08646394-7f17-4bae-95f8-a553d838c806"}],"connections":[{"id":"2fa95098-1c52-4d49-9531-040972c3c775","enabled":true,"endpoint":null,"provider":"openai","createdAt":"2026-10-20T21:43:41.379222+00:00","workspaceId":null,"credentialVersion":1}],"deployments":[{"id":"08646394-7f17-4bae-95f8-a553d838c806","name":"primary","enabled":true,"createdAt":"2026-10-20T21:43:41.77057+00:00","timeoutMs":10000,"capabilities":["temperature"],"connectionId":"2fa95098-1c52-4d49-9531-040972c3c775","configVersion":1,"upstreamModel":"gpt-proof-configured","streamingEnabled":false,"streamIdleTimeoutMs":null,"streamTotalTimeoutMs":null,"defaultMaxOutputTokens":null,"streamConnectTimeoutMs":null,"streamBackpressureTimeoutMs":null}],"streamingEnabled":false}
+
+non-streaming completion
+{"status":200,"object":"chat.completion","model":"gpt-proof-model","finishReason":"stop","contentPresent":true,"contentStoredInEvidence":false,"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2},"errorCode":null}
+
+stream rejected before headers
+{"status":400,"code":"unsupported_parameter","param":"stream","sawDone":false,"contentTypeEventStream":false}
+
+migrations after slice-03a
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+
+attempt rows: tenantStreaming,deploymentStreaming,streamStatus,attemptStatus,chunkCount,bytesWritten,firstTextDeltaMs,promptTokens,completionTokens,totalTokens,privateTextPresent
+t,t,,succeeded,,,,1,1,2,f
+t,t,completed,succeeded,4,549,207,2,1,3,f
+t,t,completed,succeeded,5,740,20,2,1,3,f
+
+sdk and curl summary
+{"curl":{"tool":"curl","exitCode":0,"statusLine":"HTTP/1.1 200 OK","chunkCount":3,"doneCount":1,"object":"chat.completion.chunk","id":"chatcmpl-proof","model":"gpt-proof-model","role":"assistant","finishReason":"stop"},"sdk":{"chunkCount":4,"id":"chatcmpl-proof","model":"gpt-proof-model","role":"assistant","finishReason":"stop","usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}}
+
+slice-02 ready after 005 stayed applied
+slice-02-ready {"status":"ready","database":"ready"}
+
+slice-02 non-streaming completion
+{"status":200,"object":"chat.completion","model":"gpt-proof-model","finishReason":"stop","contentPresent":true,"errorCode":null}
+
+migrations while slice-02 is serving
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+
+compose volume was not removed
+llm-proxy_pgdata
+
+compose containers still present
+llm-proxy-app-1 Up 2 hours (healthy)
+llm-proxy-postgres-1 Up 4 hours (healthy)

@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
-import type { ProviderAdapter } from './contract.js';
+import type { ProviderAdapter, ProviderCall } from './contract.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
+import { streamOpenAiChat, type UpstreamStreamItem } from './openai-stream.js';
+import type { StreamTimeouts } from './stream.js';
 import type { ChatMessage } from './validate.js';
 
 export type TokenUsage = {
@@ -161,7 +163,9 @@ export async function completeChat(input: {
   }
 }
 
-export const openAiAdapter: ProviderAdapter = {
+export const openAiAdapter: ProviderAdapter & {
+  stream(call: ProviderCall & { timeouts: StreamTimeouts; deadline: AbortController }): AsyncGenerator<UpstreamStreamItem>;
+} = {
   provider: 'openai',
   prepare(): void {},
   execute(call) {
@@ -173,6 +177,21 @@ export const openAiAdapter: ProviderAdapter = {
       timeoutMs: call.route.timeoutMs,
       signal: call.signal,
       optional: call.request.optional,
+    });
+  },
+  stream(call) {
+    return streamOpenAiChat({
+      apiKey: call.apiKey,
+      baseURL: call.baseURL,
+      upstreamModel: call.route.upstreamModel,
+      messages: call.request.messages,
+      signal: call.signal,
+      optional: call.request.optional,
+      includeUsage: call.request.includeUsage,
+      connectTimeoutMs: call.timeouts.connect,
+      idleTimeoutMs: call.timeouts.idle,
+      totalTimeoutMs: call.timeouts.total,
+      deadline: call.deadline,
     });
   },
 };

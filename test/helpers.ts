@@ -97,6 +97,7 @@ export async function createTestApp(
     inferenceEnabled?: boolean;
     upstreamBaseUrl?: string;
     credentialKey?: Buffer | null;
+    maxActiveStreams?: number;
   } = {},
 ) {
   const config = configFor(db);
@@ -111,6 +112,7 @@ export async function createTestApp(
     inferenceEnabled: options.inferenceEnabled ?? false,
     upstreamBaseUrl: options.upstreamBaseUrl ?? 'https://api.openai.com/v1',
     credentialKey: options.credentialKey ?? null,
+    maxActiveStreams: options.maxActiveStreams ?? config.maxActiveStreams,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

@@ -1,0 +1,17 @@
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 640ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 540ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 482ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 589ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 787ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 464ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 469ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 498ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 501ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 877ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 434ms
+ ✓ test/inference-config.test.ts > configuration lookup > registers, enables, and lists a tenant configuration without credential material 657ms
+ ✓ test/inference-config.test.ts > configuration lookup > requires a credential key when inference is enabled and does not echo it 0ms
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 1218ms
+ Test Files  12 passed (12)
+      Tests  40 passed (40)
+EXIT:0

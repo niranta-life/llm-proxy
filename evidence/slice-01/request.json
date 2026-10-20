@@ -1,0 +1,10 @@
+{
+  "model": "auto",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[REDACTED]"
+    }
+  ],
+  "temperature": 0.2
+}

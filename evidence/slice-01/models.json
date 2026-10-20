@@ -1,0 +1,17 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "alpha-chat",
+      "object": "model",
+      "created": 1792511839,
+      "owned_by": "openai"
+    },
+    {
+      "id": "auto",
+      "object": "model",
+      "created": 1792511840,
+      "owned_by": "llm-proxy"
+    }
+  ]
+}

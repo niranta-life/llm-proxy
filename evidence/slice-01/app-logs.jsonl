@@ -1,0 +1,8 @@
+{"time":"2026-10-20T15:57:13.821Z","level":"info","msg":"migrations complete","applied":["003_inference.sql"]}
+{"time":"2026-10-20T15:57:13.918Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T15:57:14.851Z","level":"info","msg":"tenant request accepted","tenantId":"809af137-dc4d-49b2-9337-7315114694fe"}
+{"time":"2026-10-20T15:57:15.184Z","level":"info","msg":"shutdown started","signal":"SIGTERM"}
+{"time":"2026-10-20T15:57:15.189Z","level":"info","msg":"shutdown complete","pools":"closed"}
+{"time":"2026-10-20T15:57:15.766Z","level":"info","msg":"migrations complete","applied":[]}
+{"time":"2026-10-20T15:57:15.827Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T15:57:16.780Z","level":"info","msg":"tenant request accepted","tenantId":"809af137-dc4d-49b2-9337-7315114694fe"}

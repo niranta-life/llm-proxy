@@ -1,0 +1,13 @@
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects stream=true instead of dropping it 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 0ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 0ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+ Test Files  12 passed (12)
+      Tests  40 passed (40)
+EXIT:0

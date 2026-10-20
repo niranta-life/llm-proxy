@@ -1,0 +1,4 @@
+ready {"status":"ready","database":"ready"}
+live 200 {"status":"live"}
+tenant 200 {"id":"809af137-dc4d-49b2-9337-7315114694fe","name":"Kept","keys":[{"id":"6b935ddc-d7e5-4290-a8d1-27ea45af7695","label":"","createdAt":"2026-10-20T15:57:09.123Z","revokedAt":null}]}
+versions 001_schema.sql,002_security.sql,003_inference.sql

@@ -91,7 +91,14 @@ export function captureLogger(level: LogLevel = 'info'): { logger: Logger; lines
   return { logger: createLogger(level, stream), lines };
 }
 
-export async function createTestApp(db: TestDatabase) {
+export async function createTestApp(
+  db: TestDatabase,
+  options: {
+    inferenceEnabled?: boolean;
+    upstreamBaseUrl?: string;
+    credentialKey?: Buffer | null;
+  } = {},
+) {
   const config = configFor(db);
   const captured = captureLogger();
   const authPool = createPool(config, 'auth', captured.logger);
@@ -101,11 +108,18 @@ export async function createTestApp(db: TestDatabase) {
     authPool,
     runtimePool,
     readyVersion: await latestMigrationVersion(),
+    inferenceEnabled: options.inferenceEnabled ?? false,
+    upstreamBaseUrl: options.upstreamBaseUrl ?? 'https://api.openai.com/v1',
+    credentialKey: options.credentialKey ?? null,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }
 
-export function runCli(db: TestDatabase, args: string[]): {
+export function runCli(
+  db: TestDatabase,
+  args: string[],
+  overrides: Record<string, string | undefined> = {},
+): {
   tenantId?: string;
   keyId?: string;
   secret?: string;
@@ -114,7 +128,7 @@ export function runCli(db: TestDatabase, args: string[]): {
 } {
   const result = spawnSync(process.execPath, [cliEntry, ...args], {
     cwd: projectRoot,
-    env: serviceEnv(db),
+    env: serviceEnv(db, overrides),
     encoding: 'utf8',
   });
   if (result.status !== 0) {

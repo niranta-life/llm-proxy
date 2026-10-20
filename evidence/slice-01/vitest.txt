@@ -1,0 +1,55 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose
+
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 640ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 540ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 482ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 589ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 787ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 464ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 469ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 498ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 501ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 877ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 434ms
+ ✓ test/readiness-failure.test.ts > readiness failure > reports the database ready only while postgres is up, and SIGTERM closes the pools 3944ms
+ ✓ test/inference-config.test.ts > configuration lookup > registers, enables, and lists a tenant configuration without credential material 657ms
+ ✓ test/inference-config.test.ts > configuration lookup > requires a credential key when inference is enabled and does not echo it 0ms
+ ✓ test/inference-isolation.test.ts > inference tenant isolation > keeps two tenants on different backends, aliases, metrics, and logs 1406ms
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 1218ms
+ ✓ test/key-rotation.test.ts > key rotation and revocation > keeps another active key working after one key is revoked 666ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 472ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 83ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 170ms
+ ✓ test/authentication.test.ts > authentication > accepts a matching active tenant and secret 87ms
+ ✓ test/authentication.test.ts > authentication > rejects missing, malformed, unknown, and mismatched credentials with no tenant data 78ms
+ ✓ test/authentication.test.ts > authentication > stores only a protected verifier for the secret 53ms
+ ✓ test/authentication.test.ts > authentication > does not accept a model request or caller provider configuration 46ms
+ ✓ test/pool-leakage.test.ts > connection-pool context leakage > clears tenant context before a connection returns to the pool 321ms
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 42ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 229ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects incomplete configuration without echoing secrets 2ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects an invalid log level 0ms
+ ✓ test/config-failure.test.ts > configuration failure > exits before listening when a required setting is missing 149ms
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects stream=true instead of dropping it 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 0ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 0ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+
+ Test Files  12 passed (12)
+      Tests  40 passed (40)
+   Start at  08:51:39
+   Duration  24.96s (transform 298ms, setup 20ms, collect 1.87s, tests 16.18s, environment 1ms, prepare 554ms)
+
+EXIT:0

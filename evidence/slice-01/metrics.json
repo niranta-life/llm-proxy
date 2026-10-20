@@ -1,0 +1,23 @@
+{
+  "window": {
+    "from": "2026-10-20T14:57:25.058Z",
+    "to": "2026-10-20T16:57:25.060Z"
+  },
+  "requests": {
+    "total": 1,
+    "succeeded": 1,
+    "failed": 0,
+    "pending": 0
+  },
+  "usage": {
+    "promptTokens": 11,
+    "completionTokens": 7,
+    "totalTokens": 18,
+    "responsesMissingUsage": 0
+  },
+  "latency": {
+    "samples": 1,
+    "sumMs": 16,
+    "maxMs": 16
+  }
+}

@@ -64,7 +64,15 @@ async function main(): Promise<void> {
   const authPool = createPool(config, 'auth', logger);
   const runtimePool = createPool(config, 'runtime', logger);
   const readyVersion = await latestMigrationVersion();
-  const app = buildApp({ logger, authPool, runtimePool, readyVersion });
+  const app = buildApp({
+    logger,
+    authPool,
+    runtimePool,
+    readyVersion,
+    inferenceEnabled: config.inferenceEnabled,
+    upstreamBaseUrl: config.openAiBaseUrl,
+    credentialKey: config.providerCredentialKey,
+  });
 
   let shuttingDown = false;
   const onSignal = (signal: string): void => {

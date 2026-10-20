@@ -1,14 +1,22 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
-import type { Logger } from '../logger.js';
+import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
+import { executeChat } from '../inference/execute.js';
+import { ProxyError, proxyError } from '../inference/errors.js';
+import { listVisibleModels, summarizeMetrics } from '../inference/store.js';
+import { parseMetricsWindow } from '../inference/window.js';
+import type { Logger } from '../logger.js';
 
 export type AppDeps = {
   logger: Logger;
   authPool: Pool;
   runtimePool: Pool;
   readyVersion: string;
+  inferenceEnabled: boolean;
+  upstreamBaseUrl: string;
+  credentialKey: Buffer | null;
 };
 
 function errorMessage(error: unknown): string {
@@ -17,6 +25,28 @@ function errorMessage(error: unknown): string {
 
 export function buildApp(deps: AppDeps): FastifyInstance {
   const app = Fastify({ logger: false });
+  const credentialStore: ProviderCredentialStore | null =
+    deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
+
+  async function rejectUnauthenticated(request: FastifyRequest, reply: FastifyReply): Promise<string | null> {
+    try {
+      const auth = await authenticate(deps.authPool, request.headers);
+      if (auth === null) {
+        deps.logger.info('credential rejected');
+        await reply
+          .code(401)
+          .send(proxyError(401, 'authentication_error', 'invalid_api_key', null, 'Invalid authentication.').body());
+        return null;
+      }
+      return auth.tenantId;
+    } catch (error) {
+      deps.logger.error('authentication failed', { message: errorMessage(error) });
+      await reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      return null;
+    }
+  }
 
   app.get('/health/live', async () => ({ status: 'live' }));
 
@@ -89,6 +119,73 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return reply.code(500).send({ error: 'internal_error' });
     }
   });
+
+  app.post('/v1/chat/completions', async (request, reply) => {
+    const tenantId = await rejectUnauthenticated(request, reply);
+    if (tenantId === null) return;
+    const controller = new AbortController();
+    const abortUpstream = (): void => {
+      if (!controller.signal.aborted) controller.abort();
+    };
+    // The request stream also closes after a normal body read. Abort only
+    // when the response is still open, which means the caller went away.
+    request.raw.on('aborted', abortUpstream);
+    reply.raw.on('close', () => {
+      if (!reply.raw.writableEnded) abortUpstream();
+    });
+    try {
+      return await executeChat({
+        runtimePool: deps.runtimePool,
+        logger: deps.logger,
+        inferenceEnabled: deps.inferenceEnabled,
+        upstreamBaseUrl: deps.upstreamBaseUrl,
+        store: credentialStore,
+        tenantId,
+        body: request.body,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('chat request failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
+
+  app.get('/v1/models', async (request, reply) => {
+    const tenantId = await rejectUnauthenticated(request, reply);
+    if (tenantId === null) return;
+    try {
+      const data = await withTenant(deps.runtimePool, tenantId, (client) => listVisibleModels(client));
+      return { object: 'list', data };
+    } catch (error) {
+      deps.logger.error('model list failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
+
+  app.get<{ Querystring: { from?: string; to?: string } }>(
+    '/internal/v1/metrics/summary',
+    async (request, reply) => {
+      const tenantId = await rejectUnauthenticated(request, reply);
+      if (tenantId === null) return;
+      try {
+        const window = parseMetricsWindow(request.query.from, request.query.to);
+        return await withTenant(deps.runtimePool, tenantId, (client) =>
+          summarizeMetrics(client, window.from, window.to),
+        );
+      } catch (error) {
+        if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+        deps.logger.error('metrics read failed', { message: errorMessage(error) });
+        return reply
+          .code(500)
+          .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      }
+    },
+  );
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });

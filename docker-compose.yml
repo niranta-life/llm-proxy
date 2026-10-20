@@ -35,6 +35,11 @@ services:
       RUNTIME_USER: llm_runtime
       RUNTIME_PASSWORD: runtime_local_dev
       LOG_LEVEL: info
+      INFERENCE_ENABLED: ${INFERENCE_ENABLED:-false}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      PROVIDER_CREDENTIAL_KEY: ${PROVIDER_CREDENTIAL_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     depends_on:

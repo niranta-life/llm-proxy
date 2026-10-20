@@ -1,5 +1,15 @@
 import { parseArgs } from 'node:util';
 import { ConfigError, loadConfig } from './config.js';
+import { createCredentialStore } from './credentials.js';
+import {
+  listTenantInference,
+  registerModelDeployment,
+  registerOpenAiConnection,
+  replaceOpenAiCredential,
+  setModelAlias,
+  setModelDeploymentEnabled,
+  setOpenAiConnectionEnabled,
+} from './db/inference-admin.js';
 import { createPool } from './db/pools.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
@@ -9,6 +19,56 @@ function errorMessage(error: unknown): string {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CAPABILITIES = new Set([
+  'temperature',
+  'top_p',
+  'max_tokens',
+  'max_completion_tokens',
+  'stop',
+  'presence_penalty',
+  'frequency_penalty',
+  'seed',
+  'n',
+  'user',
+  'response_format_text',
+]);
+
+type Flags = {
+  name?: string;
+  'tenant-id'?: string;
+  'key-id'?: string;
+  label?: string;
+  'api-key'?: string;
+  'upstream-model'?: string;
+  'timeout-ms'?: string;
+  capabilities?: string;
+  enabled?: string;
+  alias?: string;
+  deployment?: string;
+};
+
+function requireTenant(values: Flags): string | undefined {
+  const tenantId = values['tenant-id'] ?? '';
+  return UUID.test(tenantId) ? tenantId : undefined;
+}
+
+function parseEnabled(value: string | undefined): boolean | undefined {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+function parseCapabilities(value: string | undefined): string[] | undefined {
+  if (value === undefined || value.trim() === '') return [];
+  const parts = value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+  if (parts.length !== new Set(parts).size || parts.some((item) => !CAPABILITIES.has(item))) return undefined;
+  return parts;
+}
+
+function credentialStore(key: Buffer | null) {
+  if (key === null) throw new Error('PROVIDER_CREDENTIAL_KEY is required');
+  return createCredentialStore(key);
+}
 
 async function main(): Promise<void> {
   let config;
@@ -26,12 +86,7 @@ async function main(): Promise<void> {
 
   const logger = createLogger(config.logLevel, process.stderr);
   let command = '';
-  let values: {
-    name?: string;
-    'tenant-id'?: string;
-    'key-id'?: string;
-    label?: string;
-  };
+  let values: Flags;
   try {
     const parsed = parseArgs({
       args: process.argv.slice(2),
@@ -40,6 +95,13 @@ async function main(): Promise<void> {
         'tenant-id': { type: 'string' },
         'key-id': { type: 'string' },
         label: { type: 'string' },
+        'api-key': { type: 'string' },
+        'upstream-model': { type: 'string' },
+        'timeout-ms': { type: 'string' },
+        capabilities: { type: 'string' },
+        enabled: { type: 'string' },
+        alias: { type: 'string' },
+        deployment: { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -66,8 +128,8 @@ async function main(): Promise<void> {
     }
 
     if (command === 'add-key') {
-      const tenantId = values['tenant-id'] ?? '';
-      if (!UUID.test(tenantId)) {
+      const tenantId = requireTenant(values);
+      if (tenantId === undefined) {
         logger.error('tenant-id is required');
         process.exitCode = 1;
         return;
@@ -78,9 +140,9 @@ async function main(): Promise<void> {
     }
 
     if (command === 'revoke-key') {
-      const tenantId = values['tenant-id'] ?? '';
+      const tenantId = requireTenant(values);
       const keyId = values['key-id'] ?? '';
-      if (!UUID.test(tenantId) || !UUID.test(keyId)) {
+      if (tenantId === undefined || !UUID.test(keyId)) {
         logger.error('tenant-id and key-id are required');
         process.exitCode = 1;
         return;
@@ -92,6 +154,111 @@ async function main(): Promise<void> {
         return;
       }
       process.stdout.write(`${JSON.stringify({ tenantId, keyId, revoked: true })}\n`);
+      return;
+    }
+
+    if (command === 'register-openai-connection' || command === 'set-openai-credential') {
+      const tenantId = requireTenant(values);
+      const apiKey = values['api-key'] ?? '';
+      if (tenantId === undefined || apiKey.length === 0) {
+        logger.error('tenant-id and api-key are required');
+        process.exitCode = 1;
+        return;
+      }
+      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+      if (command === 'register-openai-connection') {
+        const created = await registerOpenAiConnection(pool, tenantId, protectedCredential);
+        process.stdout.write(
+          `${JSON.stringify({ ...created, tenantId, provider: 'openai', enabled: true })}\n`,
+        );
+        return;
+      }
+      const credentialVersion = await replaceOpenAiCredential(pool, tenantId, protectedCredential);
+      process.stdout.write(`${JSON.stringify({ tenantId, credentialVersion })}\n`);
+      return;
+    }
+
+    if (command === 'set-connection-enabled') {
+      const tenantId = requireTenant(values);
+      const enabled = parseEnabled(values.enabled);
+      if (tenantId === undefined || enabled === undefined) {
+        logger.error('tenant-id and enabled are required');
+        process.exitCode = 1;
+        return;
+      }
+      const credentialVersion = await setOpenAiConnectionEnabled(pool, tenantId, enabled);
+      process.stdout.write(`${JSON.stringify({ tenantId, enabled, credentialVersion })}\n`);
+      return;
+    }
+
+    if (command === 'register-deployment') {
+      const tenantId = requireTenant(values);
+      const name = values.name?.trim() ?? '';
+      const upstreamModel = values['upstream-model']?.trim() ?? '';
+      const timeoutMs = Number(values['timeout-ms']);
+      const capabilities = parseCapabilities(values.capabilities);
+      const enabled = parseEnabled(values.enabled) ?? false;
+      if (
+        tenantId === undefined ||
+        name.length === 0 ||
+        upstreamModel.length === 0 ||
+        !Number.isInteger(timeoutMs) ||
+        capabilities === undefined ||
+        (values.enabled !== undefined && parseEnabled(values.enabled) === undefined)
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const created = await registerModelDeployment(pool, {
+        tenantId,
+        name,
+        upstreamModel,
+        timeoutMs,
+        capabilities,
+        enabled,
+      });
+      process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, ...created })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-enabled') {
+      const tenantId = requireTenant(values);
+      const name = values.name?.trim() ?? '';
+      const enabled = parseEnabled(values.enabled);
+      if (tenantId === undefined || name.length === 0 || enabled === undefined) {
+        logger.error('tenant-id, name, and enabled are required');
+        process.exitCode = 1;
+        return;
+      }
+      const configVersion = await setModelDeploymentEnabled(pool, tenantId, name, enabled);
+      process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, configVersion })}\n`);
+      return;
+    }
+
+    if (command === 'set-alias') {
+      const tenantId = requireTenant(values);
+      const alias = values.alias ?? '';
+      const deployment = values.deployment?.trim() ?? '';
+      if (tenantId === undefined || alias !== 'auto' || deployment.length === 0) {
+        logger.error('tenant-id, alias auto, and deployment are required');
+        process.exitCode = 1;
+        return;
+      }
+      const aliasId = await setModelAlias(pool, tenantId, alias, deployment);
+      process.stdout.write(`${JSON.stringify({ tenantId, alias, deployment, aliasId })}\n`);
+      return;
+    }
+
+    if (command === 'list-inference') {
+      const tenantId = requireTenant(values);
+      if (tenantId === undefined) {
+        logger.error('tenant-id is required');
+        process.exitCode = 1;
+        return;
+      }
+      const listing = await listTenantInference(pool, tenantId);
+      process.stdout.write(`${JSON.stringify(listing)}\n`);
       return;
     }
 

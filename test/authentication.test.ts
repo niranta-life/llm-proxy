@@ -1,15 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifySecret } from '../src/secrets.js';
-import {
-  createTestApp,
-  loadTestDatabase,
-  projectRoot,
-  runCli,
-  type TestDatabase,
-} from './helpers.js';
+import { createTestApp, loadTestDatabase, runCli, type TestDatabase } from './helpers.js';
 
 describe('authentication', () => {
   const db = loadTestDatabase();
@@ -126,13 +118,19 @@ describe('authentication', () => {
         authorization: `Bearer ${created.secret}`,
         'content-type': 'application/json',
       },
-      payload: { model: 'gpt-test', provider: 'openai', apiKey: 'sk-live' },
+      payload: {
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'hi' }],
+        provider: 'openai',
+        apiKey: 'sk-live',
+      },
     });
-    expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: 'not_found' });
-    const source = readFileSync(join(projectRoot, 'src', 'http', 'app.ts'), 'utf8');
-    expect(source).not.toMatch(/openai|anthropic|chat\.completions/i);
-    expect(ctx.app.printRoutes()).not.toMatch(/chat|completion/i);
+    expect(response.statusCode).toBe(400);
+    const body = response.json() as { error?: { type?: string }; choices?: unknown; object?: string };
+    expect(body.error?.type).toBe('invalid_request_error');
+    expect(JSON.stringify(body)).not.toContain('sk-live');
+    expect(body.choices).toBeUndefined();
+    expect(body.object).not.toBe('chat.completion');
   });
 });
 

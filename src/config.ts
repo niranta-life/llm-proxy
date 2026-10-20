@@ -1,5 +1,7 @@
 import type { LogLevel } from './logger.js';
 
+export const OFFICIAL_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+
 const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 const REQUIRED_ENV = [
@@ -36,6 +38,9 @@ export type Config = {
   host: string;
   port: number;
   logLevel: LogLevel;
+  inferenceEnabled: boolean;
+  providerCredentialKey: Buffer | null;
+  openAiBaseUrl: string;
   database: {
     host: string;
     port: number;
@@ -43,6 +48,52 @@ export type Config = {
   };
   roles: Record<DatabaseRole, { user: string; password: string }>;
 };
+
+function readInferenceEnabled(env: NodeJS.ProcessEnv, errors: string[]): boolean {
+  const value = env.INFERENCE_ENABLED;
+  if (value === undefined || value.trim() === '') return false;
+  if (value.trim() === 'true') return true;
+  if (value.trim() === 'false') return false;
+  errors.push('INFERENCE_ENABLED must be true or false');
+  return false;
+}
+
+function readOpenAiBaseUrl(env: NodeJS.ProcessEnv, errors: string[]): string {
+  const value = readRequired(env, 'OPENAI_BASE_URL') ?? OFFICIAL_OPENAI_BASE_URL;
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.hostname === '') {
+      errors.push('OPENAI_BASE_URL must be an http or https URL');
+    } else if (url.username !== '' || url.password !== '') {
+      errors.push('OPENAI_BASE_URL must not include credentials');
+    }
+  } catch {
+    errors.push('OPENAI_BASE_URL must be an http or https URL');
+  }
+  return value.replace(/\/+$/, '');
+}
+
+function readCredentialKey(
+  env: NodeJS.ProcessEnv,
+  inferenceEnabled: boolean,
+  errors: string[],
+): Buffer | null {
+  const text = readRequired(env, 'PROVIDER_CREDENTIAL_KEY');
+  if (text === undefined) {
+    if (inferenceEnabled) errors.push('missing PROVIDER_CREDENTIAL_KEY');
+    return null;
+  }
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(text)) {
+    errors.push('PROVIDER_CREDENTIAL_KEY must be 32 bytes, base64-encoded');
+    return null;
+  }
+  const decoded = Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  if (decoded.length !== 32) {
+    errors.push('PROVIDER_CREDENTIAL_KEY must be 32 bytes, base64-encoded');
+    return null;
+  }
+  return decoded;
+}
 
 function readRequired(env: NodeJS.ProcessEnv, key: string): string | undefined {
   const value = env[key];
@@ -87,6 +138,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   }
 
   const host = readRequired(env, 'HOST') ?? '0.0.0.0';
+  const inferenceEnabled = readInferenceEnabled(env, errors);
+  const openAiBaseUrl = readOpenAiBaseUrl(env, errors);
+  const providerCredentialKey = readCredentialKey(env, inferenceEnabled, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -111,6 +165,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     host,
     port,
     logLevel: logLevelText as LogLevel,
+    inferenceEnabled,
+    providerCredentialKey,
+    openAiBaseUrl,
     database: {
       host: databaseHost,
       port: databasePort,

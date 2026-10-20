@@ -1,0 +1,16 @@
+previous image contains 002_security.sql and does not contain 003_inference.sql
+network llm-proxy_default
+slice-00 ready {"status":"ready","database":"ready"}
+versions before 003: 001_schema.sql,002_security.sql
+ready {"status":"ready","database":"ready"}
+live 200 {"status":"live"}
+versions after 003: 001_schema.sql,002_security.sql,003_inference.sql
+second migrate {"time":"2026-10-20T15:57:15.766Z","level":"info","msg":"migrations complete","applied":[]}
+kept tenant survived the additive migration and a second boot applied nothing
+list-inference omitted credential material
+auto resolved per tenant and rejected calls made no upstream request
+metrics and model list stayed inside the tenant
+persisted rows kept usage and identifiers and omitted prompt text
+disabled inference made no upstream call
+rollback {"status":"ready","database":"ready"}
+previous image served the kept tenant after 003

@@ -1,0 +1,19 @@
+compose up
+ready-1 {"status":"ready","database":"ready"}
+node 24.22.0
+provisioned two tenants and a second active key
+secretStoredRecoverable=0
+protectedVerifiers=3 keyCount=3
+roles llm_auth super=false bypass=false login=true | llm_migrator super=false bypass=false login=true | llm_owner super=false bypass=true login=false | llm_runtime super=false bypass=false login=true
+beforeRevokePrimary=200 beforeRevokeBackup=200 beta=200
+revoke=true revokedKey=401 backupKey=200
+wrongSecret=401 crossTenant=401
+modelRoute=404 {"error":"not_found"}
+restart app
+ready-2 {"status":"ready","database":"ready"}
+afterRestart=200 tenantCount=2
+stop postgres
+ready-down 503 {"status":"not_ready","database":"unavailable"}
+live 200 {"status":"live"}
+shutdown exit=0 poolsClosed=true
+configFail exit=1

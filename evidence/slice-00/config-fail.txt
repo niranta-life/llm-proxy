@@ -1,0 +1,5 @@
+exit=1
+{"time":"2026-10-20T06:28:41.118Z","level":"error","msg":"invalid configuration","errors":["missing DATABASE_HOST"]}
+ Container llm-proxy-app-run-761b78978999 Creating 
+ Container llm-proxy-app-run-761b78978999 Created 
+

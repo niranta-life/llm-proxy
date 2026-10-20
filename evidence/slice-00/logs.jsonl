@@ -1,0 +1,36 @@
+{"time":"2026-10-20T06:28:31.316Z","level":"info","msg":"migrations complete","applied":["001_schema.sql","002_security.sql"]}
+{"time":"2026-10-20T06:28:31.403Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T06:28:36.953Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:37.040Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:37.084Z","level":"info","msg":"tenant request accepted","tenantId":"9423fe74-1a34-4b50-9507-79398dd8e5a4"}
+{"time":"2026-10-20T06:28:38.343Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.404Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:38.452Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.491Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.604Z","level":"info","msg":"shutdown started","signal":"SIGTERM"}
+{"time":"2026-10-20T06:28:38.605Z","level":"info","msg":"shutdown complete","pools":"closed"}
+{"time":"2026-10-20T06:28:38.949Z","level":"info","msg":"migrations complete","applied":[]}
+{"time":"2026-10-20T06:28:38.993Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T06:28:39.926Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:40.190Z","level":"error","msg":"database pool error","role":"runtime","message":"terminating connection due to administrator command"}
+{"time":"2026-10-20T06:28:40.191Z","level":"error","msg":"database pool error","role":"auth","message":"terminating connection due to administrator command"}
+{"time":"2026-10-20T06:28:40.345Z","level":"error","msg":"readiness check failed","message":"getaddrinfo ENOTFOUND postgres"}
+{"time":"2026-10-20T06:28:31.316Z","level":"info","msg":"migrations complete","applied":["001_schema.sql","002_security.sql"]}
+{"time":"2026-10-20T06:28:31.403Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T06:28:36.953Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:37.040Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:37.084Z","level":"info","msg":"tenant request accepted","tenantId":"9423fe74-1a34-4b50-9507-79398dd8e5a4"}
+{"time":"2026-10-20T06:28:38.343Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.404Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:38.452Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.491Z","level":"info","msg":"credential rejected"}
+{"time":"2026-10-20T06:28:38.604Z","level":"info","msg":"shutdown started","signal":"SIGTERM"}
+{"time":"2026-10-20T06:28:38.605Z","level":"info","msg":"shutdown complete","pools":"closed"}
+{"time":"2026-10-20T06:28:38.949Z","level":"info","msg":"migrations complete","applied":[]}
+{"time":"2026-10-20T06:28:38.993Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+{"time":"2026-10-20T06:28:39.926Z","level":"info","msg":"tenant request accepted","tenantId":"711e7f13-6233-4e21-a2af-db1d3f277ae4"}
+{"time":"2026-10-20T06:28:40.190Z","level":"error","msg":"database pool error","role":"runtime","message":"terminating connection due to administrator command"}
+{"time":"2026-10-20T06:28:40.191Z","level":"error","msg":"database pool error","role":"auth","message":"terminating connection due to administrator command"}
+{"time":"2026-10-20T06:28:40.345Z","level":"error","msg":"readiness check failed","message":"getaddrinfo ENOTFOUND postgres"}
+{"time":"2026-10-20T06:28:40.462Z","level":"info","msg":"shutdown started","signal":"SIGTERM"}
+{"time":"2026-10-20T06:28:40.463Z","level":"info","msg":"shutdown complete","pools":"closed"}

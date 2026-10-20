@@ -1,0 +1,30 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose
+
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/readiness-failure.test.ts > readiness failure > reports the database ready only while postgres is up, and SIGTERM closes the pools 3585ms
+ ✓ test/key-rotation.test.ts > key rotation and revocation > keeps another active key working after one key is revoked 650ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 491ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 72ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 152ms
+ ✓ test/authentication.test.ts > authentication > accepts a matching active tenant and secret 81ms
+ ✓ test/authentication.test.ts > authentication > rejects missing, malformed, unknown, and mismatched credentials with no tenant data 76ms
+ ✓ test/authentication.test.ts > authentication > stores only a protected verifier for the secret 47ms
+ ✓ test/authentication.test.ts > authentication > does not accept a model request or caller provider configuration 3ms
+ ✓ test/pool-leakage.test.ts > connection-pool context leakage > clears tenant context before a connection returns to the pool 276ms
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 40ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 201ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects incomplete configuration without echoing secrets 1ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects an invalid log level 0ms
+ ✓ test/config-failure.test.ts > configuration failure > exits before listening when a required setting is missing 101ms
+
+ Test Files  7 passed (7)
+      Tests  15 passed (15)
+   Start at  23:24:46
+   Duration  12.17s (transform 122ms, setup 14ms, collect 734ms, tests 6.00s, environment 1ms, prepare 282ms)
+
+EXIT:0

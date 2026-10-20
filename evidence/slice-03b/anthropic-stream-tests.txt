@@ -1,0 +1,35 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > converts a text stream in block order 4ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > omits empty text, ping text, thinking text, and signature text 2ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > keeps the latest cumulative usage and the reported cache categories 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > maps max_tokens and refusal onto the OpenAI finish reasons 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects tool use, fallback, a foreign model, malformed input, and an in-stream error 2ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > does not complete when message_stop is missing 0ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects output-changing deltas and positive server tool counts 1ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller 579ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps cumulative usage and cache categories on the attempt 85ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > maps length and refusal and omits ping and thinking text 368ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > fails tool use, fallback, a foreign model, malformed input, a missing stop, and an in-stream error 469ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps a tenant off another tenant configuration and credential 275ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > makes no upstream call when either streaming flag is off 810ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > records client cancellation and a slow downstream consumer 1238ms
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 5ms
+ ✓ test/validate-request.test.ts > request validation > keeps stream=true and rejects it until that deployment allows streaming 4ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 1ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 1ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 2ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+   Start at  15:44:47
+   Duration  13.57s (transform 293ms, setup 9ms, collect 878ms, tests 6.59s, environment 0ms, prepare 212ms)
+
+NPM_TEST_EXIT:0

@@ -19,7 +19,7 @@ describe('request validation', () => {
     expect(parsed.optional.temperature).toBe(0.2);
   });
 
-  it('keeps stream=true and rejects it until an OpenAI deployment allows streaming', () => {
+  it('keeps stream=true and rejects it until that deployment allows streaming', () => {
     const parsed = validateChatRequest({ ...textRequest, stream: true, stream_options: { include_usage: true } });
     expect(parsed.stream).toBe(true);
     expect(parsed.includeUsage).toBe(true);
@@ -29,9 +29,13 @@ describe('request validation', () => {
     expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: true }, false)).toThrow(
       /streaming is not supported/i,
     );
-    expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: true }, true)).toThrow(
+    expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: true }, false)).toThrow(
       /streaming is not supported/i,
     );
+    expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: false }, true)).toThrow(
+      /streaming is not supported/i,
+    );
+    expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: true }, true)).not.toThrow();
     expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: true }, true)).not.toThrow();
     expect(() => validateChatRequest({ ...textRequest, stream: 'yes' })).toThrow(/stream must be false/i);
     expect(() => validateChatRequest({ ...textRequest, stream_options: { include_usage: true } })).toThrow(

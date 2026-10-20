@@ -1,0 +1,6 @@
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_bad","type":"message","role":"assistant","model":"__MODEL__","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":2,"output_tokens":1}}}
+
+event: content_block_delta
+data: {"type":
+

@@ -1,0 +1,2 @@
+migrations 001 through 005 diff exit 0
+DIFF_EXIT:0

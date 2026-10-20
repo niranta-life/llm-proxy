@@ -284,6 +284,7 @@ describe('Anthropic integration', () => {
       '003_inference.sql',
       '004_anthropic.sql',
       '005_openai_streaming.sql',
+      '006_anthropic_streaming.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

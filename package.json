@@ -10,6 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "cli": "node dist/cli.js",
+    "stack": "bash scripts/colima.sh",
+    "check:deployed": "node scripts/check-deployed.mjs",
     "test": "vitest run --reporter=verbose"
   },
   "dependencies": {

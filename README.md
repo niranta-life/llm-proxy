@@ -11,24 +11,58 @@ Authorization: Bearer <tenant-secret>
 
 There is no login, session, OAuth, or user account. The caller does not supply a provider URL or a provider credential.
 
-## Run locally
+## Requirements
 
-Docker Compose starts PostgreSQL 16 and the service on Node.js 24.
+**To start the service**
+
+- Colima.
+- The Docker CLI, including Compose.
+- curl, so the start script can wait for readiness.
+
+`scripts/colima.sh` uses the default Colima profile and the socket `~/.colima/default/docker.sock`. Set `COLIMA_PROFILE` or `COLIMA_SOCKET` to use another profile or socket. The script exports `DOCKER_HOST` for its own commands and leaves the Docker context unchanged.
+
+`stop` stops the Compose project and keeps the database volume. Colima stays up unless you pass `--vm`.
+
+Later `docker compose` commands in this file need the same socket:
 
 ```bash
-docker compose up --build
+export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
 ```
+
+**To run checks**
+
+- Node.js 24. The app image is `node:24-bookworm-slim`. If the host default is newer, run `nvm use 24` before `npm test`.
+- `npm install`, so the deployed check can load the OpenAI client.
+- A running Docker daemon for `npm test`. When `DOCKER_HOST` is unset, that suite uses the active Docker context.
+
+## Run locally
+
+```bash
+scripts/colima.sh start
+scripts/colima.sh start --build
+scripts/colima.sh restart
+scripts/colima.sh stop
+scripts/colima.sh status
+```
+
+`npm run stack -- start` is the same script. `start` brings Colima up when it is down, then starts PostgreSQL 16 and the service on port 8080. `restart --build` rebuilds the image and recreates the containers.
 
 - Liveness: `GET http://127.0.0.1:8080/health/live` returns `{"status":"live"}`.
 - Readiness: `GET http://127.0.0.1:8080/health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` only after PostgreSQL is reachable and this image's migrations are applied. If PostgreSQL is down, readiness is HTTP 503 and liveness stays HTTP 200.
 
-Inference is off unless `INFERENCE_ENABLED=true`. A tenant with no enabled deployment cannot call a model. One tenant can be configured before any other tenant.
+Inference is off unless `INFERENCE_ENABLED=true`. A tenant with no enabled deployment cannot call a model. One tenant can be configured before any other tenant. The Compose database role passwords are local development values.
 
-The Compose database role passwords are local development values. Reset them by recreating the volume:
+## Check a deployed instance
+
+`scripts/check-deployed.mjs` sends the request and response cases to a running proxy. It does not call the live OpenAI API.
 
 ```bash
-docker compose down -v
+node scripts/check-deployed.mjs --prepare-local
 ```
+
+`npm run check:deployed -- --prepare-local` is the same command. `--prepare-local` needs Colima, Docker, and Node.js. It starts the local stack when Colima is down, points the app at a mock for that run, and covers the HTTP, database, and process cases. It then restores the previous app environment and removes the mock. It keeps the database volume. `--leave-prepared` skips the restore.
+
+For a proxy that is already running, pass `--base-url` or set `PROXY_BASE_URL`. `--help` lists the tenant ids, secrets, and mock URL that instance must already have. `--http-only` runs the HTTP cases and exits. Database and process cases run with `--prepare-local`, or with `CHECK_ADMIN=local`. The same-connection pool check stays in `npm test`: a deployed process does not expose the backend pid of a returned pool connection. The script checks that a runtime session with no tenant setting sees no rows.
 
 ## Provision a tenant
 
@@ -159,10 +193,6 @@ The process exits before it listens when any required setting is missing or inva
 
 ## Deployment and rollback
 
-```bash
-docker compose up -d --build
-```
-
 Migrations are forward-only. `003_inference.sql` adds inference tables and does not change Slice 00 tables. A second boot applies nothing.
 
 To run the previous image after `003_inference.sql` is applied, build it from the Slice 00 commit if the local tag is absent, stop the current app, and start that image on the same database network:
@@ -192,12 +222,14 @@ docker compose start app
 
 ## Tests
 
-Tests need Node.js 24 and a running Docker daemon. They start real PostgreSQL with Testcontainers and a local mock OpenAI server. They do not call the live OpenAI API. The host default Node is not used. The suite uses the active `docker context` endpoint when `DOCKER_HOST` is unset.
+`npm test` needs Node.js 24 and a running Docker daemon. See [Requirements](#requirements). The suite starts real PostgreSQL with Testcontainers and a local mock OpenAI server. It does not call the live OpenAI API.
 
 ```bash
 nvm use 24
 npm test
 ```
+
+The deployed request and response check is [Check a deployed instance](#check-a-deployed-instance).
 
 ## Assumptions
 

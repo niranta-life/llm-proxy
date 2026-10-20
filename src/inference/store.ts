@@ -14,7 +14,16 @@ type DeploymentRow = {
   connection_version: number;
   enabled: boolean;
   connection_enabled: boolean;
+  provider: string;
+  endpoint: string | null;
+  workspace_id: string | null;
+  default_max_output_tokens: number | null;
 };
+
+function providerName(value: string): 'openai' | 'anthropic' {
+  if (value === 'openai' || value === 'anthropic') return value;
+  throw new Error('provider is invalid');
+}
 
 export async function loadCatalog(client: PoolClient): Promise<{
   deployments: DeploymentCandidate[];
@@ -23,7 +32,8 @@ export async function loadCatalog(client: PoolClient): Promise<{
   const deployments = await client.query<DeploymentRow>(
     `SELECT d.id, d.name, d.upstream_model, d.timeout_ms, d.capabilities, d.config_version,
             d.connection_id, c.credential_version AS connection_version, d.enabled,
-            c.enabled AS connection_enabled
+            c.enabled AS connection_enabled, c.provider, c.endpoint, c.workspace_id,
+            d.default_max_output_tokens
      FROM model_deployments d
      JOIN provider_connections c
        ON c.tenant_id = d.tenant_id AND c.id = d.connection_id`,
@@ -43,6 +53,10 @@ export async function loadCatalog(client: PoolClient): Promise<{
       connectionVersion: row.connection_version,
       enabled: row.enabled,
       connectionEnabled: row.connection_enabled,
+      provider: providerName(row.provider),
+      endpoint: row.endpoint,
+      workspaceId: row.workspace_id,
+      defaultMaxOutputTokens: row.default_max_output_tokens,
     })),
     aliases: aliases.rows.map((row) => ({ alias: row.alias, deploymentId: row.deployment_id })),
   };
@@ -99,12 +113,20 @@ export async function finishAttempt(
     errorCode: string | null;
     durationMs: number;
     usage: TokenUsage;
+    providerRequestId: string | null;
+    stopReason: string | null;
+    uncachedInputTokens: number | null;
+    cacheCreationInputTokens: number | null;
+    cacheReadInputTokens: number | null;
   },
 ): Promise<void> {
   const attempt = await client.query(
     `UPDATE model_attempts
      SET status = $3, error_code = $4, duration_ms = $5,
-         prompt_tokens = $6, completion_tokens = $7, total_tokens = $8
+         prompt_tokens = $6, completion_tokens = $7, total_tokens = $8,
+         provider_request_id = $9, stop_reason = $10,
+         uncached_input_tokens = $11, cache_creation_input_tokens = $12,
+         cache_read_input_tokens = $13
      WHERE id = $1 AND tenant_id = $2`,
     [
       input.attemptId,
@@ -115,6 +137,11 @@ export async function finishAttempt(
       input.usage.promptTokens,
       input.usage.completionTokens,
       input.usage.totalTokens,
+      input.providerRequestId,
+      input.stopReason,
+      input.uncachedInputTokens,
+      input.cacheCreationInputTokens,
+      input.cacheReadInputTokens,
     ],
   );
   if ((attempt.rowCount ?? 0) !== 1) throw new Error('attempt was not updated');
@@ -142,7 +169,7 @@ export async function listVisibleModels(client: PoolClient): Promise<ModelListIt
      JOIN provider_connections c ON c.id = d.connection_id AND c.tenant_id = d.tenant_id
      WHERE d.enabled AND c.enabled
      UNION ALL
-     SELECT d.name, floor(extract(epoch FROM d.created_at))::int, 'openai'
+     SELECT d.name, floor(extract(epoch FROM d.created_at))::int, c.provider
      FROM model_deployments d
      JOIN provider_connections c ON c.id = d.connection_id AND c.tenant_id = d.tenant_id
      WHERE d.enabled AND c.enabled

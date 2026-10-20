@@ -60,6 +60,10 @@ describe('static routing', () => {
     connectionVersion: 2,
     enabled: true,
     connectionEnabled: true,
+    provider: 'openai' as const,
+    endpoint: null,
+    workspaceId: null,
+    defaultMaxOutputTokens: null,
   };
   const alpha: DeploymentCandidate = {
     ...shared,
@@ -103,6 +107,10 @@ describe('alias resolution', () => {
       connectionVersion: 1,
       enabled: true,
       connectionEnabled: true,
+      provider: 'openai',
+      endpoint: null,
+      workspaceId: null,
+      defaultMaxOutputTokens: null,
     };
     const resolved = resolveModel('auto', [deployment], [{ alias: 'auto', deploymentId: deployment.id }]);
     expect(resolved?.upstreamModel).toBe('gpt-4o-mini');

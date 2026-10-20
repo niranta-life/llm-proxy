@@ -1,0 +1,161 @@
+{
+  "preservedCallerFields": {
+    "temperature": 0.4,
+    "stop": [
+      "END"
+    ],
+    "max_completion_tokens": 40
+  },
+  "converted": {
+    "model": "claude-test",
+    "max_tokens": 40,
+    "messages": [
+      {
+        "role": "user",
+        "content": "hello"
+      },
+      {
+        "role": "assistant",
+        "content": "ok"
+      },
+      {
+        "role": "user",
+        "content": "next"
+      }
+    ],
+    "stream": false,
+    "system": "be brief",
+    "temperature": 0.4,
+    "stop_sequences": [
+      "END"
+    ]
+  },
+  "defaultMaxTokens": 64,
+  "finishReasons": {
+    "end_turn": "stop",
+    "max_tokens": "length",
+    "stop_sequence": "stop",
+    "model_context_window_exceeded": "length",
+    "refusal": "content_filter"
+  },
+  "usage": {
+    "promptTokens": 13,
+    "completionTokens": 4,
+    "totalTokens": 17,
+    "uncachedInputTokens": 10,
+    "cacheCreationInputTokens": 1,
+    "cacheReadInputTokens": 2
+  },
+  "missingCache": {
+    "promptTokens": 8,
+    "completionTokens": 3,
+    "totalTokens": 11,
+    "uncachedInputTokens": 8,
+    "cacheCreationInputTokens": null,
+    "cacheReadInputTokens": null
+  },
+  "publicCompletion": {
+    "id": "msg_fixture",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "claude-test",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "visible"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 13,
+      "completion_tokens": 4,
+      "total_tokens": 17
+    }
+  },
+  "telemetry": {
+    "providerRequestId": "msg_fixture",
+    "stopReason": "end_turn",
+    "uncachedInputTokens": 10,
+    "cacheCreationInputTokens": 1,
+    "cacheReadInputTokens": 2
+  },
+  "refusal": {
+    "finishReason": "content_filter",
+    "content": "cannot comply",
+    "nativeReason": "refusal"
+  },
+  "errors": {
+    "auth": {
+      "status": 401,
+      "code": "upstream_auth_error",
+      "nativeReason": "authentication_error"
+    },
+    "rateLimit": {
+      "status": 429,
+      "code": "rate_limit",
+      "nativeReason": "rate_limit_error"
+    },
+    "overloaded": {
+      "status": 529,
+      "code": "overloaded",
+      "nativeReason": "overloaded_error"
+    },
+    "server": {
+      "status": 502,
+      "code": "upstream_error",
+      "nativeReason": "api_error",
+      "providerRequestId": null
+    },
+    "notFound": {
+      "status": 502,
+      "code": "upstream_error",
+      "nativeReason": "not_found_error",
+      "providerRequestId": "req_abc"
+    },
+    "serverWithoutType": {
+      "status": 502,
+      "code": "upstream_error",
+      "nativeReason": null,
+      "providerRequestId": null
+    }
+  },
+  "rejectedToolUse": {
+    "status": 502,
+    "code": "invalid_upstream_response",
+    "nativeReason": "tool_use",
+    "attempt": {
+      "providerRequestId": "msg_tool",
+      "promptTokens": 13,
+      "completionTokens": 4,
+      "totalTokens": 17,
+      "uncachedInputTokens": 10,
+      "cacheCreationInputTokens": 1,
+      "cacheReadInputTokens": 2
+    },
+    "publicBody": {
+      "error": {
+        "message": "The upstream model response was invalid.",
+        "type": "server_error",
+        "param": null,
+        "code": "invalid_upstream_response"
+      }
+    }
+  },
+  "rejectedEndTurnToolBlock": {
+    "status": 502,
+    "code": "invalid_upstream_response",
+    "nativeReason": "end_turn",
+    "attempt": {
+      "providerRequestId": "msg_tool",
+      "promptTokens": 1,
+      "completionTokens": 1,
+      "totalTokens": 2,
+      "uncachedInputTokens": 1,
+      "cacheCreationInputTokens": null,
+      "cacheReadInputTokens": null
+    }
+  }
+}

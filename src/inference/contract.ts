@@ -1,0 +1,23 @@
+import type { UpstreamCompletion } from './adapter.js';
+import type { ResolvedRoute } from './resolve.js';
+import type { ChatRequest } from './validate.js';
+
+export type ProviderName = 'openai' | 'anthropic';
+
+export type CanonicalTextRequest = ChatRequest;
+
+export type CanonicalTextCompletion = UpstreamCompletion['response'];
+
+export type ProviderCall = {
+  apiKey: string;
+  baseURL: string;
+  request: ChatRequest;
+  route: ResolvedRoute;
+  signal: AbortSignal;
+};
+
+export type ProviderAdapter = {
+  readonly provider: ProviderName;
+  prepare(request: ChatRequest, route: ResolvedRoute): void;
+  execute(call: ProviderCall): Promise<UpstreamCompletion>;
+};

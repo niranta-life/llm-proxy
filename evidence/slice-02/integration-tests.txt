@@ -1,0 +1,18 @@
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 2276ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 965ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 718ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 823ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 897ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 1303ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 1085ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 747ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 1029ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 1631ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 1690ms
+ ✓ test/inference-isolation.test.ts > inference tenant isolation > keeps two tenants on different backends, aliases, metrics, and logs 1384ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 533ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 97ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 181ms
+ Test Files  15 passed (15)
+      Tests  65 passed (65)
+EXIT:0

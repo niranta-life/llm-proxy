@@ -1,0 +1,5 @@
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 2369ms
+ ✓ test/anthropic-contract.test.ts > OpenAI SDK contract for both providers > calls OpenAI and Anthropic by changing only model 930ms
+ Test Files  15 passed (15)
+      Tests  65 passed (65)
+EXIT:0

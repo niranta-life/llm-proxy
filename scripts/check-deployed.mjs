@@ -1315,7 +1315,11 @@ async function runLocalChecks() {
       if (status !== 'pending') throw new Error(`request status ${status}`);
     } finally {
       query(
-        `GRANT UPDATE (status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens)
+        `GRANT UPDATE (
+           status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
+           provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
+           cache_read_input_tokens
+         )
          ON model_attempts TO llm_runtime;`,
       );
     }
@@ -1477,7 +1481,11 @@ async function cleanup() {
   try {
     query(
       `GRANT SELECT, INSERT ON proxy_requests TO llm_runtime;
-       GRANT UPDATE (status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens) ON model_attempts TO llm_runtime;
+       GRANT UPDATE (
+         status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
+         provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
+         cache_read_input_tokens
+       ) ON model_attempts TO llm_runtime;
        REVOKE UPDATE (label, tenant_id) ON tenant_api_keys FROM llm_runtime;`,
     );
   } catch (error) {

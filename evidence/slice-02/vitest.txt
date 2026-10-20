@@ -1,0 +1,74 @@
+RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 2276ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 965ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 718ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 823ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 897ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 1303ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 1085ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 747ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 1029ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 1631ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 1690ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 933ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 565ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 661ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 744ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 872ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 486ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 530ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 508ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 459ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 887ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 644ms
+ ✓ test/readiness-failure.test.ts > readiness failure > reports the database ready only while postgres is up, and SIGTERM closes the pools 4217ms
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 2369ms
+ ✓ test/inference-isolation.test.ts > inference tenant isolation > keeps two tenants on different backends, aliases, metrics, and logs 1384ms
+ ✓ test/anthropic-contract.test.ts > OpenAI SDK contract for both providers > calls OpenAI and Anthropic by changing only model 930ms
+ ✓ test/inference-config.test.ts > configuration lookup > registers, enables, and lists a tenant configuration without credential material 677ms
+ ✓ test/inference-config.test.ts > configuration lookup > requires a credential key when inference is enabled and does not echo it 1ms
+ ✓ test/key-rotation.test.ts > key rotation and revocation > keeps another active key working after one key is revoked 700ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 533ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 97ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 181ms
+ ✓ test/authentication.test.ts > authentication > accepts a matching active tenant and secret 95ms
+ ✓ test/authentication.test.ts > authentication > rejects missing, malformed, unknown, and mismatched credentials with no tenant data 85ms
+ ✓ test/authentication.test.ts > authentication > stores only a protected verifier for the secret 72ms
+ ✓ test/authentication.test.ts > authentication > does not accept a model request or caller provider configuration 49ms
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 44ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 457ms
+ ✓ test/pool-leakage.test.ts > connection-pool context leakage > clears tenant context before a connection returns to the pool 317ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects incomplete configuration without echoing secrets 2ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects an invalid log level 0ms
+ ✓ test/config-failure.test.ts > configuration failure > exits before listening when a required setting is missing 236ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > keeps caller fields and converts a leading system message 2ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > uses the configured default when the caller sends no output limit 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects a later system message, prefill, and disagreeing limits 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects unsupported parameters without removing them from the request 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > preserves OpenAI caller fields in the OpenAI body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > maps the four finish reasons 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > returns refusal text and hides thinking content 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > rejects a tool-use block and keeps the reported attempt facts off the public body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > keeps end_turn facts when the message contains a tool block 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > does not invent token counts the rejected message omitted 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > stores cache categories separately and does not invent missing counts 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > maps authentication, rate limit, overload, and server errors without the provider body 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > stores the native 5xx type and request id and does not invent either 1ms
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects stream=true instead of dropping it 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 0ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 0ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+
+ Test Files  15 passed (15)
+      Tests  65 passed (65)
+   Start at  11:58:24
+   Duration  46.55s (transform 535ms, setup 38ms, collect 3.41s, tests 33.21s, environment 2ms, prepare 871ms)
+EXIT:0

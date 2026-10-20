@@ -1,6 +1,6 @@
 # llm-proxy
 
-The service is a multi-tenant Node.js proxy for internal backends. Slice 00 checks tenant credentials, isolates tenant rows, and reports health. Slice 01 adds a non-streaming text chat completion through the tenant's configured OpenAI model.
+The service is a multi-tenant Node.js proxy for internal backends. Slice 00 checks tenant credentials, isolates tenant rows, and reports health. Slice 01 adds a non-streaming text chat completion through the tenant's configured OpenAI model. Slice 02 adds Anthropic on the same OpenAI chat API. The caller selects a deployment with `model`. The caller does not change SDK or request shape.
 
 Every tenant request needs both headers:
 
@@ -126,9 +126,56 @@ A deployment is selectable only when that deployment and its connection are enab
 
 An optional live check, not part of the default tests, is a `POST /v1/chat/completions` with `model` set to `auto` after the commands above and a real `OPENAI_API_KEY`. The default suite uses a mock server instead.
 
+## Configure Anthropic for one tenant
+
+Anthropic uses the same tenant registry. There is no second configuration table and no new process variable. `OPENAI_BASE_URL` is not the Anthropic endpoint. The operator stores the approved endpoint on that tenant's Anthropic connection. The API key is encrypted with `PROVIDER_CREDENTIAL_KEY` before it is stored.
+
+Registering the connection enables that connection. A new deployment stays disabled until you pass `--enabled true` or run `set-deployment-enabled`. Anthropic is not called until both the connection and the deployment are enabled. One tenant has one connection for each provider.
+
+```bash
+docker compose run --rm app node dist/cli.js register-anthropic-connection \
+  --tenant-id <tenant-id> \
+  --api-key "$ANTHROPIC_API_KEY" \
+  --endpoint https://api.anthropic.com
+docker compose run --rm app node dist/cli.js register-deployment \
+  --tenant-id <tenant-id> \
+  --provider anthropic \
+  --name claude \
+  --upstream-model claude-sonnet-4-5 \
+  --timeout-ms 30000 \
+  --capabilities temperature,stop,max_completion_tokens \
+  --default-max-output-tokens 1024 \
+  --enabled false
+docker compose run --rm app node dist/cli.js set-deployment-enabled \
+  --tenant-id <tenant-id> --name claude --enabled true
+```
+
+`--workspace-id` is optional on `register-anthropic-connection`. An Anthropic deployment requires `--default-max-output-tokens`. An OpenAI deployment rejects that flag.
+
+```bash
+docker compose run --rm app node dist/cli.js set-anthropic-credential \
+  --tenant-id <tenant-id> --api-key "$ANTHROPIC_API_KEY"
+docker compose run --rm app node dist/cli.js set-connection-enabled \
+  --tenant-id <tenant-id> --provider anthropic --enabled false
+```
+
+`set-connection-enabled` without `--provider` still changes the OpenAI connection.
+
+The same caller code reaches either provider by changing only `model`. `auto` stays on the deployment selected by `set-alias`. An explicit deployment name is not replaced.
+
+An optional staging check is `scripts/anthropic-smoke.mjs`. It does nothing unless `ANTHROPIC_SMOKE=1`, and `npm test` does not run it. With the flag, it sends one chat completion to an already configured proxy. It does not read a provider key.
+
+```bash
+ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
+  TENANT_ID=<tenant-id> TENANT_SECRET=<tenant-secret> MODEL=claude \
+  node scripts/anthropic-smoke.mjs
+```
+
 ## Chat API
 
 `POST /v1/chat/completions` accepts JSON with `model` and text `messages`. `model` is `auto` or an enabled deployment name. `stream` may be omitted or `false`. Optional fields are accepted only when that deployment lists the matching capability: `temperature`, `top_p`, `max_tokens`, `max_completion_tokens`, `stop`, `presence_penalty`, `frequency_penalty`, `seed`, `n` (only `1`), `user`, and `response_format` of `{"type":"text"}`.
+
+An Anthropic deployment accepts `temperature` from 0 through 1, `stop`, `max_tokens`, and `max_completion_tokens`. When both limits are present they must be equal. When neither is present, the deployment's default max output tokens is sent as `max_tokens`. One leading system message becomes the Anthropic system string. A later system message, a developer message, assistant prefill, tools, images, and any other optional field are rejected before the upstream call. OpenAI deployments keep the fields they already accepted. The proxy does not drop an unsupported field and continue.
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions \
@@ -140,7 +187,7 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 
 A success body is an OpenAI chat completion. `object` is `chat.completion`. `model` is the upstream model id. Assistant text is in `choices`. `usage` is present only when the upstream reported integer token counts. Missing usage is omitted, not filled in.
 
-The proxy calls the configured upstream once, with `maxRetries` set to 0 and the deployment timeout. It commits a request row and an attempt row before that call. The two ids are different. The rows store the deployment id, configuration version, connection id, connection version, status, duration, and reported token counts. They do not store the prompt or the completion text.
+The proxy calls the selected provider once, with `maxRetries` set to 0 and the deployment timeout. OpenAI uses `OPENAI_BASE_URL`. Anthropic uses the connection endpoint and the official Messages API. It commits a request row and an attempt row before that call. The two ids are different. The rows store the deployment id, configuration version, connection id, connection version, status, duration, reported token counts, the provider response id, the native stop or error reason, and cache-token categories when Anthropic reports them. They do not store the prompt or the completion text. Public `usage.prompt_tokens` is the uncached input count plus reported cache creation and cache read counts. A missing count stays null.
 
 Errors use an OpenAI error object:
 
@@ -152,12 +199,14 @@ Errors use an OpenAI error object:
 | --- | --- | --- |
 | 400 | `unsupported_parameter` or `unknown_parameter` | `stream=true`, tools, images, audio, an unsupported response format, or any other field the deployment does not allow. The field is not forwarded. |
 | 401 | `invalid_api_key` | The tenant credential was rejected. |
+| 401 | `upstream_auth_error` | Anthropic rejected the stored provider credential. The message is fixed and is not `invalid_api_key`. |
 | 404 | `model_not_found` | The alias or deployment is unknown or disabled. |
 | 408 | `request_cancelled` | The caller closed the request. |
 | 429 | `rate_limit` | The upstream reported HTTP 429. |
-| 502 | `upstream_error` or `invalid_upstream_response` | The upstream failed, or its body was not a chat completion. |
+| 502 | `upstream_error` or `invalid_upstream_response` | The upstream failed, or its body could not be represented as a chat completion. Anthropic tool-use and unknown content blocks use `invalid_upstream_response`. |
 | 503 | `inference_disabled` or `service_unavailable` | Inference is off, or the request row could not be committed. No upstream call is made in those cases. |
 | 504 | `timeout` | The deployment timeout elapsed. |
+| 529 | `overloaded` | Anthropic reported HTTP 529. |
 
 If the model call succeeds and the later status update fails, the proxy returns the completion, does not call the model again, and logs a critical event with the request id and the attempt id. The row can remain `pending`.
 
@@ -220,9 +269,37 @@ docker compose start app
 
 `scripts/verify-slice-01.mjs` provisions tenants, uses a mock provider, checks the rows, and checks this rollback. Give it an empty scratch directory.
 
+`004_anthropic.sql` adds nullable columns and Anthropic functions. It does not update existing OpenAI rows. After it is applied, the Slice 01 image still becomes ready because its latest migration file, `003_inference.sql`, remains applied. Build that image from `0b18e92` when the tag is absent, stop the current app, and start it on the same database network:
+
+```bash
+git archive --format=tar 0b18e92 | docker build -t llm-proxy:slice-01 -
+docker compose stop app
+docker run -d --name llm-proxy-slice01-run --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=true \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:slice-01
+```
+
+That image serves the existing OpenAI deployment. It does not call Anthropic. Return to the current image with:
+
+```bash
+docker rm -f llm-proxy-slice01-run
+docker compose start app
+```
+
+Do not remove the database volume. Compose init scripts run only on an empty volume.
+
 ## Tests
 
-`npm test` needs Node.js 24 and a running Docker daemon. See [Requirements](#requirements). The suite starts real PostgreSQL with Testcontainers and a local mock OpenAI server. It does not call the live OpenAI API.
+`npm test` needs Node.js 24 and a running Docker daemon. See [Requirements](#requirements). The suite starts real PostgreSQL with Testcontainers, a local mock OpenAI server, and a local mock Anthropic Messages API. It does not call a live provider.
 
 ```bash
 nvm use 24
@@ -248,12 +325,14 @@ The deployed request and response check is [Check a deployed instance](#check-a-
 - Logs are one JSON object per line. Redaction strips bearer tokens, `yck_` secrets, scrypt verifiers, `sk-` provider keys, AES-GCM ciphertext, and fields whose names look like secrets, prompts, or messages.
 - Local Compose passwords are development-only.
 - PostgreSQL 16 is the local database image. The major version is not a product requirement beyond row level security support.
-- The OpenAI Node SDK is the upstream client and the contract-test client. Both set `maxRetries` to 0. The adapter also sets `baseURL` explicitly.
+- The OpenAI Node SDK is the OpenAI upstream client and the contract-test client. The Anthropic Node SDK is the Anthropic upstream client. Both set `maxRetries` to 0. Each adapter sets its base URL explicitly. Anthropic stores that URL on the tenant connection. OpenAI uses `OPENAI_BASE_URL`.
 - The ASD-STE100 dictionary is not in this environment. The commit subject follows the public style rules for this slice: one active imperative sentence, at most 20 words, American spelling, no semicolon, and no noun cluster longer than three words.
 
 ## Limitations
 
-- The only provider is official OpenAI, and the only method is non-streaming text chat. There is no tool calling, image input, audio, fallback, retry, or quality-based routing.
+- The providers are OpenAI and Anthropic. The only method is non-streaming text chat. There is no tool calling, image input, audio, fallback, retry, or quality-based routing.
+- Anthropic accepts one leading system message, text user and assistant turns that alternate and end on a user turn, temperature from 0 through 1, stop sequences, and an output token limit. The Messages API has no `created` time. The proxy fills `created` from its own clock. Thinking blocks are omitted. A response that is only thinking has empty assistant text. Tool-use and any other content block or stop reason reject the response.
+- Anthropic cache categories are stored on the attempt when the provider reports them. They are not invented. Public usage still has the three OpenAI token fields.
 - Each accepted request makes one attempt. The schema allows a later attempt row for the same request.
 - There is no rate limit, billing, price, quality score, Kubernetes manifest, CI pipeline, or hosted deployment.
 - Provisioning is a command line tool for the migration role. There is no HTTP admin API.
@@ -264,11 +343,11 @@ The deployed request and response check is [Check a deployed instance](#check-a-
 - A person who holds the migration password can assume `llm_owner` and bypass row level security. Protect that password as an administrative credential.
 - Compose init scripts run only when the database volume is empty.
 - If status persistence fails after a successful model call, the caller still receives the completion and the stored row can stay `pending`.
-- The default tests do not call the live OpenAI API.
+- The default tests do not call a live provider. `scripts/anthropic-smoke.mjs` is an optional operator check and is off unless `ANTHROPIC_SMOKE=1`.
 
 ## Unfinished items
 
-- Other providers, streaming, multimodal input, tools, fallback, retries, and intelligent routing.
+- Streaming, multimodal input, tools, fallback, retries, and intelligent routing.
 - OAuth, login, sessions, and user accounts.
 - Key revocation and provider administration through HTTP.
 - Production management of database role passwords and the provider key.

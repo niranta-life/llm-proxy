@@ -2,11 +2,19 @@ import type { Pool } from 'pg';
 import type { ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
-import { completeChat, type TokenUsage, type UpstreamCompletion } from './adapter.js';
+import { anthropicAdapter } from './anthropic.js';
+import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
+import type { ProviderAdapter } from './contract.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode } from './errors.js';
 import { resolveModel } from './resolve.js';
 import { finishAttempt, insertPending, loadCatalog } from './store.js';
 import { assertCapabilities, validateChatRequest } from './validate.js';
+
+function adapterFor(provider: string): ProviderAdapter {
+  if (provider === 'anthropic') return anthropicAdapter;
+  if (provider === 'openai') return openAiAdapter;
+  throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
@@ -40,6 +48,9 @@ export async function executeChat(input: {
     throw proxyError(404, 'invalid_request_error', 'model_not_found', 'model', 'The model is not available.');
   }
   assertCapabilities(request, route.capabilities);
+  const adapter = adapterFor(route.provider);
+  adapter.prepare(request, route);
+  const baseURL = route.provider === 'anthropic' ? route.endpoint ?? '' : input.upstreamBaseUrl;
 
   let requestId = '';
   let attemptId = '';
@@ -64,16 +75,13 @@ export async function executeChat(input: {
   }
 
   const started = process.hrtime.bigint();
-  const emptyUsage: TokenUsage = { promptTokens: null, completionTokens: null, totalTokens: null };
   try {
-    const completion = await completeChat({
+    const completion = await adapter.execute({
       apiKey,
-      baseURL: input.upstreamBaseUrl,
-      upstreamModel: route.upstreamModel,
-      messages: request.messages,
-      timeoutMs: route.timeoutMs,
+      baseURL,
+      request,
+      route,
       signal: input.signal,
-      optional: request.optional,
     });
     await recordResult(input, {
       requestId,
@@ -82,6 +90,11 @@ export async function executeChat(input: {
       errorCode: null,
       durationMs: elapsedMs(started),
       usage: completion.usage,
+      providerRequestId: completion.providerRequestId,
+      stopReason: completion.stopReason,
+      uncachedInputTokens: completion.uncachedInputTokens,
+      cacheCreationInputTokens: completion.cacheCreationInputTokens,
+      cacheReadInputTokens: completion.cacheReadInputTokens,
     });
     return completion.response;
   } catch (error) {
@@ -90,13 +103,23 @@ export async function executeChat(input: {
       : error instanceof ProxyError
         ? error
         : normalizeUpstreamError(error, false);
+    const facts = normalized.attempt;
     await recordResult(input, {
       requestId,
       attemptId,
       status: 'failed',
       errorCode: safeErrorCode(normalized.code),
       durationMs: elapsedMs(started),
-      usage: emptyUsage,
+      usage: {
+        promptTokens: facts.promptTokens,
+        completionTokens: facts.completionTokens,
+        totalTokens: facts.totalTokens,
+      },
+      providerRequestId: facts.providerRequestId,
+      stopReason: normalized.nativeReason,
+      uncachedInputTokens: facts.uncachedInputTokens,
+      cacheCreationInputTokens: facts.cacheCreationInputTokens,
+      cacheReadInputTokens: facts.cacheReadInputTokens,
     });
     throw normalized;
   } finally {
@@ -113,6 +136,11 @@ async function recordResult(
     errorCode: string | null;
     durationMs: number;
     usage: TokenUsage;
+    providerRequestId: string | null;
+    stopReason: string | null;
+    uncachedInputTokens: number | null;
+    cacheCreationInputTokens: number | null;
+    cacheReadInputTokens: number | null;
   },
 ): Promise<void> {
   try {

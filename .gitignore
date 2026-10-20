@@ -3,3 +3,4 @@ dist/
 test/.pg.json
 *.log
 .DS_Store
+.env.live

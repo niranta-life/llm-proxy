@@ -1,0 +1,127 @@
+
+## images
+slice-02 sha256:616db9bd9c30810d4c786d91ea1b4e8f6a7f9d0a2d953935ce14c8d2a9cfc828
+slice-01 sha256:4b545d57b77ed6369a5f4784925c51dea6cba9f27b79c5cd9a3d61c987f1688d
+
+## slice-02 first boot
+slice-02 ready {"status":"ready","database":"ready"}
+
+## migrations after slice-02
+      version      
+-------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+(4 rows)
+
+provisioned tenant cbb0e4e0-edf0-4dff-b6f7-f2b62d09d47e
+
+## registry
+ provider  | enabled | endpoint_null | workspace_null | encrypted_without_plaintext 
+-----------+---------+---------------+----------------+-----------------------------
+ anthropic | t       | f             | f              | t
+ openai    | t       | t             | t              | t
+(2 rows)
+
+  name   | enabled | default_null 
+---------+---------+--------------
+ claude  | t       | f
+ primary | t       | t
+(2 rows)
+
+
+## slice-02 calls
+{"label":"slice-02-openai","status":200,"id":"chatcmpl-rollback","model":"gpt-rollback","finishReason":"stop","content":"ok","usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5},"errorCode":null}
+{"label":"slice-02-anthropic","status":200,"id":"msg_rollback","model":"claude-rollback","finishReason":"stop","content":"claude-ok","usage":{"prompt_tokens":13,"completion_tokens":4,"total_tokens":17},"errorCode":null}
+{"label":"slice-02-rate","status":429,"id":null,"model":null,"finishReason":null,"content":null,"usage":null,"errorCode":"rate_limit"}
+{"label":"slice-02-tool","status":502,"id":null,"model":null,"finishReason":null,"content":null,"usage":null,"errorCode":"invalid_upstream_response"}
+{"label":"slice-02-missing","status":502,"id":null,"model":null,"finishReason":null,"content":null,"usage":null,"errorCode":"upstream_error"}
+
+## attempt facts
+  status   |        error_code         | provider_request_id |   stop_reason    | prompt_tokens | completion_tokens | total_tokens | uncached_input_tokens | cache_creation_input_tokens | cache_read_input_tokens 
+-----------+---------------------------+---------------------+------------------+---------------+-------------------+--------------+-----------------------+-----------------------------+-------------------------
+ succeeded |                           | chatcmpl-rollback   | stop             |             3 |                 2 |            5 |                       |                             |                        
+ succeeded |                           | msg_rollback        | end_turn         |            13 |                 4 |           17 |                    10 |                           1 |                       2
+ failed    | rate_limit                |                     | rate_limit_error |               |                   |              |                       |                             |                        
+ failed    | invalid_upstream_response | msg_tool            | tool_use         |             1 |                 1 |            2 |                     1 |                             |                        
+ failed    | upstream_error            | req_abc             | not_found_error  |               |                   |              |                       |                             |                        
+(5 rows)
+
+
+## stop slice-02 and start slice-01
+slice-01 ready {"status":"ready","database":"ready"}
+
+## migrations while slice-01 is serving
+      version      
+-------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+(4 rows)
+
+{"label":"slice-01-openai","status":200,"id":"chatcmpl-rollback","model":"gpt-rollback","finishReason":"stop","content":"ok","usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5},"errorCode":null}
+
+## return to slice-02
+slice-02-again ready {"status":"ready","database":"ready"}
+{"label":"slice-02-anthropic-again","status":200,"id":"msg_rollback","model":"claude-rollback","finishReason":"stop","content":"claude-ok","usage":{"prompt_tokens":13,"completion_tokens":4,"total_tokens":17},"errorCode":null}
+
+## mock summary
+{
+  "openaiHits": 2,
+  "anthropicHits": 5,
+  "openaiUrls": [
+    "/v1/chat/completions"
+  ],
+  "anthropicUrls": [
+    "/v1/messages"
+  ],
+  "openaiAuthMatched": true,
+  "anthropicKeyMatched": true,
+  "anthropicWorkspaceMatched": true,
+  "anthropicBodies": [
+    {
+      "model": "claude-rollback",
+      "max_tokens": 64,
+      "roles": [
+        "user"
+      ],
+      "hasPromptText": true
+    },
+    {
+      "model": "claude-rollback",
+      "max_tokens": 64,
+      "roles": [
+        "user"
+      ],
+      "hasPromptText": false
+    },
+    {
+      "model": "claude-rollback",
+      "max_tokens": 64,
+      "roles": [
+        "user"
+      ],
+      "hasPromptText": false
+    },
+    {
+      "model": "claude-rollback",
+      "max_tokens": 64,
+      "roles": [
+        "user"
+      ],
+      "hasPromptText": false
+    },
+    {
+      "model": "claude-rollback",
+      "max_tokens": 64,
+      "roles": [
+        "user"
+      ],
+      "hasPromptText": true
+    }
+  ]
+}
+
+## done

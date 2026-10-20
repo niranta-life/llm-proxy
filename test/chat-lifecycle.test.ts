@@ -308,8 +308,11 @@ describe('chat lifecycle', () => {
       expect(stored.rows[0]?.status).toBe('pending');
     } finally {
       await harness.admin.query(
-        `GRANT UPDATE (status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens)
-         ON model_attempts TO llm_runtime`,
+        `GRANT UPDATE (
+           status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
+           provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
+           cache_read_input_tokens
+         ) ON model_attempts TO llm_runtime`,
       );
     }
   });

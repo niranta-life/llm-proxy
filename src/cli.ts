@@ -3,12 +3,16 @@ import { ConfigError, loadConfig } from './config.js';
 import { createCredentialStore } from './credentials.js';
 import {
   listTenantInference,
+  registerAnthropicConnection,
   registerModelDeployment,
   registerOpenAiConnection,
+  registerProviderDeployment,
+  replaceAnthropicCredential,
   replaceOpenAiCredential,
   setModelAlias,
   setModelDeploymentEnabled,
   setOpenAiConnectionEnabled,
+  setProviderConnectionEnabled,
 } from './db/inference-admin.js';
 import { createPool } from './db/pools.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
@@ -45,6 +49,10 @@ type Flags = {
   enabled?: string;
   alias?: string;
   deployment?: string;
+  endpoint?: string;
+  'workspace-id'?: string;
+  provider?: string;
+  'default-max-output-tokens'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -102,6 +110,10 @@ async function main(): Promise<void> {
         enabled: { type: 'string' },
         alias: { type: 'string' },
         deployment: { type: 'string' },
+        endpoint: { type: 'string' },
+        'workspace-id': { type: 'string' },
+        provider: { type: 'string' },
+        'default-max-output-tokens': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -157,6 +169,35 @@ async function main(): Promise<void> {
       return;
     }
 
+    if (command === 'register-anthropic-connection' || command === 'set-anthropic-credential') {
+      const tenantId = requireTenant(values);
+      const apiKey = values['api-key'] ?? '';
+      const endpoint = values.endpoint?.trim() ?? '';
+      const workspaceId = values['workspace-id']?.trim() ?? '';
+      if (tenantId === undefined || apiKey.length === 0 || (command === 'register-anthropic-connection' && endpoint.length === 0)) {
+        logger.error('tenant-id, api-key, and endpoint are required');
+        process.exitCode = 1;
+        return;
+      }
+      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+      if (command === 'register-anthropic-connection') {
+        const created = await registerAnthropicConnection(
+          pool,
+          tenantId,
+          protectedCredential,
+          endpoint,
+          workspaceId.length === 0 ? null : workspaceId,
+        );
+        process.stdout.write(
+          `${JSON.stringify({ ...created, tenantId, provider: 'anthropic', enabled: true })}\n`,
+        );
+        return;
+      }
+      const credentialVersion = await replaceAnthropicCredential(pool, tenantId, protectedCredential);
+      process.stdout.write(`${JSON.stringify({ tenantId, provider: 'anthropic', credentialVersion })}\n`);
+      return;
+    }
+
     if (command === 'register-openai-connection' || command === 'set-openai-credential') {
       const tenantId = requireTenant(values);
       const apiKey = values['api-key'] ?? '';
@@ -186,8 +227,11 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
       }
-      const credentialVersion = await setOpenAiConnectionEnabled(pool, tenantId, enabled);
-      process.stdout.write(`${JSON.stringify({ tenantId, enabled, credentialVersion })}\n`);
+      const provider = values.provider ?? 'openai';
+      const credentialVersion = provider === 'openai'
+        ? await setOpenAiConnectionEnabled(pool, tenantId, enabled)
+        : await setProviderConnectionEnabled(pool, tenantId, provider, enabled);
+      process.stdout.write(`${JSON.stringify({ tenantId, provider, enabled, credentialVersion })}\n`);
       return;
     }
 
@@ -198,16 +242,36 @@ async function main(): Promise<void> {
       const timeoutMs = Number(values['timeout-ms']);
       const capabilities = parseCapabilities(values.capabilities);
       const enabled = parseEnabled(values.enabled) ?? false;
+      const provider = values.provider ?? 'openai';
+      const defaultMaxText = values['default-max-output-tokens'];
+      const defaultMaxOutputTokens = defaultMaxText === undefined ? null : Number(defaultMaxText);
       if (
         tenantId === undefined ||
         name.length === 0 ||
         upstreamModel.length === 0 ||
         !Number.isInteger(timeoutMs) ||
         capabilities === undefined ||
-        (values.enabled !== undefined && parseEnabled(values.enabled) === undefined)
+        (provider !== 'openai' && provider !== 'anthropic') ||
+        (values.enabled !== undefined && parseEnabled(values.enabled) === undefined) ||
+        (defaultMaxOutputTokens !== null && !Number.isInteger(defaultMaxOutputTokens)) ||
+        (provider === 'openai' && defaultMaxText !== undefined)
       ) {
         logger.error('deployment arguments are invalid');
         process.exitCode = 1;
+        return;
+      }
+      if (provider === 'anthropic') {
+        const created = await registerProviderDeployment(pool, {
+          tenantId,
+          provider,
+          name,
+          upstreamModel,
+          timeoutMs,
+          capabilities,
+          enabled,
+          defaultMaxOutputTokens,
+        });
+        process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
         return;
       }
       const created = await registerModelDeployment(pool, {

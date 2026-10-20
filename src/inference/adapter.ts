@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import { ProxyError, normalizeUpstreamError, proxyError } from './errors.js';
+import type { ProviderAdapter } from './contract.js';
+import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ChatMessage } from './validate.js';
 
 export type TokenUsage = {
@@ -22,6 +23,11 @@ export type UpstreamCompletion = {
     usage?: Record<string, number>;
   };
   usage: TokenUsage;
+  providerRequestId: string | null;
+  stopReason: string | null;
+  uncachedInputTokens: number | null;
+  cacheCreationInputTokens: number | null;
+  cacheReadInputTokens: number | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -83,11 +89,33 @@ export function validateCompletion(value: unknown): UpstreamCompletion {
       ...(Object.keys(publicUsage).length > 0 ? { usage: publicUsage } : {}),
     },
     usage,
+    providerRequestId: safeProviderRequestId(value.id),
+    stopReason: safeNativeReason(choices[0]?.finish_reason),
+    uncachedInputTokens: null,
+    cacheCreationInputTokens: null,
+    cacheReadInputTokens: null,
   };
 }
 
 function invalidUpstream(): never {
   throw proxyError(502, 'server_error', 'invalid_upstream_response', null, 'The upstream model response was invalid.');
+}
+
+export function toOpenAiChatBody(input: {
+  upstreamModel: string;
+  messages: ChatMessage[];
+  optional: Record<string, unknown>;
+}): {
+  model: string;
+  messages: ChatMessage[];
+  stream: false;
+} & Record<string, unknown> {
+  return {
+    model: input.upstreamModel,
+    messages: input.messages,
+    stream: false,
+    ...input.optional,
+  };
 }
 
 export async function completeChat(input: {
@@ -112,12 +140,11 @@ export async function completeChat(input: {
   const timer = setTimeout(() => controller.abort(), input.timeoutMs);
   try {
     const response = await client.chat.completions.create(
-      {
-        model: input.upstreamModel,
+      toOpenAiChatBody({
+        upstreamModel: input.upstreamModel,
         messages: input.messages,
-        stream: false,
-        ...input.optional,
-      },
+        optional: input.optional,
+      }),
       { maxRetries: 0, timeout: input.timeoutMs, signal: controller.signal },
     );
     return validateCompletion(response);
@@ -133,3 +160,19 @@ export async function completeChat(input: {
     input.signal.removeEventListener('abort', abort);
   }
 }
+
+export const openAiAdapter: ProviderAdapter = {
+  provider: 'openai',
+  prepare(): void {},
+  execute(call) {
+    return completeChat({
+      apiKey: call.apiKey,
+      baseURL: call.baseURL,
+      upstreamModel: call.route.upstreamModel,
+      messages: call.request.messages,
+      timeoutMs: call.route.timeoutMs,
+      signal: call.signal,
+      optional: call.request.optional,
+    });
+  },
+};

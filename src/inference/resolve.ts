@@ -1,3 +1,5 @@
+import type { ProviderName } from './contract.js';
+
 export type DeploymentCandidate = {
   id: string;
   name: string;
@@ -9,6 +11,10 @@ export type DeploymentCandidate = {
   connectionVersion: number;
   enabled: boolean;
   connectionEnabled: boolean;
+  provider: ProviderName;
+  endpoint: string | null;
+  workspaceId: string | null;
+  defaultMaxOutputTokens: number | null;
 };
 
 export type AliasCandidate = {
@@ -26,6 +32,10 @@ export type ResolvedRoute = {
   configVersion: number;
   connectionId: string;
   connectionVersion: number;
+  provider: ProviderName;
+  endpoint: string | null;
+  workspaceId: string | null;
+  defaultMaxOutputTokens: number | null;
 };
 
 export function resolveModel(
@@ -48,5 +58,9 @@ export function resolveModel(
     configVersion: deployment.configVersion,
     connectionId: deployment.connectionId,
     connectionVersion: deployment.connectionVersion,
+    provider: deployment.provider,
+    endpoint: deployment.endpoint,
+    workspaceId: deployment.workspaceId,
+    defaultMaxOutputTokens: deployment.defaultMaxOutputTokens,
   };
 }

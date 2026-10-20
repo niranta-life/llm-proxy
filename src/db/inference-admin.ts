@@ -6,6 +6,8 @@ export type InferenceListing = {
     provider: string;
     enabled: boolean;
     credentialVersion: number;
+    endpoint: string | null;
+    workspaceId: string | null;
     createdAt: string;
   }>;
   deployments: Array<{
@@ -17,6 +19,7 @@ export type InferenceListing = {
     capabilities: string[];
     enabled: boolean;
     configVersion: number;
+    defaultMaxOutputTokens: number | null;
     createdAt: string;
   }>;
   aliases: Array<{
@@ -67,6 +70,83 @@ export async function setOpenAiConnectionEnabled(
   const version = result.rows[0]?.version;
   if (version === undefined) throw new Error('connection was not updated');
   return version;
+}
+
+export async function registerAnthropicConnection(
+  pool: Pool,
+  tenantId: string,
+  protectedCredential: string,
+  endpoint: string,
+  workspaceId: string | null,
+): Promise<{ connectionId: string; credentialVersion: number }> {
+  const result = await pool.query<{ connection_id: string; credential_version: number }>(
+    'SELECT connection_id, credential_version FROM register_anthropic_connection($1::uuid, $2, $3, $4)',
+    [tenantId, protectedCredential, endpoint, workspaceId],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('connection was not created');
+  return { connectionId: row.connection_id, credentialVersion: row.credential_version };
+}
+
+export async function replaceAnthropicCredential(
+  pool: Pool,
+  tenantId: string,
+  protectedCredential: string,
+): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    'SELECT replace_anthropic_credential($1::uuid, $2) AS version',
+    [tenantId, protectedCredential],
+  );
+  const version = result.rows[0]?.version;
+  if (version === undefined) throw new Error('credential was not replaced');
+  return version;
+}
+
+export async function setProviderConnectionEnabled(
+  pool: Pool,
+  tenantId: string,
+  provider: string,
+  enabled: boolean,
+): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    'SELECT set_provider_connection_enabled($1::uuid, $2, $3) AS version',
+    [tenantId, provider, enabled],
+  );
+  const version = result.rows[0]?.version;
+  if (version === undefined) throw new Error('connection was not updated');
+  return version;
+}
+
+export async function registerProviderDeployment(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    provider: string;
+    name: string;
+    upstreamModel: string;
+    timeoutMs: number;
+    capabilities: string[];
+    enabled: boolean;
+    defaultMaxOutputTokens: number | null;
+  },
+): Promise<{ deploymentId: string; configVersion: number }> {
+  const result = await pool.query<{ deployment_id: string; config_version: number }>(
+    `SELECT deployment_id, config_version
+     FROM register_provider_deployment($1::uuid, $2, $3, $4, $5, $6::text[], $7, $8)`,
+    [
+      input.tenantId,
+      input.provider,
+      input.name,
+      input.upstreamModel,
+      input.timeoutMs,
+      input.capabilities,
+      input.enabled,
+      input.defaultMaxOutputTokens,
+    ],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not created');
+  return { deploymentId: row.deployment_id, configVersion: row.config_version };
 }
 
 export async function registerModelDeployment(

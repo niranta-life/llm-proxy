@@ -25,6 +25,66 @@ export function provisionTenant(db: TestDatabase, name: string): {
   return { tenantId: created.tenantId, keyId: created.keyId, secret: created.secret, name: created.name };
 }
 
+export function registerAnthropic(
+  db: TestDatabase,
+  input: {
+    tenantId: string;
+    apiKey: string;
+    endpoint: string;
+    deployment: string;
+    upstreamModel: string;
+    timeoutMs?: number;
+    capabilities?: string;
+    enabled?: boolean;
+    workspaceId?: string;
+    defaultMaxOutputTokens?: number;
+    alias?: boolean;
+  },
+): void {
+  const env = cliEnv();
+  const connection = [
+    'register-anthropic-connection',
+    '--tenant-id',
+    input.tenantId,
+    '--api-key',
+    input.apiKey,
+    '--endpoint',
+    input.endpoint,
+  ];
+  if (input.workspaceId) connection.push('--workspace-id', input.workspaceId);
+  runCli(db, connection, env);
+  runCli(
+    db,
+    [
+      'register-deployment',
+      '--tenant-id',
+      input.tenantId,
+      '--provider',
+      'anthropic',
+      '--name',
+      input.deployment,
+      '--upstream-model',
+      input.upstreamModel,
+      '--timeout-ms',
+      String(input.timeoutMs ?? 5000),
+      '--capabilities',
+      input.capabilities ?? 'temperature,stop,max_completion_tokens',
+      '--enabled',
+      input.enabled === false ? 'false' : 'true',
+      '--default-max-output-tokens',
+      String(input.defaultMaxOutputTokens ?? 64),
+    ],
+    env,
+  );
+  if (input.alias) {
+    runCli(
+      db,
+      ['set-alias', '--tenant-id', input.tenantId, '--alias', 'auto', '--deployment', input.deployment],
+      env,
+    );
+  }
+}
+
 export function registerInference(
   db: TestDatabase,
   input: {

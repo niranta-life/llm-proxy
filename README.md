@@ -1,41 +1,121 @@
 # llm-proxy
 
-The service is a multi-tenant Node.js proxy for internal backends. Slice 00 checks tenant credentials, isolates tenant rows, and reports health. Slice 01 adds a non-streaming text chat completion through the tenant's configured OpenAI model. Slice 02 adds Anthropic on the same OpenAI chat API. The caller selects a deployment with `model`. The caller does not change SDK or request shape.
+The llm-proxy is a multi-tenant proxy.
+Your programs send requests to the proxy.
+The proxy uses Node.js.
+The proxy checks the tenant secret.
+The proxy keeps the rows for each tenant separate.
+The proxy can send a text chat completion to OpenAI.
+The proxy can send the same chat completion to Anthropic.
+You select the deployment with `model`.
+You use the same request for OpenAI and for Anthropic.
+You do not change the SDK.
 
-Every tenant request needs both headers:
+Each tenant request must have these 2 headers:
 
 ```http
 X-Tenant-ID: <tenant-uuid>
 Authorization: Bearer <tenant-secret>
 ```
 
-There is no login, session, OAuth, or user account. The caller does not supply a provider URL or a provider credential.
+The proxy has no login.
+The proxy does not keep caller state between requests.
+The proxy does not use OAuth.
+The proxy has no user account.
+The caller does not send a provider URL.
+The caller does not send a provider API key.
 
-## Requirements
+## Terms
 
-**To start the service**
+Use these words for these things:
+
+- A tenant secret is the secret in the `Authorization` header.
+- A tenant key is 1 key record for 1 tenant.
+- A key id identifies that tenant key.
+- A verifier is the scrypt value for a tenant secret.
+- A provider API key is the key for OpenAI or for Anthropic.
+- A connection is the provider access record for 1 tenant.
+- A deployment is a named model configuration for 1 tenant.
+- The upstream model is the model name at the provider.
+- The alias is the name `auto`.
+- The alias selects 1 deployment.
+- Inference is a chat request that the proxy sends to a provider.
+- HTTP, JSON, API, URL, CLI, SQL, and TLS are technical names.
+
+## Capabilities
+
+The proxy checks the tenant secret on each tenant request.
+The proxy records only a verifier for that secret.
+PostgreSQL row-level security permits a tenant to read only its own rows.
+The proxy reports liveness.
+The proxy reports readiness.
+You can add a tenant with the CLI.
+You can add a tenant key.
+You can revoke a tenant key.
+
+The proxy accepts 1 text chat completion for 1 tenant.
+The proxy returns that completion in 1 response.
+The proxy sends the request 1 time to the OpenAI model for that tenant.
+The proxy records the attempt, the duration, and the token counts from the provider.
+The proxy returns an OpenAI chat completion.
+The proxy returns the model list for that tenant.
+The proxy returns metric totals for a time window.
+
+The proxy can send the same request to Anthropic.
+The proxy changes that request into a request for the Anthropic Messages API.
+The proxy returns an OpenAI chat completion for the Anthropic result.
+The proxy records the token counts from Anthropic.
+The proxy records the errors from Anthropic.
+An OpenAI deployment continues to operate after you add Anthropic.
+
+You can start the local Compose project with Colima.
+You can stop that project with Colima.
+You can check a proxy that is in operation.
+`scripts/check-deployed.mjs` does not send a request to OpenAI.
+
+Git does not track the file `.env.live`.
+A Docker build does not copy the file `.env.live`.
+This project uses the MIT license.
+
+## What you must have
+
+You must have these programs before you start the proxy:
 
 - Colima.
-- The Docker CLI, including Compose.
-- curl, so the start script can wait for readiness.
+- The Docker CLI.
+- Docker Compose, as part of that CLI.
+- curl.
 
-`scripts/colima.sh` uses the default Colima profile and the socket `~/.colima/default/docker.sock`. Set `COLIMA_PROFILE` or `COLIMA_SOCKET` to use another profile or socket. The script exports `DOCKER_HOST` for its own commands and leaves the Docker context unchanged.
+The start script uses curl.
+The script waits until the readiness route returns HTTP 200.
 
-`stop` stops the Compose project and keeps the database volume. Colima stays up unless you pass `--vm`.
+`scripts/colima.sh` uses the Colima profile `default`.
+The socket is `~/.colima/default/docker.sock`.
+Set `COLIMA_PROFILE` when you use a different profile.
+Set `COLIMA_SOCKET` when you use a different socket.
+The script sets `DOCKER_HOST` for its own commands.
+The script does not change the Docker context.
 
-Later `docker compose` commands in this file need the same socket:
+`stop` stops the Compose project.
+`stop` keeps the database volume.
+Colima continues to operate.
+Colima stops only when you add `--vm`.
+
+Set this socket before each `docker compose` command in this file:
 
 ```bash
 export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
 ```
 
-**To run checks**
+You must have Node.js 24 before you test the proxy.
+Run `npm install` before `scripts/check-deployed.mjs`.
+`scripts/check-deployed.mjs` loads the OpenAI client.
+The proxy image is `node:24-bookworm-slim`.
+When your computer does not use Node.js 24, run `nvm use 24` before `npm test`.
+`npm test` must have a Docker daemon in operation.
+When `DOCKER_HOST` is absent, the tests use the selected Docker context.
 
-- Node.js 24. The app image is `node:24-bookworm-slim`. If the host default is newer, run `nvm use 24` before `npm test`.
-- `npm install`, so the deployed check can load the OpenAI client.
-- A running Docker daemon for `npm test`. When `DOCKER_HOST` is unset, that suite uses the active Docker context.
-
-## Run locally
+## Start the local proxy
 
 ```bash
 scripts/colima.sh start
@@ -45,28 +125,69 @@ scripts/colima.sh stop
 scripts/colima.sh status
 ```
 
-`npm run stack -- start` is the same script. `start` brings Colima up when it is down, then starts PostgreSQL 16 and the service on port 8080. `restart --build` rebuilds the image and recreates the containers.
+`npm run stack -- start` runs the same script.
+`start` starts Colima when Colima is not in operation.
+`start` starts PostgreSQL 16.
+`start` starts the proxy on port 8080.
+`restart --build` builds the image again.
+`restart --build` creates the containers again.
 
-- Liveness: `GET http://127.0.0.1:8080/health/live` returns `{"status":"live"}`.
-- Readiness: `GET http://127.0.0.1:8080/health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` only after PostgreSQL is reachable and this image's migrations are applied. If PostgreSQL is down, readiness is HTTP 503 and liveness stays HTTP 200.
+`GET http://127.0.0.1:8080/health/live` returns `{"status":"live"}`.
 
-Inference is off unless `INFERENCE_ENABLED=true`. A tenant with no enabled deployment cannot call a model. One tenant can be configured before any other tenant. The Compose database role passwords are local development values.
+`GET http://127.0.0.1:8080/health/ready` returns HTTP 200 when the proxy is ready.
+The body is `{"status":"ready","database":"ready"}`.
+The proxy is ready only when the proxy can connect to PostgreSQL.
+The proxy is ready only when `schema_migrations` contains the latest migration file for this image.
+When the proxy is not ready, the proxy returns HTTP 503.
+The body is `{"status":"not_ready","database":"unavailable"}`.
+The liveness route continues to return HTTP 200.
 
-## Check a deployed instance
+Inference is off when `INFERENCE_ENABLED` is not `true`.
+A tenant with no enabled deployment cannot send a chat completion.
+You can set 1 tenant before you set the other tenants.
+The database role passwords in Compose are for local development.
 
-`scripts/check-deployed.mjs` sends the request and response cases to a running proxy. It does not call the live OpenAI API.
+## Check a started proxy
+
+`scripts/check-deployed.mjs` sends request cases and response cases to a proxy that is in operation.
+The script does not send a request to OpenAI.
 
 ```bash
 node scripts/check-deployed.mjs --prepare-local
 ```
 
-`npm run check:deployed -- --prepare-local` is the same command. `--prepare-local` needs Colima, Docker, and Node.js. It starts the local stack when Colima is down, points the app at a mock for that run, and covers the HTTP, database, and process cases. It then restores the previous app environment and removes the mock. It keeps the database volume. `--leave-prepared` skips the restore.
+`npm run check:deployed -- --prepare-local` runs the same command.
+`--prepare-local` must have Colima, Docker, and Node.js.
+When Colima is not in operation, the script starts the local Compose project.
+The script uses a mock server for that run.
+The script checks the HTTP cases.
+The script checks the database cases.
+The script checks the process cases.
+The script restores the environment variables of the proxy.
+The script removes the mock server.
+The script keeps the database volume.
+`--leave-prepared` does not restore the environment variables of the proxy.
 
-For a proxy that is already running, pass `--base-url` or set `PROXY_BASE_URL`. `--help` lists the tenant ids, secrets, and mock URL that instance must already have. `--http-only` runs the HTTP cases and exits. Database and process cases run with `--prepare-local`, or with `CHECK_ADMIN=local`. The same-connection pool check stays in `npm test`: a deployed process does not expose the backend pid of a returned pool connection. The script checks that a runtime session with no tenant setting sees no rows.
+For a proxy that is in operation, pass `--base-url` or set `PROXY_BASE_URL`.
+`--help` shows the tenant ids, the secrets, and the mock URL.
+That proxy must have those values.
+`--http-only` runs the HTTP cases.
+The script is complete after those cases.
+Database cases and process cases run with `--prepare-local`.
+Those cases also run when `CHECK_ADMIN` is `local`.
 
-## Provision a tenant
+Only `npm test` can read the backend process id of a database session in the pool.
+A proxy that is in operation does not give that process id.
+The script opens 1 database session.
+That database session does not set `app.tenant_id`.
+That database session reads no rows.
 
-The CLI prints a tenant secret once on standard output. Logs go to standard error. The database stores only a scrypt verifier.
+## Add a tenant
+
+The CLI shows a new tenant secret 1 time.
+The secret is on standard output.
+The CLI writes logs to standard error.
+The database records only a verifier.
 
 ```bash
 docker compose run --rm app node dist/cli.js provision-tenant --name Acme
@@ -74,21 +195,36 @@ docker compose run --rm app node dist/cli.js add-key --tenant-id <tenant-id> --l
 docker compose run --rm app node dist/cli.js revoke-key --tenant-id <tenant-id> --key-id <key-id>
 ```
 
-A tenant can have more than one active key. Revoking one key leaves the other active keys working.
+A tenant can have more than 1 tenant key that is not revoked.
+When you revoke 1 tenant key, each other tenant key that is not revoked continues to operate.
 
-`GET /v1/tenant` returns that tenant's id, name, and key ids. It does not return secrets or verifiers. Missing, malformed, unknown, mismatched, and revoked credentials get HTTP 401 `{"error":"unauthorized"}`.
+`GET /v1/tenant` returns the tenant id, the name, and the key ids for that tenant.
+The route does not return a tenant secret.
+The route does not return a verifier.
+The proxy returns HTTP 401 when the tenant secret is not valid.
+The body is `{"error":"unauthorized"}`.
+The proxy uses this result in these conditions:
 
-## Configure OpenAI for one tenant
+- The tenant secret is absent.
+- The tenant secret has the wrong form.
+- The tenant secret is unknown.
+- The tenant secret is for a different tenant.
+- The tenant key is revoked.
 
-Set these on the proxy process before a model call. Callers cannot change them.
+## Set OpenAI for 1 tenant
 
-| Variable | Required | Purpose |
+Set these variables on the proxy before a chat completion.
+A caller cannot change these variables.
+
+| Variable | Necessary | Use |
 | --- | --- | --- |
-| `INFERENCE_ENABLED` | no | `true` or `false`. Unset means `false`. |
-| `PROVIDER_CREDENTIAL_KEY` | when inference is on | 32-byte key, base64-encoded. It stays in the process environment. |
-| `OPENAI_BASE_URL` | no | Upstream base URL. The default is `https://api.openai.com/v1`. Use this only so an operator can point the process at a mock. |
+| `INFERENCE_ENABLED` | no | `true` or `false`. When the variable is absent, the proxy uses `false`. |
+| `PROVIDER_CREDENTIAL_KEY` | When `INFERENCE_ENABLED` is `true` | A 32-byte key in base64. The process keeps this key in its environment. |
+| `OPENAI_BASE_URL` | no | The OpenAI base URL. When the variable is absent, the proxy uses `https://api.openai.com/v1`. Set this variable for a mock server. |
 
-Generate a process key and recreate the app with inference on:
+Make the key for `PROVIDER_CREDENTIAL_KEY`.
+Set `INFERENCE_ENABLED` to `true`.
+Build the proxy container again:
 
 ```bash
 export INFERENCE_ENABLED=true
@@ -97,7 +233,12 @@ export OPENAI_BASE_URL="https://api.openai.com/v1"
 docker compose up -d --force-recreate --build app
 ```
 
-Register the tenant's OpenAI connection, one deployment, and the `auto` alias. The API key is encrypted before it is stored. `list-inference` does not print it.
+Record the OpenAI connection for the tenant.
+Record 1 deployment.
+Set the alias `auto`.
+The proxy encrypts the provider API key.
+The proxy records the ciphertext.
+`list-inference` does not show the provider API key.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-openai-connection \
@@ -114,7 +255,7 @@ docker compose run --rm app node dist/cli.js set-alias \
 docker compose run --rm app node dist/cli.js list-inference --tenant-id <tenant-id>
 ```
 
-Other operator commands:
+You can also use these commands:
 
 ```bash
 docker compose run --rm app node dist/cli.js set-openai-credential --tenant-id <tenant-id> --api-key "$OPENAI_API_KEY"
@@ -122,15 +263,34 @@ docker compose run --rm app node dist/cli.js set-connection-enabled --tenant-id 
 docker compose run --rm app node dist/cli.js set-deployment-enabled --tenant-id <tenant-id> --name primary --enabled false
 ```
 
-A deployment is selectable only when that deployment and its connection are enabled. The only alias in this slice is `auto`. A deployment cannot be named `auto`.
+You can select a deployment only when that deployment is enabled.
+You can select a deployment only when its connection is enabled.
+The only alias is `auto`.
+Do not give a deployment the name `auto`.
 
-An optional live check, not part of the default tests, is a `POST /v1/chat/completions` with `model` set to `auto` after the commands above and a real `OPENAI_API_KEY`. The default suite uses a mock server instead.
+You can send 1 chat completion to OpenAI after you set the tenant.
+Set `model` to `auto`.
+Use an `OPENAI_API_KEY` from OpenAI.
+The tests that `npm test` runs use a mock server.
+Those tests do not send a request to OpenAI.
 
-## Configure Anthropic for one tenant
+## Set Anthropic for 1 tenant
 
-Anthropic uses the same tenant registry. There is no second configuration table and no new process variable. `OPENAI_BASE_URL` is not the Anthropic endpoint. The operator stores the approved endpoint on that tenant's Anthropic connection. The API key is encrypted with `PROVIDER_CREDENTIAL_KEY` before it is stored.
+Anthropic uses the same tenant tables.
+The proxy does not use a second configuration table.
+The proxy does not add an environment variable for Anthropic.
+`OPENAI_BASE_URL` is not the Anthropic endpoint.
+Record the endpoint on the Anthropic connection for that tenant.
+The proxy encrypts the provider API key with `PROVIDER_CREDENTIAL_KEY`.
+The proxy records the ciphertext.
 
-Registering the connection enables that connection. A new deployment stays disabled until you pass `--enabled true` or run `set-deployment-enabled`. Anthropic is not called until both the connection and the deployment are enabled. One tenant has one connection for each provider.
+`register-anthropic-connection` sets the connection to enabled.
+A new deployment is not enabled.
+The deployment is not enabled until you pass `--enabled true`.
+You can use `set-deployment-enabled`.
+The proxy does not send a request to Anthropic until the connection is enabled.
+The proxy does not send a request to Anthropic until the deployment is enabled.
+Each tenant has 1 connection for each provider.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-anthropic-connection \
@@ -150,7 +310,10 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
   --tenant-id <tenant-id> --name claude --enabled true
 ```
 
-`--workspace-id` is optional on `register-anthropic-connection`. An Anthropic deployment requires `--default-max-output-tokens`. An OpenAI deployment rejects that flag.
+`--workspace-id` is not necessary on `register-anthropic-connection`.
+An Anthropic deployment must have `--default-max-output-tokens`.
+Do not use `--default-max-output-tokens` for an OpenAI deployment.
+The command does not record the deployment.
 
 ```bash
 docker compose run --rm app node dist/cli.js set-anthropic-credential \
@@ -159,11 +322,20 @@ docker compose run --rm app node dist/cli.js set-connection-enabled \
   --tenant-id <tenant-id> --provider anthropic --enabled false
 ```
 
-`set-connection-enabled` without `--provider` still changes the OpenAI connection.
+`set-connection-enabled` changes the OpenAI connection when you omit `--provider`.
 
-The same caller code reaches either provider by changing only `model`. `auto` stays on the deployment selected by `set-alias`. An explicit deployment name is not replaced.
+The same caller code can reach OpenAI or Anthropic.
+Change only `model`.
+`auto` selects the deployment from `set-alias`.
+The proxy keeps the deployment name that you write in `model`.
+The proxy does not replace that name.
 
-An optional staging check is `scripts/anthropic-smoke.mjs`. It does nothing unless `ANTHROPIC_SMOKE=1`, and `npm test` does not run it. With the flag, it sends one chat completion to an already configured proxy. It does not read a provider key.
+Use `scripts/anthropic-smoke.mjs` on a proxy that you have set.
+The script sends no request when `ANTHROPIC_SMOKE` is not `1`.
+`npm test` does not run the script.
+When `ANTHROPIC_SMOKE` is `1`, the script sends 1 chat completion.
+Set the proxy before you run the script.
+The script does not read a provider API key.
 
 ```bash
 ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
@@ -173,9 +345,53 @@ ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
 
 ## Chat API
 
-`POST /v1/chat/completions` accepts JSON with `model` and text `messages`. `model` is `auto` or an enabled deployment name. `stream` may be omitted or `false`. Optional fields are accepted only when that deployment lists the matching capability: `temperature`, `top_p`, `max_tokens`, `max_completion_tokens`, `stop`, `presence_penalty`, `frequency_penalty`, `seed`, `n` (only `1`), `user`, and `response_format` of `{"type":"text"}`.
+`POST /v1/chat/completions` accepts JSON.
+The JSON must contain `model`.
+The JSON must contain text `messages`.
+`model` is `auto` or the name of an enabled deployment.
+You can omit `stream`.
+You can set `stream` to `false`.
 
-An Anthropic deployment accepts `temperature` from 0 through 1, `stop`, `max_tokens`, and `max_completion_tokens`. When both limits are present they must be equal. When neither is present, the deployment's default max output tokens is sent as `max_tokens`. One leading system message becomes the Anthropic system string. A later system message, a developer message, assistant prefill, tools, images, and any other optional field are rejected before the upstream call. OpenAI deployments keep the fields they already accepted. The proxy does not drop an unsupported field and continue.
+The proxy accepts a field other than `model` and `messages` only when that deployment lists the capability for that field.
+The fields are:
+
+- `temperature`
+- `top_p`
+- `max_tokens`
+- `max_completion_tokens`
+- `stop`
+- `presence_penalty`
+- `frequency_penalty`
+- `seed`
+- `n`, only with the value `1`
+- `user`
+- `response_format`, only with the value `{"type":"text"}`
+
+An Anthropic deployment accepts these fields:
+
+- `temperature` from 0 through 1
+- `stop`
+- `max_tokens`
+- `max_completion_tokens`
+
+When you send `max_tokens` and `max_completion_tokens`, the 2 values must be equal.
+When you send no maximum, the proxy sends `--default-max-output-tokens` as `max_tokens`.
+
+The proxy accepts 1 system message for Anthropic.
+That message must be the first message.
+The proxy uses that text as the Anthropic system text.
+The proxy does not send the provider request for these values:
+
+- A system message that is not first.
+- A developer message.
+- Assistant text as the last message.
+- A tool.
+- An image.
+- A field that the deployment does not list.
+
+An OpenAI deployment keeps each field that its capability list contains.
+The proxy does not remove a field that it does not accept.
+The proxy does not send the provider request for that field.
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions \
@@ -185,11 +401,57 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
   -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-A success body is an OpenAI chat completion. `object` is `chat.completion`. `model` is the upstream model id. Assistant text is in `choices`. `usage` is present only when the upstream reported integer token counts. Missing usage is omitted, not filled in.
+A success body is an OpenAI chat completion.
+`object` is `chat.completion`.
+`model` is the upstream model.
+The assistant text is in `choices`.
+The body contains `usage` only when the provider sent integer token counts.
+When the provider does not send usage, the body has no `usage`.
+The proxy does not invent a token count.
 
-The proxy calls the selected provider once, with `maxRetries` set to 0 and the deployment timeout. OpenAI uses `OPENAI_BASE_URL`. Anthropic uses the connection endpoint and the official Messages API. It commits a request row and an attempt row before that call. The two ids are different. The rows store the deployment id, configuration version, connection id, connection version, status, duration, reported token counts, the provider response id, the native stop or error reason, and cache-token categories when Anthropic reports them. They do not store the prompt or the completion text. Public `usage.prompt_tokens` is the uncached input count plus reported cache creation and cache read counts. A missing count stays null.
+The Anthropic Messages API does not send `created`.
+The proxy sets `created` from the proxy clock.
+The proxy does not put a `thinking` block in the assistant text.
+A response with only `thinking` blocks has empty assistant text.
+The proxy maps each Anthropic stop reason to these values:
 
-Errors use an OpenAI error object:
+- `end_turn` and `stop_sequence` become `stop`.
+- `max_tokens` and `model_context_window_exceeded` become `length`.
+- `refusal` becomes `content_filter`.
+
+The proxy sends 1 request to the selected provider.
+`maxRetries` is `0`.
+The proxy uses the timeout on the deployment.
+OpenAI uses `OPENAI_BASE_URL`.
+Anthropic uses the endpoint on the connection.
+Anthropic uses the Messages API.
+
+The proxy records a request row before that provider request.
+The proxy records an attempt row before that provider request.
+The 2 ids are different.
+The rows record these values:
+
+- The deployment id.
+- The configuration version.
+- The connection id.
+- The connection version.
+- The status.
+- The duration.
+- The token counts from the provider.
+- The provider response id.
+- The native stop reason, or the native error reason.
+- The cache counts, when Anthropic sends them.
+
+The rows do not record the prompt.
+The rows do not record the completion text.
+
+`usage.prompt_tokens` is the input count that was not in the cache.
+When Anthropic sends a cache count, the proxy adds that count to `usage.prompt_tokens`.
+The attempt row records null for a count that the provider does not send.
+The public `usage` object has the 3 OpenAI token fields.
+The proxy does not invent a cache count.
+
+An error body is an OpenAI error object:
 
 ```json
 {"error":{"message":"...","type":"invalid_request_error","param":"stream","code":"unsupported_parameter"}}
@@ -197,59 +459,113 @@ Errors use an OpenAI error object:
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `unsupported_parameter` or `unknown_parameter` | `stream=true`, tools, images, audio, an unsupported response format, or any other field the deployment does not allow. The field is not forwarded. |
-| 401 | `invalid_api_key` | The tenant credential was rejected. |
-| 401 | `upstream_auth_error` | Anthropic rejected the stored provider credential. The message is fixed and is not `invalid_api_key`. |
-| 404 | `model_not_found` | The alias or deployment is unknown or disabled. |
+| 400 | `unsupported_parameter` or `unknown_parameter` | The deployment does not accept the field. |
+| 401 | `invalid_api_key` | The tenant secret is not valid. |
+| 401 | `upstream_auth_error` | Anthropic did not accept the provider API key. |
+| 404 | `model_not_found` | The name is unknown, or the deployment is not enabled. |
 | 408 | `request_cancelled` | The caller closed the request. |
-| 429 | `rate_limit` | The upstream reported HTTP 429. |
-| 502 | `upstream_error` or `invalid_upstream_response` | The upstream failed, or its body could not be represented as a chat completion. Anthropic tool-use and unknown content blocks use `invalid_upstream_response`. |
-| 503 | `inference_disabled` or `service_unavailable` | Inference is off, or the request row could not be committed. No upstream call is made in those cases. |
-| 504 | `timeout` | The deployment timeout elapsed. |
-| 529 | `overloaded` | Anthropic reported HTTP 529. |
+| 429 | `rate_limit` | The provider returned HTTP 429. |
+| 502 | `upstream_error` or `invalid_upstream_response` | The provider sent an error, or the body is not a chat completion. |
+| 503 | `inference_disabled` or `service_unavailable` | Inference is off, or the proxy cannot prepare the provider request. |
+| 504 | `timeout` | The deployment timeout is complete. |
+| 529 | `overloaded` | Anthropic returned HTTP 529. |
 
-If the model call succeeds and the later status update fails, the proxy returns the completion, does not call the model again, and logs a critical event with the request id and the attempt id. The row can remain `pending`.
+For HTTP 400, the proxy does not send the field to the provider.
+The field can be one of these values:
 
-`GET /v1/models` returns `{"object":"list","data":[...]}` for that tenant's enabled deployment names and the `auto` alias.
+- `stream` set to `true`.
+- A tool.
+- An image.
+- Audio.
+- A response format that is not text.
+- A field that the deployment does not accept.
 
-`GET /internal/v1/metrics/summary?from=<timestamp>&to=<timestamp>` needs the same tenant headers. `from` and `to` are absolute timestamps, `to` is exclusive, and the window is at most 32 days. The body has request counts, reported token sums, and latency sample count, sum, and max. Sums are null when no usage was reported. The body has no price and no quality score.
+For `upstream_auth_error`, the error text does not change.
+That code is not `invalid_api_key`.
+A tool-use block from Anthropic uses `invalid_upstream_response`.
+A content block that the proxy cannot represent uses the same code.
+An unknown stop reason uses the same code.
+For HTTP 503, the proxy does not send the provider request.
 
-Health routes keep the Slice 00 JSON shapes. `GET /v1/tenant` keeps `{"error":"unauthorized"}` for a bad credential.
+When the provider returns the chat completion and the proxy cannot record the status, the result is:
+
+- The proxy returns the chat completion.
+- The proxy does not send the provider request again.
+- The proxy logs a critical event.
+- The event contains the request id and the attempt id.
+- The status of the row can be `pending`.
+
+`GET /v1/models` returns `{"object":"list","data":[...]}`.
+The list contains each enabled deployment name for that tenant.
+The list contains the alias `auto`.
+
+`GET /internal/v1/metrics/summary` uses the same tenant headers.
+The query must contain `from` and `to`.
+`from` and `to` each contain a date and a time.
+The window does not contain `to`.
+The window has a maximum of 32 days.
+The body contains the request counts.
+The body contains the sums of the token counts from the provider.
+The body contains the latency sample count, the latency sum, and the latency maximum.
+A sum is null when the provider sent no usage.
+The body contains no price.
+The body contains no quality score.
+
+`GET /health/live` returns `{"status":"live"}`.
+`GET /health/ready` returns `{"status":"ready","database":"ready"}` when the proxy is ready.
+The same route returns HTTP 503 `{"status":"not_ready","database":"unavailable"}` when the proxy is not ready.
+`GET /v1/tenant` returns `{"error":"unauthorized"}` when the tenant secret is not valid.
+When the tenant secret is not valid, a chat completion uses the OpenAI error object.
+The code is `invalid_api_key`.
 
 ## Configuration
 
-The process exits before it listens when any required setting is missing or invalid.
+The process stops before it listens when a necessary value is absent.
+The process stops before it listens when a necessary value is not valid.
 
-| Variable | Required | Purpose |
+| Variable | Necessary | Use |
 | --- | --- | --- |
-| `DATABASE_HOST` | yes | PostgreSQL host |
-| `DATABASE_PORT` | yes | PostgreSQL port |
-| `DATABASE_NAME` | yes | Database name |
-| `MIGRATOR_USER` | yes | Must be `llm_migrator` |
-| `MIGRATOR_PASSWORD` | yes | Migration role password |
-| `AUTH_USER` | yes | Must be `llm_auth` |
-| `AUTH_PASSWORD` | yes | Authentication role password |
-| `RUNTIME_USER` | yes | Must be `llm_runtime` |
-| `RUNTIME_PASSWORD` | yes | Runtime role password |
-| `HOST` | no | Listen address, default `0.0.0.0` |
-| `PORT` | no | Listen port, default `8080` |
-| `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error` |
-| `INFERENCE_ENABLED` | no | Default `false` |
-| `PROVIDER_CREDENTIAL_KEY` | when inference is on | Base64 32-byte key |
-| `OPENAI_BASE_URL` | no | Default official OpenAI API |
+| `DATABASE_HOST` | yes | The PostgreSQL host. |
+| `DATABASE_PORT` | yes | The PostgreSQL port. |
+| `DATABASE_NAME` | yes | The database name. |
+| `MIGRATOR_USER` | yes | The value must be `llm_migrator`. |
+| `MIGRATOR_PASSWORD` | yes | The password for the migration role. |
+| `AUTH_USER` | yes | The value must be `llm_auth`. |
+| `AUTH_PASSWORD` | yes | The password for the authentication role. |
+| `RUNTIME_USER` | yes | The value must be `llm_runtime`. |
+| `RUNTIME_PASSWORD` | yes | The password for the runtime role. |
+| `HOST` | no | The listen address. When the variable is absent, the proxy uses `0.0.0.0`. |
+| `PORT` | no | The listen port. When the variable is absent, the proxy uses `8080`. |
+| `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. |
+| `INFERENCE_ENABLED` | no | `true` or `false`. When the variable is absent, the proxy uses `false`. |
+| `PROVIDER_CREDENTIAL_KEY` | When `INFERENCE_ENABLED` is `true` | A 32-byte key in base64. |
+| `OPENAI_BASE_URL` | no | The OpenAI base URL. When the variable is absent, the proxy uses `https://api.openai.com/v1`. |
 
-`SIGTERM` stops new work, closes the database pools, and exits.
+`SIGTERM` stops a new request.
+The proxy closes the database pools.
+The process ends.
 
-## Deployment and rollback
+## Migrations and an earlier image
 
-Migrations are forward-only. `003_inference.sql` adds inference tables and does not change Slice 00 tables. A second boot applies nothing.
+The proxy applies migration files in one direction.
+`003_inference.sql` adds the inference tables.
+That file does not change the tables from `001_schema.sql`.
+That file does not change the tables from `002_security.sql`.
+When the process starts again, the proxy does not apply a file that `schema_migrations` contains.
 
-To run the previous image after `003_inference.sql` is applied, build it from the Slice 00 commit if the local tag is absent, stop the current app, and start that image on the same database network:
+The image `104831e` checks the tenant secret.
+The image applies row-level security.
+That image has no chat route.
+Its latest migration file is `002_security.sql`.
+Use these commands when `schema_migrations` contains `003_inference.sql`.
+Build the image when your computer has no tag `llm-proxy:104831e`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
 
 ```bash
-git archive --format=tar 8794d06 | docker build -t llm-proxy:slice-00 -
+git archive --format=tar 104831e | docker build -t llm-proxy:104831e -
 docker compose stop app
-docker run -d --name llm-proxy-slice00-run --network llm-proxy_default \
+docker run -d --name llm-proxy-104831e --network llm-proxy_default \
   -p 8080:8080 \
   -e HOST=0.0.0.0 -e PORT=8080 \
   -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
@@ -257,24 +573,35 @@ docker run -d --name llm-proxy-slice00-run --network llm-proxy_default \
   -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
   -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
   -e LOG_LEVEL=info \
-  llm-proxy:slice-00
+  llm-proxy:104831e
 ```
 
-The previous image becomes ready because `002_security.sql` is still applied. `GET /v1/tenant` still works. It has no chat route. Return to the current image with:
+The readiness route returns HTTP 200 because `schema_migrations` contains `002_security.sql`.
+`GET /v1/tenant` returns the tenant id, the name, and the key ids.
+The image has no chat route.
+Start the Compose proxy again with these commands:
 
 ```bash
-docker rm -f llm-proxy-slice00-run
+docker rm -f llm-proxy-104831e
 docker compose start app
 ```
 
-`scripts/verify-slice-01.mjs` provisions tenants, uses a mock provider, checks the rows, and checks this rollback. Give it an empty scratch directory.
-
-`004_anthropic.sql` adds nullable columns and Anthropic functions. It does not update existing OpenAI rows. After it is applied, the Slice 01 image still becomes ready because its latest migration file, `003_inference.sql`, remains applied. Build that image from `0b18e92` when the tag is absent, stop the current app, and start it on the same database network:
+`004_anthropic.sql` adds columns that can be null.
+The file adds the Anthropic functions.
+The file does not change an OpenAI row that is in the database.
+The image `0b18e92` sends an OpenAI chat completion.
+The image does not send a request to Anthropic.
+Its latest migration file is `003_inference.sql`.
+`schema_migrations` keeps `003_inference.sql`.
+The readiness route can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:0b18e92`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
 
 ```bash
-git archive --format=tar 0b18e92 | docker build -t llm-proxy:slice-01 -
+git archive --format=tar 0b18e92 | docker build -t llm-proxy:0b18e92 -
 docker compose stop app
-docker run -d --name llm-proxy-slice01-run --network llm-proxy_default \
+docker run -d --name llm-proxy-0b18e92 --network llm-proxy_default \
   -p 8080:8080 \
   -e HOST=0.0.0.0 -e PORT=8080 \
   -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
@@ -285,74 +612,195 @@ docker run -d --name llm-proxy-slice01-run --network llm-proxy_default \
   -e INFERENCE_ENABLED=true \
   -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
   -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
-  llm-proxy:slice-01
+  llm-proxy:0b18e92
 ```
 
-That image serves the existing OpenAI deployment. It does not call Anthropic. Return to the current image with:
+That image sends a chat completion for the OpenAI deployment in the database.
+That image does not send a request to Anthropic.
+Start the Compose proxy again with these commands:
 
 ```bash
-docker rm -f llm-proxy-slice01-run
+docker rm -f llm-proxy-0b18e92
 docker compose start app
 ```
 
-Do not remove the database volume. Compose init scripts run only on an empty volume.
+Do not remove the database volume.
+The init scripts for Compose run only when the database volume is empty.
 
 ## Tests
 
-`npm test` needs Node.js 24 and a running Docker daemon. See [Requirements](#requirements). The suite starts real PostgreSQL with Testcontainers, a local mock OpenAI server, and a local mock Anthropic Messages API. It does not call a live provider.
+`npm test` must use Node.js 24.
+`npm test` must have a Docker daemon in operation.
+Refer to [What you must have](#what-you-must-have).
+The tests start PostgreSQL with Testcontainers.
+The tests start a local mock OpenAI server.
+The tests start a local mock of the Anthropic Messages API.
+The tests do not send a request to a provider on the internet.
 
 ```bash
 nvm use 24
 npm test
 ```
 
-The deployed request and response check is [Check a deployed instance](#check-a-deployed-instance).
+Refer to [Check a started proxy](#check-a-started-proxy).
 
-## Assumptions
+## System rules
 
 - This directory is the git repository.
-- Verifiers are Node.js `crypto.scrypt` with `N=16384`, `r=8`, and `p=1`. A native hashing package is not used, so the Node.js 24 image does not need a compiler.
-- Tenant secrets are 32 random bytes, prefixed with `yck_`, and shown once. The database check constraint rejects a raw secret as a verifier.
-- Provider credentials are AES-256-GCM ciphertext (`aes-256-gcm$...`). The encryption key is `PROVIDER_CREDENTIAL_KEY` and is not stored in PostgreSQL. The runtime role cannot select the ciphertext column. A security-definer function returns it only when the transaction tenant matches and the connection is enabled.
-- `llm_owner` is a `NOLOGIN` role with `BYPASSRLS` and `CREATE` on schema `public`. It owns the tables and the security-definer functions. Application connections use only `llm_migrator`, `llm_auth`, and `llm_runtime`. Those three roles are not superusers and cannot bypass row level security.
-- `llm_migrator` is a member of `llm_owner` so it can assign ownership during migrations, and it is `NOINHERIT`. A holder of the migration password can `SET ROLE llm_owner`. The request path never uses that role. `003_inference.sql` creates its foreign keys as `llm_owner` because that role owns `tenants`.
-- The authentication role may execute only `list_active_key_verifiers`. The runtime role may read tenant rows under row level security and may not read the verifier column or the provider ciphertext.
-- Tenant context is `set_config('app.tenant_id', ..., true)` inside a transaction. The setting ends when the transaction ends, before the connection returns to the pool. The upstream call runs after that transaction commits.
-- Row level security is forced. With no tenant setting, policies match no rows.
-- Migrations are forward-only SQL files in `migrations/`, applied in lexical order and recorded in `schema_migrations`. A second run skips applied files and does not delete rows. Do not edit a file after it has been applied.
-- Role creation is separate from migrations. Compose runs `docker/postgres/init.sh` as the database superuser. Tests apply the same attributes through `bootstrapRoles`.
-- The service migrates on startup, then listens. A later database outage does not exit the process. Readiness fails and liveness stays up.
-- Logs are one JSON object per line. Redaction strips bearer tokens, `yck_` secrets, scrypt verifiers, `sk-` provider keys, AES-GCM ciphertext, and fields whose names look like secrets, prompts, or messages.
-- Local Compose passwords are development-only.
-- PostgreSQL 16 is the local database image. The major version is not a product requirement beyond row level security support.
-- The OpenAI Node SDK is the OpenAI upstream client and the contract-test client. The Anthropic Node SDK is the Anthropic upstream client. Both set `maxRetries` to 0. Each adapter sets its base URL explicitly. Anthropic stores that URL on the tenant connection. OpenAI uses `OPENAI_BASE_URL`.
-- The ASD-STE100 dictionary is not in this environment. The commit subject follows the public style rules for this slice: one active imperative sentence, at most 20 words, American spelling, no semicolon, and no noun cluster longer than three words.
+- A verifier uses Node.js `crypto.scrypt`.
+- The scrypt parameters are `N=16384`, `r=8`, and `p=1`.
+- The proxy does not use a native code package for the verifier.
+- A compiler is not necessary for the Node.js 24 image.
+- A tenant secret is 32 random bytes.
+- The tenant secret has the prefix `yck_`.
+- The CLI shows the tenant secret 1 time.
+- The verifier column cannot contain a raw tenant secret.
+- A provider API key is AES-256-GCM ciphertext.
+- The ciphertext has the prefix `aes-256-gcm$`.
+- The encryption key is `PROVIDER_CREDENTIAL_KEY`.
+- PostgreSQL does not record that key.
+- The runtime role cannot read the ciphertext column.
+- A `SECURITY DEFINER` function gives the ciphertext only when 2 conditions are true.
+- The tenant in the transaction must match the row.
+- The connection must be enabled.
+- `llm_owner` is a `NOLOGIN` role.
+- The role has `BYPASSRLS`.
+- The role has `CREATE` on the schema `public`.
+- The role owns the tables.
+- The role owns the `SECURITY DEFINER` functions.
+- The proxy connects to PostgreSQL only as `llm_migrator`, `llm_auth`, or `llm_runtime`.
+- Those 3 roles are not superusers.
+- Those 3 roles cannot bypass row-level security.
+- `llm_migrator` is a member of `llm_owner`.
+- The member can assign table ownership in a migration.
+- The role is `NOINHERIT`.
+- A person with the migration password can `SET ROLE llm_owner`.
+- A tenant request does not use `llm_owner`.
+- `003_inference.sql` creates its foreign keys as `llm_owner`.
+- `llm_owner` owns the table `tenants`.
+- The authentication role can run only `list_active_key_verifiers`.
+- The runtime role can read tenant rows under row-level security.
+- The runtime role cannot read the verifier column.
+- The runtime role cannot read the provider ciphertext.
+- The proxy sets the tenant with `set_config('app.tenant_id', ..., true)`.
+- The proxy sets the tenant in a transaction.
+- The proxy removes `app.tenant_id` when the transaction is complete.
+- The pool receives the database session again.
+- The provider request starts after that transaction is complete.
+- Row-level security applies to the table owner and to each other role.
+- When `app.tenant_id` is absent, a policy matches no rows.
+- The migration files are SQL files in `migrations/`.
+- The proxy applies the files in lexical order.
+- The proxy records each file in `schema_migrations`.
+- When the process starts again, the proxy does not apply a file that `schema_migrations` contains.
+- When the process starts again, the proxy does not delete rows.
+- After the proxy applies a file, do not change that file.
+- A migration does not create the database roles.
+- Compose runs `docker/postgres/init.sh` as the database superuser.
+- The tests set the same role attributes with `bootstrapRoles`.
+- The proxy applies the migration files before the proxy listens.
+- When the proxy cannot connect to PostgreSQL after it listens, the process does not stop.
+- The readiness route returns HTTP 503.
+- The liveness route continues to return HTTP 200.
+- Each log line is 1 JSON object.
+- Redaction removes a bearer token.
+- Redaction removes a `yck_` tenant secret.
+- Redaction removes a scrypt verifier.
+- Redaction removes a provider API key that has the prefix `sk-`.
+- Redaction removes AES-GCM ciphertext.
+- Redaction removes a field when the field name identifies a secret, a prompt, or a chat message.
+- A password in local Compose is for development.
+- The local database image is PostgreSQL 16.
+- You can use a different major version when that version has row-level security.
+- The OpenAI Node SDK is the OpenAI client in the proxy.
+- The same SDK is the client in the contract tests.
+- The Anthropic Node SDK is the Anthropic client in the proxy.
+- Each client sets `maxRetries` to `0`.
+- Each adapter sets its base URL.
+- Anthropic records that URL on the tenant connection.
+- OpenAI uses `OPENAI_BASE_URL`.
+- Git does not track `.env.live`.
+- A Docker build does not copy `.env.live`.
 
-## Limitations
+## Limits
 
-- The providers are OpenAI and Anthropic. The only method is non-streaming text chat. There is no tool calling, image input, audio, fallback, retry, or quality-based routing.
-- Anthropic accepts one leading system message, text user and assistant turns that alternate and end on a user turn, temperature from 0 through 1, stop sequences, and an output token limit. The Messages API has no `created` time. The proxy fills `created` from its own clock. Thinking blocks are omitted. A response that is only thinking has empty assistant text. Tool-use and any other content block or stop reason reject the response.
-- Anthropic cache categories are stored on the attempt when the provider reports them. They are not invented. Public usage still has the three OpenAI token fields.
-- Each accepted request makes one attempt. The schema allows a later attempt row for the same request.
-- There is no rate limit, billing, price, quality score, Kubernetes manifest, CI pipeline, or hosted deployment.
-- Provisioning is a command line tool for the migration role. There is no HTTP admin API.
-- Database role passwords and `PROVIDER_CREDENTIAL_KEY` come from the environment. There is no external secret manager and no TLS termination in this slice.
-- `OPENAI_BASE_URL` is process configuration so a test can use a mock. A caller field that selects a URL is rejected.
-- Authentication spends scrypt time on each presented secret. Unknown tenants pay one dummy scrypt so an empty key list is harder to time. This is not a formal constant-time proof across every failure branch.
-- The authentication function returns verifiers to the authentication role so the application can compare them. Verifiers are not reversible and are not logged.
-- A person who holds the migration password can assume `llm_owner` and bypass row level security. Protect that password as an administrative credential.
-- Compose init scripts run only when the database volume is empty.
-- If status persistence fails after a successful model call, the caller still receives the completion and the stored row can stay `pending`.
-- The default tests do not call a live provider. `scripts/anthropic-smoke.mjs` is an optional operator check and is off unless `ANTHROPIC_SMOKE=1`.
+- The providers are OpenAI and Anthropic.
+- The proxy accepts only a text chat completion in 1 response.
+- The proxy does not accept a tool.
+- The proxy does not accept an image.
+- The proxy does not accept audio.
+- The proxy does not send the request to a second provider.
+- The proxy does not send the request again after an error.
+- The proxy does not select a deployment by a quality score.
+- Anthropic accepts 1 system message, and that message must be first.
+- Anthropic accepts a user message and an assistant message as text.
+- The messages must alternate.
+- The last message must be a user message.
+- Anthropic accepts `temperature` from 0 through 1.
+- Anthropic accepts a stop sequence.
+- Anthropic accepts a maximum number of output tokens.
+- The proxy does not put a `thinking` block in the assistant text.
+- A response with only `thinking` blocks has empty assistant text.
+- The proxy returns HTTP 502 for a tool-use block.
+- The proxy returns HTTP 502 for a content block that it cannot represent.
+- The proxy returns HTTP 502 for a stop reason that it cannot represent.
+- The proxy records a cache count on the attempt only when Anthropic sends that count.
+- The proxy does not invent a cache count.
+- Public `usage` has the 3 OpenAI token fields.
+- The proxy sends 1 attempt for each request that it accepts.
+- The schema permits one more attempt row for the same request.
+- The proxy does not set a maximum number of requests.
+- The proxy does not calculate a charge.
+- The proxy has no price.
+- The proxy has no quality score.
+- The repository has no Kubernetes manifest.
+- The repository has no pipeline for continuous integration.
+- The repository has no installation on a public server.
+- You add a tenant with the CLI.
+- The CLI uses the migration role.
+- The proxy has no HTTP route for administration.
+- A database role password comes from the environment.
+- `PROVIDER_CREDENTIAL_KEY` comes from the environment.
+- The proxy has no external secret manager.
+- The proxy does not use TLS on its listen port.
+- `OPENAI_BASE_URL` is an environment variable.
+- A test can select a mock server with that value.
+- The proxy does not accept a caller field that selects a URL.
+- The proxy uses scrypt for each tenant secret that a caller sends.
+- For an unknown tenant, the proxy uses 1 dummy scrypt.
+- With the dummy scrypt, the time for an empty key list is closer to the time for a key list that has keys.
+- This scrypt step is not a constant-time proof.
+- The authentication function gives the verifiers to the authentication role.
+- The proxy compares the verifiers.
+- You cannot calculate the tenant secret from a verifier.
+- The proxy does not log a verifier.
+- A person with the migration password can become `llm_owner`.
+- That person can bypass row-level security.
+- Keep the migration password secret.
+- The migration password is an administrative credential.
+- The init scripts for Compose run only on an empty database volume.
+- When the proxy cannot record the status after the provider returns the chat completion, the caller receives the chat completion.
+- The status of the row can be `pending`.
+- The tests that `npm test` runs do not send a request to a provider on the internet.
+- `scripts/anthropic-smoke.mjs` is a procedure for an operator.
+- The script sends no request when `ANTHROPIC_SMOKE` is not `1`.
 
-## Unfinished items
+## Work that is not complete
 
-- Streaming, multimodal input, tools, fallback, retries, and intelligent routing.
-- OAuth, login, sessions, and user accounts.
-- Key revocation and provider administration through HTTP.
-- Production management of database role passwords and the provider key.
-- Billing, rate limits, and cost metering.
+- A response in parts.
+- Input that is not text.
+- A tool call.
+- A second provider after an error.
+- A second send after an error.
+- Selection of a deployment by a quality score.
+- OAuth, a login, saved caller state, and a user account.
+- An HTTP route that revokes a tenant key.
+- An HTTP route that changes a provider record.
+- Production control of a database role password.
+- Production control of the provider key.
+- A charge for use, a maximum number of requests, and the cost of each request.
 
 ## License
 
-Released under the MIT license. See [LICENSE](LICENSE).
+This project uses the MIT license.
+Refer to [LICENSE](LICENSE).

@@ -201,7 +201,7 @@ npm test
 
 ## Assumptions
 
-- This directory is the service repository. The workspace root is not the git root.
+- This directory is the git repository.
 - Verifiers are Node.js `crypto.scrypt` with `N=16384`, `r=8`, and `p=1`. A native hashing package is not used, so the Node.js 24 image does not need a compiler.
 - Tenant secrets are 32 random bytes, prefixed with `yck_`, and shown once. The database check constraint rejects a raw secret as a verifier.
 - Provider credentials are AES-256-GCM ciphertext (`aes-256-gcm$...`). The encryption key is `PROVIDER_CREDENTIAL_KEY` and is not stored in PostgreSQL. The runtime role cannot select the ciphertext column. A security-definer function returns it only when the transaction tenant matches and the connection is enabled.
@@ -241,3 +241,7 @@ npm test
 - Key revocation and provider administration through HTTP.
 - Production management of database role passwords and the provider key.
 - Billing, rate limits, and cost metering.
+
+## License
+
+Released under the MIT license. See [LICENSE](LICENSE).

@@ -650,6 +650,7 @@ The endpoint has no user name and no password.
 The host is not a public provider host.
 The endpoint is on an allowlist for that tenant.
 The allowlist pins the addresses for that host.
+The proxy does not follow a redirect.
 A production endpoint keeps TLS verification on.
 A chat uses `/v1/models` and `/v1/chat/completions`.
 A health check uses only the stored health endpoint.
@@ -658,6 +659,7 @@ Do not pass `--default-max-output-tokens` for DGX.
 Do not pass an OpenRouter routing flag for DGX.
 A new DGX deployment stays disabled until you enable it.
 You can set a concurrency limit on that deployment.
+The concurrency limit is a count in this process.
 DGX can stream when the tenant and the deployment both enable streaming.
 `validate-deployment` records `unvalidated`, `valid`, `invalid`, or `validated_mock`.
 `validate-deployment` does not record `validated_live`.
@@ -1437,6 +1439,55 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`011_private_endpoint.sql` stores an allowlist for a private endpoint.
+The file stores a concurrency limit on a deployment.
+The file allows an approved DGX deployment to stream.
+The file can record `validated_mock`.
+The file does not record `validated_live`.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `010`.
+
+The image `9f21f94` stays ready on this database.
+A tenant that stores OpenAI, Anthropic, Vertex, xAI, and OpenRouter can still send a chat completion.
+That image does not serve a DGX chat.
+Its latest migration file is `010_compatible_providers.sql`.
+After `011_private_endpoint.sql` is applied, `schema_migrations` keeps `010_compatible_providers.sql`.
+The readiness route on image `9f21f94` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:9f21f94`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar 9f21f94 | docker build -t llm-proxy:9f21f94 -
+docker compose stop app
+docker rm -f llm-proxy-9f21f94
+docker run -d --name llm-proxy-9f21f94 --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=false \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:9f21f94
+```
+
+That image stays ready.
+Do not delete a DGX row to roll back.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-9f21f94
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1452,6 +1503,8 @@ An xAI live test runs only when `XAI_LIVE` is `1`.
 `npm test` does not set `XAI_LIVE`.
 An OpenRouter live test runs only when `OPENROUTER_LIVE` is `1`.
 `npm test` does not set `OPENROUTER_LIVE`.
+The tests start a local mock of a private endpoint.
+The tests do not send a request to a DGX host.
 
 ```bash
 nvm use 24
@@ -1543,8 +1596,10 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - OpenAI uses `OPENAI_BASE_URL`.
 - xAI uses `https://api.x.ai/v1`.
 - OpenRouter uses `https://openrouter.ai/api/v1`.
+- DGX uses the stored tenant endpoint.
 - The caller cannot change the xAI base URL.
 - The caller cannot change the OpenRouter base URL.
+- The caller cannot change the DGX endpoint.
 - Git does not track `.env.live`.
 - A Docker build does not copy `.env.live`.
 
@@ -1554,7 +1609,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The registry can store 1 private DGX endpoint.
 - An approved DGX deployment can serve a text chat.
 - DGX uses the stored tenant endpoint.
+- The caller cannot change the DGX endpoint.
 - DGX does not use `OPENAI_BASE_URL`.
+- The DGX concurrency limit is a count in this process.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
 - Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
 - Vertex can stream a text chat when that tenant and that deployment both enable streaming.

@@ -68,6 +68,38 @@ The proxy records the token counts from Anthropic.
 The proxy records the errors from Anthropic.
 An OpenAI deployment continues to operate after you add Anthropic.
 
+The proxy can stream a text chat for an OpenAI deployment.
+The proxy can stream a text chat for an Anthropic deployment.
+The same caller can use both.
+The caller changes only the model.
+Streaming stays off until that tenant and that deployment both have streaming enabled.
+One accepted stream makes one upstream attempt.
+
+The metric totals for a time window include the stream request count.
+Those totals include the completed, cancelled, failed, and truncated stream counts.
+Those totals include the stream token counts.
+Those totals include P50 and P95 for the time to the first text.
+Those totals include P50 and P95 for the stream duration.
+A window with no samples does not invent a latency or a token count.
+A tenant reads only its own rows.
+
+The proxy limits the open streams in one process.
+The proxy limits the open streams for one tenant in that same process.
+A second process has its own counts.
+A slow caller ends that stream and releases the slot.
+
+After `SIGTERM` or `SIGINT`, the proxy accepts no new stream.
+The proxy waits for the configured drain time.
+A stream that finishes in that time can complete.
+The proxy then aborts each stream that is still open.
+The proxy records `interrupted` when that row write succeeds.
+
+An Anthropic stream accepts the configured model.
+An Anthropic stream also accepts that model with an 8-digit snapshot suffix.
+The caller still receives the configured model.
+A different model fails the stream.
+The proxy does not use the Anthropic fields `inference_geo` and `speed`.
+
 You can start the local Compose project with Colima.
 You can stop that project with Colima.
 You can check a proxy that is in operation.
@@ -1094,6 +1126,8 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - A stream is `completed` only after the provider finish event.
 - An OpenAI stream is `completed` only after the provider `[DONE]` event.
 - An Anthropic stream is `completed` only after `message_stop`.
+- An Anthropic response model can add an 8-digit date to the configured model.
+- The proxy ignores the Anthropic usage fields `inference_geo` and `speed`.
 - The OpenAI SDK treats a closed socket as the end of a stream.
 - The Anthropic SDK stream helper treats a closed socket as the end of a stream.
 - An Anthropic stream does not use that helper.

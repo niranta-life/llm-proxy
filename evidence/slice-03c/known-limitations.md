@@ -13,3 +13,5 @@
 - Rollback does not delete attempt rows. Do not edit migrations `001` through `006`. Do not remove the database volume.
 - `npm test` does not call a live provider. `scripts/openai-stream-smoke.mjs` stays idle unless `OPENAI_STREAM_SMOKE=1`. `scripts/anthropic-smoke.mjs` stays idle unless `ANTHROPIC_SMOKE=1`.
 - The proxy does not add dynamic routing, fallback, retry orchestration, replay, or evaluation.
+- An Anthropic stream accepts the configured model or that model plus an 8-digit snapshot date. Any other model fails the stream.
+- The proxy ignores Anthropic usage fields `inference_geo` and `speed`.

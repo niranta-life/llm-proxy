@@ -42,6 +42,8 @@ export type Config = {
   providerCredentialKey: Buffer | null;
   openAiBaseUrl: string;
   maxActiveStreams: number;
+  maxStreamsPerTenant: number;
+  streamShutdownDrainMs: number;
   database: {
     host: string;
     port: number;
@@ -102,18 +104,38 @@ function readRequired(env: NodeJS.ProcessEnv, key: string): string | undefined {
   return value.trim();
 }
 
-function readMaxActiveStreams(env: NodeJS.ProcessEnv, errors: string[]): number {
-  const text = readRequired(env, 'MAX_ACTIVE_STREAMS') ?? '32';
+function readBoundedInteger(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  fallback: string,
+  min: number,
+  max: number,
+  errors: string[],
+): number {
+  const text = readRequired(env, key) ?? fallback;
+  const label = `${key} must be an integer from ${min} to ${max}`;
   if (!/^\d+$/.test(text)) {
-    errors.push('MAX_ACTIVE_STREAMS must be an integer from 1 to 10000');
-    return 32;
+    errors.push(label);
+    return Number(fallback);
   }
   const value = Number(text);
-  if (value < 1 || value > 10_000) {
-    errors.push('MAX_ACTIVE_STREAMS must be an integer from 1 to 10000');
-    return 32;
+  if (value < min || value > max) {
+    errors.push(label);
+    return Number(fallback);
   }
   return value;
+}
+
+function readMaxActiveStreams(env: NodeJS.ProcessEnv, errors: string[]): number {
+  return readBoundedInteger(env, 'MAX_ACTIVE_STREAMS', '32', 1, 10_000, errors);
+}
+
+function readMaxStreamsPerTenant(env: NodeJS.ProcessEnv, errors: string[]): number {
+  return readBoundedInteger(env, 'MAX_STREAMS_PER_TENANT', '32', 1, 10_000, errors);
+}
+
+function readStreamShutdownDrainMs(env: NodeJS.ProcessEnv, errors: string[]): number {
+  return readBoundedInteger(env, 'STREAM_SHUTDOWN_DRAIN_MS', '5000', 0, 600_000, errors);
 }
 
 function readPort(value: string, label: string, errors: string[]): number | undefined {
@@ -157,6 +179,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const openAiBaseUrl = readOpenAiBaseUrl(env, errors);
   const providerCredentialKey = readCredentialKey(env, inferenceEnabled, errors);
   const maxActiveStreams = readMaxActiveStreams(env, errors);
+  const maxStreamsPerTenant = readMaxStreamsPerTenant(env, errors);
+  const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -185,6 +209,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     providerCredentialKey,
     openAiBaseUrl,
     maxActiveStreams,
+    maxStreamsPerTenant,
+    streamShutdownDrainMs,
     database: {
       host: databaseHost,
       port: databasePort,

@@ -140,6 +140,42 @@ describe('Anthropic stream conversion', () => {
     expect(wrong.done).toBe(false);
     expect(wrong.error?.code).toBe('invalid_upstream_response');
 
+    const dated = eventsFromAnthropicEvent({
+      type: 'message_start',
+      message: {
+        id: 'msg_dated',
+        type: 'message',
+        role: 'assistant',
+        model: `${MODEL}-20250929`,
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+        usage: {
+          input_tokens: 4,
+          output_tokens: 1,
+          inference_geo: 'ignored',
+          speed: 'standard',
+        },
+      },
+    }, initialAnthropicStreamCursor(1_700_000_000), MODEL);
+    expect(dated.events[0]).toMatchObject({ type: 'start', model: MODEL });
+    expect(JSON.stringify(dated.events)).not.toContain('inference_geo');
+    expect(JSON.stringify(dated.events)).not.toContain('standard');
+
+    expect(() => eventsFromAnthropicEvent({
+      type: 'message_start',
+      message: {
+        id: 'msg_alias',
+        type: 'message',
+        role: 'assistant',
+        model: `${MODEL}-latest`,
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      },
+    }, initialAnthropicStreamCursor(1_700_000_000), MODEL)).toThrow(ProxyError);
+
     const malformed = play('malformed.sse');
     expect(malformed.done).toBe(false);
     expect(malformed.error?.code).toBe('invalid_upstream_response');

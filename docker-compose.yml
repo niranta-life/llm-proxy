@@ -39,6 +39,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       PROVIDER_CREDENTIAL_KEY: ${PROVIDER_CREDENTIAL_KEY:-}
       MAX_ACTIVE_STREAMS: ${MAX_ACTIVE_STREAMS:-32}
+      MAX_STREAMS_PER_TENANT: ${MAX_STREAMS_PER_TENANT:-32}
+      STREAM_SHUTDOWN_DRAIN_MS: ${STREAM_SHUTDOWN_DRAIN_MS:-5000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

@@ -98,6 +98,7 @@ export async function createTestApp(
     upstreamBaseUrl?: string;
     credentialKey?: Buffer | null;
     maxActiveStreams?: number;
+    maxStreamsPerTenant?: number;
   } = {},
 ) {
   const config = configFor(db);
@@ -113,6 +114,7 @@ export async function createTestApp(
     upstreamBaseUrl: options.upstreamBaseUrl ?? 'https://api.openai.com/v1',
     credentialKey: options.credentialKey ?? null,
     maxActiveStreams: options.maxActiveStreams ?? config.maxActiveStreams,
+    maxStreamsPerTenant: options.maxStreamsPerTenant ?? config.maxStreamsPerTenant,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

@@ -227,6 +227,17 @@ export async function listVisibleModels(client: PoolClient): Promise<ModelListIt
   }));
 }
 
+export type StreamCount = {
+  requests: number;
+  completed: number;
+  cancelled: number;
+  errors: number;
+  truncated: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+};
+
 export type MetricsSummary = {
   window: { from: string; to: string };
   requests: { total: number; succeeded: number; failed: number; pending: number };
@@ -237,6 +248,22 @@ export type MetricsSummary = {
     responsesMissingUsage: number;
   };
   latency: { samples: number; sumMs: number | null; maxMs: number | null };
+  streaming: {
+    requests: number;
+    completed: number;
+    cancelled: number;
+    errors: number;
+    truncated: number;
+    firstTextDeltaMs: { samples: number; p50: number | null; p95: number | null };
+    durationMs: { samples: number; p50: number | null; p95: number | null };
+    usage: {
+      promptTokens: number | null;
+      completionTokens: number | null;
+      totalTokens: number | null;
+    };
+  };
+  byProvider: Array<StreamCount & { provider: string }>;
+  byDeployment: Array<StreamCount & { provider: string; deployment: string }>;
 };
 
 function count(value: unknown): number {
@@ -248,6 +275,42 @@ function sumOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function intOrNull(value: unknown): number | null {
+  const parsed = sumOrNull(value);
+  return parsed === null ? null : Math.trunc(parsed);
+}
+
+const STREAM_ERROR_STATUSES = `('provider_failed', 'timed_out', 'slow_consumer', 'interrupted')`;
+
+type StreamCountRow = {
+  requests: number;
+  completed: number;
+  cancelled: number;
+  errors: number;
+  truncated: number;
+  prompt_tokens: string | null;
+  completion_tokens: string | null;
+  total_tokens: string | null;
+};
+
+function streamCountFrom(row: StreamCountRow | undefined): Omit<StreamCount, never> {
+  return {
+    requests: count(row?.requests),
+    completed: count(row?.completed),
+    cancelled: count(row?.cancelled),
+    errors: count(row?.errors),
+    truncated: count(row?.truncated),
+    promptTokens: sumOrNull(row?.prompt_tokens),
+    completionTokens: sumOrNull(row?.completion_tokens),
+    totalTokens: sumOrNull(row?.total_tokens),
+  };
+}
+
+function addToken(left: number | null, right: number | null): number | null {
+  if (left === null && right === null) return null;
+  return (left ?? 0) + (right ?? 0);
 }
 
 export async function summarizeMetrics(client: PoolClient, from: Date, to: Date): Promise<MetricsSummary> {
@@ -291,8 +354,100 @@ export async function summarizeMetrics(client: PoolClient, from: Date, to: Date)
      WHERE r.created_at >= $1 AND r.created_at < $2`,
     [from, to],
   );
+  const streams = await client.query<StreamCountRow>(
+    `SELECT count(*) FILTER (WHERE a.stream_status IS NOT NULL)::int AS requests,
+            count(*) FILTER (WHERE a.stream_status = 'completed')::int AS completed,
+            count(*) FILTER (WHERE a.stream_status = 'client_aborted')::int AS cancelled,
+            count(*) FILTER (WHERE a.stream_status IN ${STREAM_ERROR_STATUSES})::int AS errors,
+            count(*) FILTER (WHERE a.stream_status = 'stream_truncated')::int AS truncated,
+            sum(a.prompt_tokens) FILTER (WHERE a.stream_status IS NOT NULL)::bigint AS prompt_tokens,
+            sum(a.completion_tokens) FILTER (WHERE a.stream_status IS NOT NULL)::bigint AS completion_tokens,
+            sum(a.total_tokens) FILTER (WHERE a.stream_status IS NOT NULL)::bigint AS total_tokens
+     FROM model_attempts a
+     JOIN proxy_requests r ON r.id = a.request_id AND r.tenant_id = a.tenant_id
+     WHERE r.created_at >= $1 AND r.created_at < $2`,
+    [from, to],
+  );
+  const firstText = await client.query<{ samples: number; p50: number | null; p95: number | null }>(
+    `SELECT count(a.first_text_delta_ms)::int AS samples,
+            percentile_disc(0.5) WITHIN GROUP (ORDER BY a.first_text_delta_ms) AS p50,
+            percentile_disc(0.95) WITHIN GROUP (ORDER BY a.first_text_delta_ms) AS p95
+     FROM model_attempts a
+     JOIN proxy_requests r ON r.id = a.request_id AND r.tenant_id = a.tenant_id
+     WHERE r.created_at >= $1 AND r.created_at < $2
+       AND a.stream_status IS NOT NULL
+       AND a.first_text_delta_ms IS NOT NULL`,
+    [from, to],
+  );
+  const duration = await client.query<{ samples: number; p50: number | null; p95: number | null }>(
+    `SELECT count(a.duration_ms)::int AS samples,
+            percentile_disc(0.5) WITHIN GROUP (ORDER BY a.duration_ms) AS p50,
+            percentile_disc(0.95) WITHIN GROUP (ORDER BY a.duration_ms) AS p95
+     FROM model_attempts a
+     JOIN proxy_requests r ON r.id = a.request_id AND r.tenant_id = a.tenant_id
+     WHERE r.created_at >= $1 AND r.created_at < $2
+       AND a.stream_status IS NOT NULL
+       AND a.duration_ms IS NOT NULL`,
+    [from, to],
+  );
+  const deployments = await client.query<
+    StreamCountRow & { provider: string; deployment: string }
+  >(
+    `SELECT c.provider AS provider,
+            d.name AS deployment,
+            count(*)::int AS requests,
+            count(*) FILTER (WHERE a.stream_status = 'completed')::int AS completed,
+            count(*) FILTER (WHERE a.stream_status = 'client_aborted')::int AS cancelled,
+            count(*) FILTER (WHERE a.stream_status IN ${STREAM_ERROR_STATUSES})::int AS errors,
+            count(*) FILTER (WHERE a.stream_status = 'stream_truncated')::int AS truncated,
+            sum(a.prompt_tokens)::bigint AS prompt_tokens,
+            sum(a.completion_tokens)::bigint AS completion_tokens,
+            sum(a.total_tokens)::bigint AS total_tokens
+     FROM model_attempts a
+     JOIN proxy_requests r ON r.id = a.request_id AND r.tenant_id = a.tenant_id
+     JOIN model_deployments d ON d.id = a.deployment_id AND d.tenant_id = a.tenant_id
+     JOIN provider_connections c ON c.id = d.connection_id AND c.tenant_id = d.tenant_id
+     WHERE r.created_at >= $1 AND r.created_at < $2
+       AND a.stream_status IS NOT NULL
+     GROUP BY c.provider, d.name
+     ORDER BY c.provider, d.name`,
+    [from, to],
+  );
   const requestRow = requests.rows[0];
   const attemptRow = attempts.rows[0];
+  const streamRow = streamCountFrom(streams.rows[0]);
+  const firstRow = firstText.rows[0];
+  const durationRow = duration.rows[0];
+  const byDeployment = deployments.rows.map((row) => ({
+    provider: row.provider,
+    deployment: row.deployment,
+    ...streamCountFrom(row),
+  }));
+  const byProviderMap = new Map<string, StreamCount>();
+  for (const row of byDeployment) {
+    const current = byProviderMap.get(row.provider) ?? {
+      requests: 0,
+      completed: 0,
+      cancelled: 0,
+      errors: 0,
+      truncated: 0,
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+    };
+    byProviderMap.set(row.provider, {
+      requests: current.requests + row.requests,
+      completed: current.completed + row.completed,
+      cancelled: current.cancelled + row.cancelled,
+      errors: current.errors + row.errors,
+      truncated: current.truncated + row.truncated,
+      promptTokens: addToken(current.promptTokens, row.promptTokens),
+      completionTokens: addToken(current.completionTokens, row.completionTokens),
+      totalTokens: addToken(current.totalTokens, row.totalTokens),
+    });
+  }
+  const firstSamples = count(firstRow?.samples);
+  const durationSamples = count(durationRow?.samples);
   return {
     window: { from: from.toISOString(), to: to.toISOString() },
     requests: {
@@ -312,5 +467,31 @@ export async function summarizeMetrics(client: PoolClient, from: Date, to: Date)
       sumMs: sumOrNull(attemptRow?.latency_sum),
       maxMs: attemptRow?.latency_max ?? null,
     },
+    streaming: {
+      requests: streamRow.requests,
+      completed: streamRow.completed,
+      cancelled: streamRow.cancelled,
+      errors: streamRow.errors,
+      truncated: streamRow.truncated,
+      firstTextDeltaMs: {
+        samples: firstSamples,
+        p50: firstSamples === 0 ? null : intOrNull(firstRow?.p50),
+        p95: firstSamples === 0 ? null : intOrNull(firstRow?.p95),
+      },
+      durationMs: {
+        samples: durationSamples,
+        p50: durationSamples === 0 ? null : intOrNull(durationRow?.p50),
+        p95: durationSamples === 0 ? null : intOrNull(durationRow?.p95),
+      },
+      usage: {
+        promptTokens: streamRow.promptTokens,
+        completionTokens: streamRow.completionTokens,
+        totalTokens: streamRow.totalTokens,
+      },
+    },
+    byProvider: [...byProviderMap.entries()]
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .map(([provider, counts]) => ({ provider, ...counts })),
+    byDeployment,
   };
 }

@@ -11,15 +11,23 @@ function errorMessage(error: unknown): string {
 async function shutdownProcess(
   signal: string,
   logger: Logger,
+  drainMs: number,
+  drain: () => Promise<{ aborted: number; activeAfter: number }>,
   closeServer: () => Promise<void>,
   closePools: () => Promise<void>,
 ): Promise<void> {
   const timer = setTimeout(() => {
     logger.error('shutdown timed out');
     process.exit(1);
-  }, 10_000);
+  }, drainMs + 15_000);
   timer.unref();
   logger.info('shutdown started', { signal });
+  try {
+    const drained = await drain();
+    logger.info('stream drain complete', { aborted: drained.aborted, active: drained.activeAfter });
+  } catch (error) {
+    logger.error('stream drain failed', { message: errorMessage(error) });
+  }
   try {
     await closeServer();
   } catch (error) {
@@ -73,6 +81,7 @@ async function main(): Promise<void> {
     upstreamBaseUrl: config.openAiBaseUrl,
     credentialKey: config.providerCredentialKey,
     maxActiveStreams: config.maxActiveStreams,
+    maxStreamsPerTenant: config.maxStreamsPerTenant,
   });
 
   let shuttingDown = false;
@@ -82,6 +91,8 @@ async function main(): Promise<void> {
     void shutdownProcess(
       signal,
       logger,
+      config.streamShutdownDrainMs,
+      () => app.drainStreams(config.streamShutdownDrainMs),
       () => app.close(),
       async () => {
         await authPool.end();

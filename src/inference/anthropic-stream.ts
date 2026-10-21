@@ -3,6 +3,7 @@ import type { ProviderCall } from './contract.js';
 import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
 import {
   createSseDecoder,
+  StreamShutdownError,
   StreamTimeoutError,
   type CanonicalEvent,
 } from './stream.js';
@@ -19,6 +20,8 @@ const USAGE_KEYS = new Set([
   'cache_creation',
   'service_tier',
   'server_tool_use',
+  'inference_geo',
+  'speed',
 ]);
 
 const COUNTED_KEYS = [
@@ -84,14 +87,22 @@ function readIndex(value: unknown): number {
   return value;
 }
 
+function isConfiguredModel(reported: unknown, permittedModel: string): boolean {
+  if (typeof reported !== 'string' || reported.length === 0 || reported.length > 256) return false;
+  if (reported === permittedModel) return true;
+  const prefix = `${permittedModel}-`;
+  if (!reported.startsWith(prefix)) return false;
+  return /^\d{8}$/.test(reported.slice(prefix.length));
+}
+
 function rejectForeignModel(value: Record<string, unknown>, permittedModel: string, current: string | null): void {
   const models: unknown[] = [];
   if ('model' in value) models.push(value.model);
   if (isRecord(value.message) && 'model' in value.message) models.push(value.message.model);
   if (isRecord(value.delta) && 'model' in value.delta) models.push(value.delta.model);
   for (const model of models) {
-    if (typeof model !== 'string' || model.length === 0 || model !== permittedModel) invalidStream();
-    if (current !== null && model !== current) invalidStream();
+    if (!isConfiguredModel(model, permittedModel)) invalidStream();
+    if (current !== null && !isConfiguredModel(model, current)) invalidStream();
   }
 }
 
@@ -130,6 +141,8 @@ function applyUsage(cursor: AnthropicStreamCursor, value: unknown): void {
   }
   if ('cache_creation' in value && value.cache_creation !== null && !isRecord(value.cache_creation)) invalidStream();
   if ('service_tier' in value && value.service_tier !== null && typeof value.service_tier !== 'string') invalidStream();
+  if ('inference_geo' in value && value.inference_geo !== null && typeof value.inference_geo !== 'string') invalidStream();
+  if ('speed' in value && value.speed !== null && typeof value.speed !== 'string') invalidStream();
   if ('server_tool_use' in value && value.server_tool_use !== null) {
     if (!isRecord(value.server_tool_use)) invalidStream();
     for (const count of Object.values(value.server_tool_use)) {
@@ -256,7 +269,7 @@ export function eventsFromAnthropicEvent(
     const message = value.message;
     if (message.type !== 'message' || message.role !== 'assistant') invalidStream();
     const id = safeProviderRequestId(message.id);
-    if (id === null || message.model !== permittedModel) invalidStream();
+    if (id === null || !isConfiguredModel(message.model, permittedModel)) invalidStream();
     if (!Array.isArray(message.content)) invalidStream();
     const next = copyCursor(cursor);
     next.phase = 'started';
@@ -354,6 +367,10 @@ export async function* streamAnthropicChat(input: {
   };
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abort, { once: true });
+  // A shutdown abort must stop a read that is blocked in the provider body.
+  const onDeadline = (): void => abort();
+  if (input.deadline.signal.aborted) onDeadline();
+  else input.deadline.signal.addEventListener('abort', onDeadline, { once: true });
 
   let timedOut: 'connect' | 'idle' | 'total' | null = null;
   function expire(timer: 'connect' | 'idle' | 'total'): void {
@@ -443,6 +460,7 @@ export async function* streamAnthropicChat(input: {
     }
   } catch (error) {
     if (input.signal.aborted) throw statusFailure(408, true);
+    if (input.deadline.signal.reason instanceof StreamShutdownError) throw input.deadline.signal.reason;
     if (timedOut !== null) throw new StreamTimeoutError(timedOut);
     if (error instanceof StreamTimeoutError) throw error;
     if (error instanceof ProxyError) throw error;
@@ -452,6 +470,7 @@ export async function* streamAnthropicChat(input: {
     clearTimeout(totalTimer);
     clearIdle();
     input.signal.removeEventListener('abort', abort);
+    input.deadline.signal.removeEventListener('abort', onDeadline);
     abort();
     await reader?.cancel().catch(() => undefined);
   }

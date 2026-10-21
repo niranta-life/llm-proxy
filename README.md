@@ -34,6 +34,7 @@ Use these words for these things:
 - A key id identifies that tenant key.
 - A verifier is the scrypt value for a tenant secret.
 - A provider API key is the key for OpenAI or for Anthropic.
+- A provider credential is the encrypted secret on 1 connection.
 - A connection is the provider access record for 1 tenant.
 - A deployment is a named model configuration for 1 tenant.
 - The upstream model is the model name at the provider.
@@ -99,6 +100,12 @@ An Anthropic stream also accepts that model with an 8-digit snapshot suffix.
 The caller still receives the configured model.
 A different model fails the stream.
 The proxy does not use the Anthropic fields `inference_geo` and `speed`.
+
+The proxy can store a Vertex connection for a tenant.
+The proxy can store an xAI connection for a tenant.
+The proxy can store an OpenRouter connection for a tenant.
+The proxy can store 1 private DGX endpoint for a tenant.
+A chat completion still uses OpenAI or Anthropic.
 
 You can start the local Compose project with Colima.
 You can stop that project with Colima.
@@ -392,6 +399,68 @@ The script does not read a provider API key.
 ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
   TENANT_ID=<tenant-id> TENANT_SECRET=<tenant-secret> MODEL=claude \
   node scripts/anthropic-smoke.mjs
+```
+
+## Record a provider that does not serve chat
+
+The proxy stores Vertex, xAI, OpenRouter, and 1 private DGX endpoint.
+Each tenant has 1 connection for each provider.
+A chat completion still uses OpenAI or Anthropic.
+The proxy encrypts the provider credential.
+`list-inference` does not show that credential.
+
+Vertex uses service-account key material.
+That material must contain `private_key`.
+An email address is not a credential.
+A resource name is not a credential.
+Vertex requires `--project` and `--location`.
+Vertex stores no endpoint.
+
+xAI uses an API key.
+OpenRouter uses an API key.
+Those providers store no endpoint.
+
+DGX uses an API key and 1 `https` endpoint.
+The endpoint has no user name and no password.
+The host is not a public provider host.
+The caller cannot select a provider URL.
+
+A deployment uses the same capability list as an OpenAI deployment.
+Do not pass `--default-max-output-tokens` for these providers.
+`validate-deployment` records `valid`, `invalid`, or `unvalidated`.
+The health status stays as it was.
+`set-deployment-health` records `unknown`, `healthy`, or `unhealthy`.
+The configuration version stays as it was.
+
+```bash
+docker compose run --rm app node dist/cli.js register-vertex-connection \
+  --tenant-id <tenant-id> \
+  --api-key "$VERTEX_SERVICE_ACCOUNT_KEY" \
+  --project acme-vertex-proj \
+  --location us-central1
+docker compose run --rm app node dist/cli.js register-xai-connection \
+  --tenant-id <tenant-id> --api-key "$XAI_API_KEY"
+docker compose run --rm app node dist/cli.js register-openrouter-connection \
+  --tenant-id <tenant-id> --api-key "$OPENROUTER_API_KEY"
+docker compose run --rm app node dist/cli.js register-dgx-connection \
+  --tenant-id <tenant-id> \
+  --api-key "$DGX_API_KEY" \
+  --endpoint https://dgx.lab.internal/v1
+docker compose run --rm app node dist/cli.js register-deployment \
+  --tenant-id <tenant-id> \
+  --provider vertex \
+  --name vertex-chat \
+  --upstream-model gemini-example \
+  --timeout-ms 30000 \
+  --capabilities temperature \
+  --enabled true
+docker compose run --rm app node dist/cli.js validate-deployment \
+  --tenant-id <tenant-id> --deployment vertex-chat --status valid
+docker compose run --rm app node dist/cli.js set-deployment-health \
+  --tenant-id <tenant-id> --deployment vertex-chat --status healthy
+docker compose run --rm app node dist/cli.js set-connection-enabled \
+  --tenant-id <tenant-id> --provider vertex --enabled false
+docker compose run --rm app node dist/cli.js list-inference --tenant-id <tenant-id>
 ```
 
 ## Chat API
@@ -1032,6 +1101,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The CLI shows the tenant secret 1 time.
 - The verifier column cannot contain a raw tenant secret.
 - A provider API key is AES-256-GCM ciphertext.
+- Vertex service-account key material uses the same ciphertext.
 - The ciphertext has the prefix `aes-256-gcm$`.
 - The encryption key is `PROVIDER_CREDENTIAL_KEY`.
 - PostgreSQL does not record that key.
@@ -1102,7 +1172,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Limits
 
-- The providers are OpenAI and Anthropic.
+- A chat completion uses OpenAI or Anthropic.
+- The registry can also store Vertex, xAI, OpenRouter, and 1 private DGX endpoint.
+- The proxy does not send a chat completion to those 4 providers.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
 - Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
 - The proxy accepts a text chat completion in 1 response when `stream` is not `true`.
@@ -1183,6 +1255,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Work that is not complete
 
+- A chat completion for Vertex, xAI, OpenRouter, or a private DGX endpoint.
 - Input that is not text.
 - A tool call.
 - A second provider after an error.

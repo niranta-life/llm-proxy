@@ -7,7 +7,7 @@ import { executeChat } from '../inference/execute.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { listVisibleModels, summarizeMetrics } from '../inference/store.js';
-import { createStreamGate } from '../inference/stream.js';
+import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
 import type { Logger } from '../logger.js';
 
@@ -20,6 +20,12 @@ export type AppDeps = {
   upstreamBaseUrl: string;
   credentialKey: Buffer | null;
   maxActiveStreams: number;
+  maxStreamsPerTenant: number;
+};
+
+export type ProxyApp = FastifyInstance & {
+  streamGate: StreamGate;
+  drainStreams(drainMs: number): Promise<DrainResult>;
 };
 
 function errorMessage(error: unknown): string {
@@ -52,11 +58,13 @@ function streamReply(reply: FastifyReply): StreamHttp {
   };
 }
 
-export function buildApp(deps: AppDeps): FastifyInstance {
-  const app = Fastify({ logger: false });
+export function buildApp(deps: AppDeps): ProxyApp {
+  const app = Fastify({ logger: false }) as unknown as ProxyApp;
   const credentialStore: ProviderCredentialStore | null =
     deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
-  const streamGate = createStreamGate(deps.maxActiveStreams);
+  const streamGate = createStreamGate(deps.maxActiveStreams, deps.maxStreamsPerTenant);
+  app.streamGate = streamGate;
+  app.drainStreams = (drainMs: number) => drainStreams(streamGate, drainMs);
 
   async function rejectUnauthenticated(request: FastifyRequest, reply: FastifyReply): Promise<string | null> {
     try {

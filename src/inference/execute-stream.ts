@@ -16,6 +16,7 @@ import {
   renderDone,
   SlowConsumerError,
   streamErrorCode,
+  StreamShutdownError,
   StreamTimeoutError,
   writeFrame,
   type FrameSocket,
@@ -62,7 +63,11 @@ export async function runChatStream(input: {
   reply: StreamHttp;
   gate: StreamGate;
 }): Promise<void> {
-  if (!input.gate.tryAcquire()) {
+  const admission = input.gate.tryAcquire(input.tenantId);
+  if (admission === 'shutting_down') {
+    throw proxyError(503, 'server_error', 'shutting_down', null, 'The service is unavailable.');
+  }
+  if (admission !== 'admitted') {
     throw proxyError(503, 'server_error', 'stream_capacity', null, 'The service is unavailable.');
   }
 
@@ -71,6 +76,11 @@ export async function runChatStream(input: {
   let apiKey = '';
   let opened = false;
   const timeouts = streamTimeouts(input.route);
+  const shutdownState = { fired: false };
+  let abortShutdown = (): void => {
+    shutdownState.fired = true;
+  };
+  const untrack = input.gate.track(() => abortShutdown());
   try {
     try {
       const store = input.store;
@@ -96,6 +106,11 @@ export async function runChatStream(input: {
 
     const started = process.hrtime.bigint();
     const deadline = new AbortController();
+    abortShutdown = (): void => {
+      shutdownState.fired = true;
+      if (!deadline.signal.aborted) deadline.abort(new StreamShutdownError());
+    };
+    if (shutdownState.fired && !deadline.signal.aborted) deadline.abort(new StreamShutdownError());
     let machine = initialStreamMachine();
     let header: { id: string; model: string; created: number } | null = null;
     let bytesWritten = 0;
@@ -114,6 +129,9 @@ export async function runChatStream(input: {
     let failure: unknown = null;
 
     try {
+      if (deadline.signal.reason instanceof StreamShutdownError) {
+        machine = reduceStream(machine, { type: 'shutdown' });
+      } else {
       const call = {
         apiKey,
         baseURL: input.route.provider === 'anthropic' ? input.route.endpoint ?? '' : input.upstreamBaseUrl,
@@ -127,6 +145,10 @@ export async function runChatStream(input: {
       for await (const item of iterable) {
         if (input.signal.aborted) {
           machine = reduceStream(machine, { type: 'client_abort' });
+          break;
+        }
+        if (deadline.signal.reason instanceof StreamShutdownError) {
+          machine = reduceStream(machine, { type: 'shutdown' });
           break;
         }
         if (item.type === 'done') {
@@ -157,6 +179,7 @@ export async function runChatStream(input: {
             'content-type': 'text/event-stream; charset=utf-8',
             'cache-control': 'no-cache, no-transform',
             connection: 'keep-alive',
+            'x-accel-buffering': 'no',
           });
           machine = reduceStream(machine, { type: 'downstream_open' });
         }
@@ -180,10 +203,13 @@ export async function runChatStream(input: {
         bytesWritten += await writeFrame(input.reply, rendered, timeouts.backpressure, input.signal, deadline.signal);
         chunkCount += 1;
       }
+      }
     } catch (error) {
       failure = error;
       if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
-      else if (error instanceof SlowConsumerError) machine = reduceStream(machine, { type: 'backpressure_timeout' });
+      else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
+        machine = reduceStream(machine, { type: 'shutdown' });
+      } else if (error instanceof SlowConsumerError) machine = reduceStream(machine, { type: 'backpressure_timeout' });
       else if (error instanceof StreamTimeoutError) machine = reduceStream(machine, { type: 'timeout', timer: error.timer });
       else {
         machine = reduceStream(machine, { type: 'provider_failure' });
@@ -198,7 +224,9 @@ export async function runChatStream(input: {
       } catch (error) {
         failure = error;
         if (input.signal.aborted) machine = { ...machine, status: 'client_aborted' };
-        else if (error instanceof SlowConsumerError) machine = { ...machine, status: 'slow_consumer' };
+        else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
+          machine = { ...machine, status: 'interrupted' };
+        } else if (error instanceof SlowConsumerError) machine = { ...machine, status: 'slow_consumer' };
         else if (error instanceof StreamTimeoutError) machine = { ...machine, status: 'timed_out' };
         else machine = { ...machine, status: 'provider_failed' };
       }
@@ -238,7 +266,8 @@ export async function runChatStream(input: {
     throw httpError(terminal, failure);
   } finally {
     apiKey = '';
-    input.gate.release();
+    untrack();
+    input.gate.release(input.tenantId);
   }
 }
 
@@ -252,6 +281,9 @@ function httpError(status: TerminalStreamStatus, failure: unknown): ProxyError {
   }
   if (status === 'slow_consumer') {
     return proxyError(503, 'server_error', 'slow_consumer', null, 'The service is unavailable.');
+  }
+  if (status === 'interrupted') {
+    return proxyError(503, 'server_error', 'shutting_down', null, 'The service is unavailable.');
   }
   if (failure instanceof ProxyError) return failure;
   return proxyError(502, 'server_error', 'invalid_upstream_response', null, 'The upstream model response was invalid.');

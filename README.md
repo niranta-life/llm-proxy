@@ -521,8 +521,10 @@ The rows record these values:
 - `timed_out`
 - `stream_truncated`
 - `slow_consumer`
+- `interrupted`
 
 `completed` is the only stream status with attempt status `succeeded`.
+`interrupted` is the status after a shutdown abort.
 The rows do not record the prompt.
 The rows do not record the completion text.
 
@@ -534,10 +536,19 @@ The proxy does not invent a cache count.
 
 `MAX_ACTIVE_STREAMS` limits the streams in this process.
 When the variable is absent, the limit is 32.
+`MAX_STREAMS_PER_TENANT` limits the streams for one tenant in this process.
+When the variable is absent, the limit is 32.
+The two limits are in the memory of this process.
+A count in one process does not change the count in another process.
 One more stream receives HTTP 503.
 The code is `stream_capacity`.
 The proxy sends that response before an event.
+The proxy does not send the provider request.
 The proxy does not stop a stream that is already open.
+Another tenant that is under its own limit can stream.
+A slow caller ends with `slow_consumer`.
+That end releases the stream slot.
+A later stream can start.
 
 An error body is an OpenAI error object:
 
@@ -554,7 +565,7 @@ An error body is an OpenAI error object:
 | 408 | `request_cancelled` | The caller closed the request. |
 | 429 | `rate_limit` | The provider returned HTTP 429. |
 | 502 | `upstream_error` or `invalid_upstream_response` | The provider sent an error, or the body is not a chat completion. |
-| 503 | `inference_disabled`, `service_unavailable`, `stream_capacity`, or `slow_consumer` | Inference is off, the proxy cannot prepare the provider request, the process is at the stream limit, or the caller does not read. |
+| 503 | `inference_disabled`, `service_unavailable`, `stream_capacity`, `slow_consumer`, or `shutting_down` | Inference is off, the proxy cannot prepare the provider request, a stream limit is full, the caller does not read, or the process is shutting down. |
 | 504 | `timeout` | The deployment timeout is complete, or a stream timeout is complete before the response headers. |
 | 529 | `overloaded` | Anthropic returned HTTP 529. |
 
@@ -575,7 +586,8 @@ A content block that the proxy cannot represent uses the same code.
 An unknown stop reason uses the same code.
 For HTTP 503, the proxy does not send the provider request when inference is off.
 The proxy does not send the provider request when it cannot record the request row.
-The proxy does not send the provider request when the process is at the stream limit.
+The proxy does not send the provider request when a stream limit is full.
+The proxy does not send the provider request when the process is shutting down.
 
 When the provider returns the chat completion and the proxy cannot record the status, the result is:
 
@@ -614,6 +626,18 @@ The body contains the request counts.
 The body contains the sums of the token counts from the provider.
 The body contains the latency sample count, the latency sum, and the latency maximum.
 A sum is null when the provider sent no usage.
+The body also contains the stream request count.
+The body contains the completed count, the cancelled count, the stream error count, and the truncated count.
+A cancellation is `client_aborted`.
+A stream error is `provider_failed`, `timed_out`, `slow_consumer`, or `interrupted`.
+The body contains the P50 and the P95 of the time to the first text.
+The body contains the P50 and the P95 of the stream duration.
+The body contains those counts for each provider.
+The body contains those counts for each deployment.
+The body contains the reported stream token sums.
+A window with no latency samples has a null P50 and a null P95.
+A window with no reported tokens has null token sums.
+The proxy does not invent a zero for an empty latency or an empty token sum.
 The body contains no price.
 The body contains no quality score.
 
@@ -647,10 +671,33 @@ The process stops before it listens when a necessary value is not valid.
 | `PROVIDER_CREDENTIAL_KEY` | When `INFERENCE_ENABLED` is `true` | A 32-byte key in base64. |
 | `OPENAI_BASE_URL` | no | The OpenAI base URL. When the variable is absent, the proxy uses `https://api.openai.com/v1`. |
 | `MAX_ACTIVE_STREAMS` | no | The stream limit for this process. When the variable is absent, the proxy uses `32`. Use an integer from 1 through 10000. |
+| `MAX_STREAMS_PER_TENANT` | no | The stream limit for one tenant in this process. When the variable is absent, the proxy uses `32`. Use an integer from 1 through 10000. The limit is not shared with another process. |
+| `STREAM_SHUTDOWN_DRAIN_MS` | no | The drain time after `SIGTERM` or `SIGINT`. When the variable is absent, the proxy uses `5000`. Use an integer from 0 through 600000. |
 
-`SIGTERM` stops a new request.
-The proxy closes the database pools.
+`SIGTERM` and `SIGINT` stop new streams.
+The proxy waits for `STREAM_SHUTDOWN_DRAIN_MS`.
+A stream that ends in that time can complete.
+The proxy then aborts each stream that is still open.
+The proxy records `interrupted` when that row write succeeds.
+The proxy then closes the server.
+The proxy then closes the database pools.
 The process ends.
+A second signal does not start a second shutdown.
+
+## A reverse proxy
+
+The proxy sends `X-Accel-Buffering: no` on a stream.
+The proxy sends `Cache-Control: no-cache, no-transform` on a stream.
+The proxy does not compress a stream.
+Configure the reverse proxy so it does not buffer `text/event-stream`.
+Configure the reverse proxy so it does not gzip `text/event-stream`.
+Set the proxy read timeout longer than the stream idle timeout.
+Set the proxy read timeout longer than the stream total timeout.
+Set the connect timeout longer than the stream connect timeout.
+Send `SIGTERM` before the platform stops the process.
+Set the platform stop grace longer than `STREAM_SHUTDOWN_DRAIN_MS`.
+The stream limits are in the memory of one process.
+Two processes do not share those counts.
 
 ## Migrations and an earlier image
 
@@ -829,6 +876,54 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`007_stream_interrupted.sql` allows the stream status `interrupted`.
+The file does not drop a column.
+The file does not change an existing row.
+The file does not edit migrations `001` through `006`.
+
+The image `aa7d0b3` streams an enabled OpenAI deployment.
+That image streams an enabled Anthropic deployment.
+Streaming stays off until both flags are on.
+Its latest migration file is `006_anthropic_streaming.sql`.
+After `007_stream_interrupted.sql` is applied, `schema_migrations` keeps `006_anthropic_streaming.sql`.
+The readiness route on image `aa7d0b3` can return HTTP 200.
+That image does not record `interrupted`.
+Build the image when your computer has no tag `llm-proxy:aa7d0b3`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar aa7d0b3 | docker build -t llm-proxy:aa7d0b3 -
+docker compose stop app
+docker rm -f llm-proxy-aa7d0b3
+docker run -d --name llm-proxy-aa7d0b3 --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=true \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:aa7d0b3
+```
+
+That image sends a chat completion for OpenAI.
+That image sends a chat completion for Anthropic.
+That image streams OpenAI when both flags are on.
+That image streams Anthropic when both flags are on.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-aa7d0b3
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -993,7 +1088,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - `scripts/openai-stream-smoke.mjs` is a procedure for an operator.
 - The script sends no request when `OPENAI_STREAM_SMOKE` is not `1`.
 - The stream limit is a count in this process.
-- The count is not shared with another process.
+- The tenant stream limit is a count in this process.
+- Those counts are not shared with another process.
+- A shutdown records `interrupted` when the row write succeeds.
 - A stream is `completed` only after the provider finish event.
 - An OpenAI stream is `completed` only after the provider `[DONE]` event.
 - An Anthropic stream is `completed` only after `message_stop`.

@@ -1,0 +1,95 @@
+{
+  "window": {
+    "from": "2026-10-21T00:49:40.173Z",
+    "to": "2026-10-21T00:53:40.173Z"
+  },
+  "requests": {
+    "total": 6,
+    "succeeded": 3,
+    "failed": 3,
+    "pending": 0
+  },
+  "usage": {
+    "promptTokens": 21,
+    "completionTokens": 19,
+    "totalTokens": 40,
+    "responsesMissingUsage": 0
+  },
+  "latency": {
+    "samples": 6,
+    "sumMs": 83,
+    "maxMs": 36
+  },
+  "streaming": {
+    "requests": 5,
+    "completed": 2,
+    "cancelled": 1,
+    "errors": 1,
+    "truncated": 1,
+    "firstTextDeltaMs": {
+      "samples": 2,
+      "p50": 11,
+      "p95": 23
+    },
+    "durationMs": {
+      "samples": 5,
+      "p50": 11,
+      "p95": 36
+    },
+    "usage": {
+      "promptTokens": 18,
+      "completionTokens": 17,
+      "totalTokens": 35
+    }
+  },
+  "byProvider": [
+    {
+      "provider": "anthropic",
+      "requests": 1,
+      "completed": 1,
+      "cancelled": 0,
+      "errors": 0,
+      "truncated": 0,
+      "promptTokens": 15,
+      "completionTokens": 15,
+      "totalTokens": 30
+    },
+    {
+      "provider": "openai",
+      "requests": 4,
+      "completed": 1,
+      "cancelled": 1,
+      "errors": 1,
+      "truncated": 1,
+      "promptTokens": 3,
+      "completionTokens": 2,
+      "totalTokens": 5
+    }
+  ],
+  "byDeployment": [
+    {
+      "provider": "anthropic",
+      "deployment": "metrics-claude",
+      "requests": 1,
+      "completed": 1,
+      "cancelled": 0,
+      "errors": 0,
+      "truncated": 0,
+      "promptTokens": 15,
+      "completionTokens": 15,
+      "totalTokens": 30
+    },
+    {
+      "provider": "openai",
+      "deployment": "metrics-openai",
+      "requests": 4,
+      "completed": 1,
+      "cancelled": 1,
+      "errors": 1,
+      "truncated": 1,
+      "promptTokens": 3,
+      "completionTokens": 2,
+      "totalTokens": 5
+    }
+  ]
+}

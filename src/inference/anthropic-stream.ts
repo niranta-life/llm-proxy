@@ -3,6 +3,7 @@ import type { ProviderCall } from './contract.js';
 import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
 import {
   createSseDecoder,
+  StreamShutdownError,
   StreamTimeoutError,
   type CanonicalEvent,
 } from './stream.js';
@@ -354,6 +355,10 @@ export async function* streamAnthropicChat(input: {
   };
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abort, { once: true });
+  // A shutdown abort must stop a read that is blocked in the provider body.
+  const onDeadline = (): void => abort();
+  if (input.deadline.signal.aborted) onDeadline();
+  else input.deadline.signal.addEventListener('abort', onDeadline, { once: true });
 
   let timedOut: 'connect' | 'idle' | 'total' | null = null;
   function expire(timer: 'connect' | 'idle' | 'total'): void {
@@ -443,6 +448,7 @@ export async function* streamAnthropicChat(input: {
     }
   } catch (error) {
     if (input.signal.aborted) throw statusFailure(408, true);
+    if (input.deadline.signal.reason instanceof StreamShutdownError) throw input.deadline.signal.reason;
     if (timedOut !== null) throw new StreamTimeoutError(timedOut);
     if (error instanceof StreamTimeoutError) throw error;
     if (error instanceof ProxyError) throw error;
@@ -452,6 +458,7 @@ export async function* streamAnthropicChat(input: {
     clearTimeout(totalTimer);
     clearIdle();
     input.signal.removeEventListener('abort', abort);
+    input.deadline.signal.removeEventListener('abort', onDeadline);
     abort();
     await reader?.cancel().catch(() => undefined);
   }

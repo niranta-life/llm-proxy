@@ -2,7 +2,9 @@ import { getEventListeners } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import {
   attemptStatusFor,
+  createStreamGate,
   createSseDecoder,
+  drainStreams,
   eventsFromOpenAiChunk,
   initialChunkCursor,
   initialStreamMachine,
@@ -11,6 +13,7 @@ import {
   renderDone,
   SlowConsumerError,
   streamErrorCode,
+  StreamShutdownError,
   StreamTimeoutError,
   writeEventSequence,
   writeFrame,
@@ -226,7 +229,10 @@ describe('stream state transitions', () => {
     expect(reduceStream(streaming, { type: 'timeout', timer: 'idle' }).status).toBe('timed_out');
     expect(reduceStream(streaming, { type: 'timeout', timer: 'total' }).status).toBe('timed_out');
     expect(reduceStream(streaming, { type: 'backpressure_timeout' }).status).toBe('slow_consumer');
+    expect(reduceStream(streaming, { type: 'shutdown' }).status).toBe('interrupted');
     expect(reduceStream(initialStreamMachine(), { type: 'upstream_closed' }).status).toBe('stream_truncated');
+    expect(attemptStatusFor('interrupted')).toBe('failed');
+    expect(streamErrorCode('interrupted', null)).toBe('interrupted');
     expect(new StreamTimeoutError('connect').timer).toBe('connect');
     expect(new StreamTimeoutError('idle').timer).toBe('idle');
     expect(new StreamTimeoutError('total').timer).toBe('total');
@@ -317,5 +323,58 @@ describe('SSE writer backpressure', () => {
     await expect(writeFrame(socket, 'data: {}\n\n', 3_000, client.signal, idle.signal)).rejects.toMatchObject({
       timer: 'idle',
     });
+
+    const shutdown = new AbortController();
+    shutdown.abort(new StreamShutdownError());
+    await expect(writeFrame(socket, 'data: {}\n\n', 3_000, client.signal, shutdown.signal)).rejects.toMatchObject({
+      code: 'interrupted',
+    });
+  });
+});
+
+describe('stream admission', () => {
+  it('keeps a tenant cap beside the process cap and drains open streams', async () => {
+    const gate = createStreamGate(2, 1);
+    expect(gate.tryAcquire('alpha')).toBe('admitted');
+    expect(gate.tryAcquire('alpha')).toBe('capacity');
+    expect(gate.activeFor('alpha')).toBe(1);
+    expect(gate.tryAcquire('beta')).toBe('admitted');
+    expect(gate.active()).toBe(2);
+    expect(gate.tryAcquire('beta')).toBe('capacity');
+    gate.release('alpha');
+    expect(gate.activeFor('alpha')).toBe(0);
+    expect(gate.tryAcquire('alpha')).toBe('admitted');
+
+    const full = createStreamGate(1, 2);
+    expect(full.tryAcquire('alpha')).toBe('admitted');
+    expect(full.tryAcquire('beta')).toBe('capacity');
+    full.release('alpha');
+
+    const draining = createStreamGate(2, 2);
+    expect(draining.tryAcquire('alpha')).toBe('admitted');
+    let aborted = 0;
+    draining.track(() => {
+      aborted += 1;
+      setTimeout(() => draining.release('alpha'), 15);
+    });
+    const early = drainStreams(draining, 200);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(draining.tryAcquire('beta')).toBe('shutting_down');
+    const finishedDuringDrain = createStreamGate(1, 1);
+    expect(finishedDuringDrain.tryAcquire('alpha')).toBe('admitted');
+    setTimeout(() => finishedDuringDrain.release('alpha'), 20);
+    const completed = await drainStreams(finishedDuringDrain, 200);
+    expect(completed.idleBeforeAbort).toBe(true);
+    expect(completed.aborted).toBe(0);
+    expect(completed.activeAfter).toBe(0);
+    expect(finishedDuringDrain.tryAcquire('beta')).toBe('shutting_down');
+    const drained = await early;
+    expect(aborted).toBe(1);
+    expect(drained.aborted).toBe(1);
+    expect(drained.activeAfter).toBe(0);
+    const again = await drainStreams(draining, 50);
+    expect(again.activeAfter).toBe(0);
+    expect(again.aborted).toBe(0);
+    expect(draining.tryAcquire('alpha')).toBe('shutting_down');
   });
 });

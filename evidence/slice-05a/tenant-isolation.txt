@@ -1,0 +1,16 @@
+Tenant isolation verification.
+
+Source: one Vitest run of test/cost-api.test.ts on Node v24.22.0.
+The full run is recorded in api-test-results.txt.
+EXIT:0.
+
+Two tenants called the shipped cost route at the same time.
+Alpha estimated amount is 0.7 on deployment cost-alpha and model gpt-cost-alpha.
+Beta estimated amount is 1.7 on deployment cost-beta and model gpt-cost-beta.
+Each body contains only that tenant's deployment and model.
+
+COST_ISOLATION {"alpha":{"window":{"from":"2026-10-21T15:14:15.633Z","to":"2026-10-21T15:20:15.633Z"},"external":{"estimated":{"attempts":1,"amount":"0.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-alpha","model":"gpt-cost-alpha","external":{"estimated":{"attempts":1,"amount":"0.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]},"beta":{"window":{"from":"2026-10-21T15:14:15.633Z","to":"2026-10-21T15:20:15.633Z"},"external":{"estimated":{"attempts":1,"amount":"1.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-beta","model":"gpt-cost-beta","external":{"estimated":{"attempts":1,"amount":"1.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}}
+
+An unscoped runtime select of attempt_costs returned no rows.
+A tenant with no attempts did not see another tenant's model.
+Result: COST_ISOLATION_PASSED

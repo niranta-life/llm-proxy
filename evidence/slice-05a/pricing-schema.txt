@@ -1,0 +1,57 @@
+Pricing schema.
+
+Migration 012_cost_accounting.sql adds the schema.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations 001 through 011.
+No price catalog is seeded.
+
+model_deployments.service_tier is text.
+It is null or it matches ^[a-z0-9][a-z0-9-]{0,31}$.
+
+price_versions is insert-only.
+Columns:
+id uuid primary key.
+provider text in openai, anthropic, vertex, xai, openrouter, dgx.
+model text length 1 to 128 with no whitespace.
+region text null, global, or a location pattern.
+service_tier text null or the same tier pattern.
+serving_provider text null or a serving provider pattern.
+effective_at timestamptz not null.
+price_source text length 1 to 128.
+verification_status text verified or unverified.
+currency text USD.
+input_rate numeric null or >= 0.
+output_rate numeric null or >= 0.
+cache_read_rate numeric null or >= 0.
+cache_write_rate numeric null or >= 0.
+thinking_rate numeric null or >= 0.
+request_fee numeric null or >= 0.
+allocated_rate numeric null or >= 0.
+created_at timestamptz not null.
+
+Rates are stored as numeric.
+assert_rate accepts a decimal text with at most 12 fractional digits.
+A 13-digit fractional rate raises rate is invalid.
+UPDATE or DELETE on price_versions raises price version is immutable.
+
+attempt_costs primary key is tenant_id and attempt_id.
+It references model_attempts (tenant_id, id).
+price_version_id references price_versions and may be null.
+cost_status is estimated, provisional, reconciled, or unknown.
+unknown requires a null amount.
+estimated, provisional, and reconciled require an amount >= 0.
+allocated_status and allocated_amount follow the same pair of rules.
+A null allocated status stays with a null allocated amount.
+currency is null when no price version is stored.
+currency is USD when a price version is stored.
+Row level security is forced on app.tenant_id.
+llm_runtime may select price versions.
+llm_runtime may select and insert attempt costs.
+A stored amount, price version, and currency cannot change.
+Status may change only from estimated or provisional to reconciled.
+Unknown cannot become reconciled.
+
+insert_price_version writes one version and returns its id.
+set_deployment_service_tier sets or clears a deployment tier.
+reconcile_attempt_cost sets a stored outcome to reconciled and does not change the amount.

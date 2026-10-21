@@ -1,0 +1,37 @@
+Full regression results.
+
+Node was v24.22.0.
+Vitest was v3.2.7.
+The full suite command was ./node_modules/.bin/vitest run.
+No live flag was set for the suite.
+
+Test Files 34 passed | 2 skipped (36).
+Tests 194 passed | 3 skipped (197).
+Duration 313.25s.
+Start at 09:36:02.
+EXIT:0.
+
+Failed tests in the saved run: none.
+
+The skipped tests were the existing live suites.
+test/compatible-live.test.ts skipped the xAI live call because XAI_LIVE was unset.
+test/compatible-live.test.ts skipped the OpenRouter live call because OPENROUTER_LIVE was unset.
+test/vertex-live.test.ts skipped the Vertex live call because VERTEX_LIVE was unset.
+
+The new cost tests passed and were not skipped.
+test/cost-calculation.test.ts passed 19 tests.
+test/cost-api.test.ts passed 5 tests.
+
+An earlier full run failed two assertions that listed migrations through 011_private_endpoint.sql.
+Those lists were extended to include 012_cost_accounting.sql.
+The two assertions then passed.
+
+Three full runs after the cache count fix failed only the existing slow consumer check.
+An isolated rerun of that file passed 5 tests.
+The saved full run then passed that test.
+The assertion was not changed.
+
+A cache or thinking rate is billed only when that count is stored.
+The saved run includes that rule.
+
+Result: SUITE_PASSED

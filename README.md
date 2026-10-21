@@ -1013,6 +1013,26 @@ The proxy does not invent a zero for an empty latency or an empty token sum.
 The body contains no price.
 The body contains no quality score.
 
+`GET /internal/v1/metrics/costs` uses the same tenant headers.
+The query must contain `from` and `to`.
+The window is the same window as the metrics summary.
+The query can contain `provider`, `deployment`, and `model`.
+An empty filter is rejected.
+The body contains expense by model and provider.
+Estimated, provisional, reconciled, and unknown amounts stay apart.
+An unknown amount is null.
+The body does not use zero for a missing amount.
+A cache rate is billed only when that count is stored.
+A thinking rate is billed only when that count is stored.
+An absent count is not zero.
+An absent count is not a missing category.
+A stored cache count with no cache rate stays provisional.
+A DGX allocated operating cost stays apart from an external provider charge.
+The route returns records for that tenant.
+A stored amount keeps the price version that was in force for that attempt.
+A missing price does not change the chat completion.
+A cost recording error does not change the chat completion.
+
 `GET /health/live` returns `{"status":"live"}`.
 `GET /health/ready` returns `{"status":"ready","database":"ready"}` when the proxy is ready.
 The same route returns HTTP 503 `{"status":"not_ready","database":"unavailable"}` when the proxy is not ready.
@@ -1488,6 +1508,50 @@ Start the Compose proxy again with these commands:
 
 ```bash
 docker rm -f llm-proxy-9f21f94
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
+`012_cost_accounting.sql` stores a price version and the cost of an attempt.
+The file adds a service tier on a deployment.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `011`.
+
+The image `832d8ac` stays ready on this database.
+Its latest migration file is `011_private_endpoint.sql`.
+After `012_cost_accounting.sql` is applied, `schema_migrations` keeps `011_private_endpoint.sql`.
+The readiness route on image `832d8ac` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:832d8ac`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar 832d8ac | docker build -t llm-proxy:832d8ac -
+docker compose stop app
+docker rm -f llm-proxy-832d8ac
+docker run -d --name llm-proxy-832d8ac --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=false \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:832d8ac
+```
+
+That image stays ready.
+Do not delete a price row to roll back.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-832d8ac
 docker compose start app
 ```
 

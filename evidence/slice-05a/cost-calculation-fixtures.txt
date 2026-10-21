@@ -1,0 +1,78 @@
+Cost calculation fixtures.
+
+Command: ./node_modules/.bin/vitest run test/cost-calculation.test.ts
+Node: v24.22.0
+Vitest: v3.2.7
+The tests call the shipped calculateCost, selectPrice, and costToStore functions.
+Amounts below are the printed results.
+EXIT:0.
+
+Test Files 1 passed (1).
+Tests 19 passed (19).
+Duration 13.48s.
+Start at 09:13:18.
+
+OpenAI input 0.000003 and output 0.000015.
+Prompt 1000 and completion 500.
+COST_CALC {"name":"openai-tokens","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-v1"}
+
+OpenAI cache read is billed once.
+Prompt 100, cache read 40, completion 10.
+COST_CALC {"name":"openai-cache","status":"estimated","amount":"0.84","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache"}
+
+OpenAI cache count with no cache rate stays provisional.
+COST_CALC {"name":"openai-cache-unpriced","status":"provisional","amount":"0.8","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache-missing"}
+
+OpenAI cache rates with absent cache counts stay estimated.
+The amount is the input and output product.
+The absent counts are not billed as zero and are not missing.
+COST_CALC {"name":"openai-cache-rates-absent","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache-rates-absent"}
+
+A negative cache subtraction does not become input.
+COST_CALC {"name":"openai-negative-cache","status":"provisional","amount":"0.06","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-negative"}
+
+Anthropic cache write and cache read are billed without the summed prompt.
+COST_CALC {"name":"anthropic-cache","status":"estimated","amount":"0.406","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"anthropic-v1"}
+
+Vertex cached input and thinking tokens are billed once.
+COST_CALC {"name":"vertex-usage","status":"estimated","amount":"1.095","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-v1"}
+
+Vertex does not fall back to the prompt total when uncached input is missing.
+COST_CALC {"name":"vertex-no-prompt-fallback","status":"provisional","amount":"0.345","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-partial"}
+
+Vertex cache and thinking rates with those counts absent stay estimated.
+Uncached input 100 at 0.01 and completion 4 at 0.04.
+COST_CALC {"name":"vertex-optional-counts","status":"estimated","amount":"1.16","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-optional"}
+
+OpenRouter uses the stored serving provider.
+COST_CALC {"name":"openrouter-serving","status":"estimated","amount":"1","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"deepinfra"}
+
+Missing usage is unknown and the amount is null.
+COST_CALC {"name":"missing-usage","status":"unknown","amount":null,"allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-empty"}
+
+A missing price is unknown for the external amount and for DGX allocated cost.
+COST_CALC {"name":"missing-price","status":"unknown","amount":null,"allocatedStatus":"unknown","allocatedAmount":null,"priceVersionId":null}
+
+An unverified price and partial usage are provisional.
+COST_CALC {"name":"provisional","status":"provisional","amount":"1","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-partial"}
+
+A reconciled amount stays after a later price would calculate a new amount.
+COST_CALC {"name":"historical","status":"reconciled","amount":"0.7","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"price-old"}
+
+A failed attempt with usage is costed.
+A failed attempt without usage is unknown.
+COST_CALC {"name":"failed-with-usage","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"failed-priced"}
+COST_CALC {"name":"failed-without-usage","status":"unknown","amount":null,"allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"failed-empty"}
+
+A rate that is not a binary fraction multiplies exactly.
+COST_CALC {"name":"decimal","status":"estimated","amount":"0.3","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"fraction"}
+
+DGX allocated operating cost stays apart from the external amount.
+COST_CALC {"name":"dgx-allocated","status":"estimated","amount":"0.18","allocatedStatus":"estimated","allocatedAmount":"9","priceVersionId":"dgx-v1"}
+
+A request fee is charged only when some usage is present.
+COST_CALC {"name":"request-fee","status":"estimated","amount":"0.25","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"fee"}
+
+A region price and a service tier price win over a later generic price.
+That test passed.
+Result: COST_CALC_PASSED

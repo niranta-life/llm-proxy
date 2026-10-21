@@ -1,0 +1,55 @@
+Docker build.
+
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Image: llm-proxy-app:latest
+Tag: llm-proxy:slice-05a
+Image id: sha256:f0bca6297d8dc971ca0fe10d3e2be9b47dc322ece6ec1218642858754f9aef09
+docker image inspect --format '{{.Id}}' returned that id for llm-proxy:slice-05a.
+docker image inspect --format '{{.Id}}' returned that id for llm-proxy-app:latest.
+docker inspect llm-proxy-app-1 Image matched that id after start, after restart, and after restore.
+
+The build log also printed config digest sha256:7b47a0ab90f569dbb60ff1bf120474cf565f83d727d659f6a0144362c1e9325e.
+The build log also printed attestation digest sha256:ad7efbaf4066391087079339391fd170dc6c5f2c3a7962db43317de051f99786.
+The recorded image id is the inspect id.
+That id is the manifest list sha256:f0bca6297d8dc971ca0fe10d3e2be9b47dc322ece6ec1218642858754f9aef09.
+
+The image was built from the worktree.
+The image file migrations/012_cost_accounting.sql is present.
+The image file migrations/011_private_endpoint.sql is present.
+The image file migrations/001_schema.sql is present.
+The image file dist/inference/cost.js is present.
+The image contains the stored-rate cost rule.
+The image does not contain .env.live.
+Result: NEW_FILES_OK
+Result: PUSH_STORED_RATE_PRESENT
+
+git diff --exit-code for migrations 001 through 011 was empty.
+DIFF_001_011:0
+
+The same image was started on the existing database.
+The first two readiness probes returned an empty reply while the process started.
+new_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+new_image_try 2 curl_rc=52 curl: (52) Empty reply from server
+new_image_try 3 200
+new_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+
+The app was restarted.
+The first restart probe returned an empty reply while the process started.
+restart_app_try 1 curl_rc=52 curl: (52) Empty reply from server
+restart_app_try 2 200
+restart_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+The restarted container image was sha256:f0bca6297d8dc971ca0fe10d3e2be9b47dc322ece6ec1218642858754f9aef09.
+
+schema_migrations contained versions 001 through 012.
+schema_migrations kept 011_private_endpoint.sql.
+schema_migrations contained 012_cost_accounting.sql.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The database volume llm-proxy_pgdata was not removed.
+Inference on the previous app was false.
+No provider key was present on the previous app.
+DEPLOY_EXIT:0

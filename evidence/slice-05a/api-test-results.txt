@@ -1,0 +1,36 @@
+API test results.
+
+Command: ./node_modules/.bin/vitest run test/cost-api.test.ts
+Node: v24.22.0
+Vitest: v3.2.7
+The tests boot the shipped proxy against real PostgreSQL.
+They persist attempts through the shipped chat or attempt path.
+They call GET /internal/v1/metrics/costs.
+EXIT:0.
+
+Test Files 1 passed (1).
+Tests 5 passed (5).
+Duration 28.07s.
+Start at 08:16:50.
+
+Chat cost report:
+COST_API {"window":{"from":"2026-10-21T15:14:05.110Z","to":"2026-10-21T15:20:05.110Z"},"external":{"estimated":{"attempts":2,"amount":"5"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":1,"amount":"0.7"},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-openai","model":"gpt-cost-test","external":{"estimated":{"attempts":2,"amount":"5"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":1,"amount":"0.7"},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}
+
+Provider attempts:
+COST_API_PROVIDERS {"window":{"from":"2026-10-21T15:14:12.197Z","to":"2026-10-21T15:20:12.197Z"},"external":{"estimated":{"attempts":4,"amount":"2.2855"},"provisional":{"attempts":1,"amount":"0.406"},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":1,"amount":"9"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"byProvider":[{"provider":"anthropic","deployment":"cost-anthropic","model":"claude-cost-test","external":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":1,"amount":"0.406"},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"dgx","deployment":"cost-dgx","model":"dgx-cost-test","external":{"estimated":{"attempts":1,"amount":"0.18"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":1,"amount":"9"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"}},{"provider":"openai","deployment":"cost-empty","model":"gpt-failed-empty","external":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":1,"amount":null},"currency":null},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"openai","deployment":"cost-failed","model":"gpt-failed-cost","external":{"estimated":{"attempts":1,"amount":"0.0105"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"openrouter","deployment":"cost-openrouter","model":"route-cost-test","external":{"estimated":{"attempts":1,"amount":"1"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"vertex","deployment":"cost-vertex","model":"gemini-cost-test","external":{"estimated":{"attempts":1,"amount":"1.095"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}
+
+The external estimated total is 2.2855.
+The DGX allocated amount 9 is not included in that external total.
+Anthropic provisional amount is 0.406.
+Vertex estimated amount is 1.095.
+OpenRouter estimated amount is 1.
+A failed attempt with usage is 0.0105.
+A failed attempt without usage is unknown and the amount is null.
+
+A missing price left the chat at HTTP 200.
+Public usage stayed unchanged.
+The summary body has no price.
+A cost insert failure left the chat at HTTP 200.
+COST_API_FAILURE chat status 200 and the attempt stayed stored
+
+Result: COST_API_PASSED

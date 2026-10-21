@@ -1,0 +1,27 @@
+Migration tests.
+
+The cost API run applied 012_cost_accounting.sql on real PostgreSQL beside 011_private_endpoint.sql.
+COST_MIGRATION 012_cost_accounting.sql applied and price versions reject updates
+
+The migration file text does not contain DROP TABLE or DROP COLUMN.
+The file names 011_private_endpoint.sql in its header.
+schema_migrations on that test database contained both files.
+price_versions has the rate, source, region, tier, serving provider, and effective date columns.
+model_deployments.service_tier exists.
+A 13-digit rate raises rate is invalid.
+UPDATE and DELETE on a price version raise price version is immutable.
+A price flag on provision-tenant is rejected.
+A scientific rate on register-price is rejected.
+
+git diff --exit-code for migrations 001 through 011 was empty.
+DIFF_001_011:0
+
+On the local database before the new image started, schema_migrations contained 001 through 011.
+After the new image started, schema_migrations contained 001 through 012.
+011_private_endpoint.sql remained applied.
+012_cost_accounting.sql remained applied during the rollback probe.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+
+Result: MIGRATION_PASSED

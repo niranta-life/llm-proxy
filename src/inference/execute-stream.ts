@@ -9,6 +9,7 @@ import { vertexAdapter } from './vertex.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
+import { recordAttemptCostSafely } from './cost-store.js';
 import { finishAttempt, insertPending, markStream } from './store.js';
 import {
   attemptStatusFor,
@@ -385,6 +386,7 @@ async function recordStream(
         servingModel: result.servingModel ?? null,
         servingProvider: result.servingProvider ?? null,
       });
+      await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
   } catch (error) {
     input.logger.error('attempt result was not recorded', {

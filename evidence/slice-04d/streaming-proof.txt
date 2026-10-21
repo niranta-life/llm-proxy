@@ -1,0 +1,27 @@
+Streaming proof.
+
+Command: ./node_modules/.bin/vitest run test/private-chat.test.ts
+Runtime: v24.22.0
+The stream uses the existing OpenAI-compatible SSE writer.
+The proxy does not add a second writer.
+
+Passed: ends a stream and a delayed first token with one DONE marker
+Passed: omits DONE when the caller cancels or the consumer stalls
+Passed: normalizes malformed SSE, missing usage, timeout, refusal, 429, and 5xx without a second call
+
+A complete stream ends with one data: [DONE].
+A delayed first token still completes and ends with one data: [DONE].
+The caller requested stream_options include_usage true.
+The rendered stream contains the upstream prompt token count.
+A missing usage object does not add invented counts.
+Malformed SSE returns no data: [DONE].
+Client cancellation stores client_aborted and writes no data: [DONE].
+A stalled consumer stores slow_consumer and writes no data: [DONE].
+HTTP 429 and HTTP 500 become normalized provider errors.
+Each of those failures makes one upstream call.
+The proxy does not retry.
+The proxy does not switch model.
+The proxy does not fall back.
+Test Files  1 passed (1)
+Tests  5 passed (5)
+Duration  20.66s

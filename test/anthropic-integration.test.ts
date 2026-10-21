@@ -289,6 +289,7 @@ describe('Anthropic integration', () => {
       '008_provider_registry.sql',
       '009_vertex_provider.sql',
       '010_compatible_providers.sql',
+      '011_private_endpoint.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

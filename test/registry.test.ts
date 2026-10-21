@@ -80,6 +80,7 @@ describe('provider registry', () => {
       '008_provider_registry.sql',
       '009_vertex_provider.sql',
       '010_compatible_providers.sql',
+      '011_private_endpoint.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -89,6 +90,8 @@ describe('provider registry', () => {
     expect(added).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const compatible = readFileSync(join(projectRoot, 'migrations', '010_compatible_providers.sql'), 'utf8');
     expect(compatible).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    const privateEndpoint = readFileSync(join(projectRoot, 'migrations', '011_private_endpoint.sql'), 'utf8');
+    expect(privateEndpoint).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

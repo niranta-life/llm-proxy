@@ -1,0 +1,16 @@
+{
+  "id": "chatcmpl-missing-usage",
+  "object": "chat.completion",
+  "created": 1700000000,
+  "model": "private-model-actual",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "private-ok"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

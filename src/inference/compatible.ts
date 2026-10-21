@@ -26,6 +26,12 @@ export function providerChatBaseUrl(provider: string, endpoint: string | null, o
   if (provider === 'anthropic') return endpoint ?? '';
   if (provider === 'xai') return XAI_BASE_URL;
   if (provider === 'openrouter') return OPENROUTER_BASE_URL;
+  if (provider === 'dgx') {
+    if (endpoint === null || endpoint.length === 0) {
+      throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+    }
+    return endpoint;
+  }
   if (provider === 'openai' || provider === 'vertex') return openAiBaseUrl;
   throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
 }

@@ -40,7 +40,8 @@ describe('request validation', () => {
     expect(() => assertStreamAllowed(parsed, { provider: 'vertex', streamingEnabled: true }, true)).not.toThrow();
     expect(() => assertStreamAllowed(parsed, { provider: 'xai', streamingEnabled: true }, true)).not.toThrow();
     expect(() => assertStreamAllowed(parsed, { provider: 'openrouter', streamingEnabled: true }, true)).not.toThrow();
-    expect(() => assertStreamAllowed(parsed, { provider: 'dgx', streamingEnabled: true }, true)).toThrow(
+    expect(() => assertStreamAllowed(parsed, { provider: 'dgx', streamingEnabled: true }, true)).not.toThrow();
+    expect(() => assertStreamAllowed(parsed, { provider: 'dgx', streamingEnabled: false }, true)).toThrow(
       /streaming is not supported/i,
     );
     expect(() => assertStreamAllowed(parsed, { provider: 'xai', streamingEnabled: false }, true)).toThrow(

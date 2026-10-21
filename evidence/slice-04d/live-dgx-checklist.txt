@@ -1,0 +1,22 @@
+Live DGX validation checklist.
+
+Live DGX was not verified.
+This slice did not run a live DGX call.
+This slice did not mark a deployment validated_live.
+The mock test records validated_mock.
+The database function rejects validated_live.
+No caller request was sent to a real DGX host.
+The Docker proof kept inference off.
+
+Do not check these items until a real DGX host is tested.
+
+[ ] Confirm the operator-approved endpoint is the real DGX base URL.
+[ ] Confirm the pinned addresses match the current DNS answer for that host.
+[ ] Confirm TLS verification is on for that production endpoint.
+[ ] Confirm the stored credential is an operator reference and is absent from logs.
+[ ] Send one non-streaming chat and compare the body with the OpenAI-compatible contract.
+[ ] Send one streaming chat and confirm one trailing data: [DONE].
+[ ] Confirm usage is stored only when the host sends integer counts.
+[ ] Confirm a disabled deployment accepts no caller chat.
+[ ] Confirm a second tenant cannot use this endpoint or credential.
+[ ] Record the result with an operator command that still cannot write validated_live until that live run is accepted.

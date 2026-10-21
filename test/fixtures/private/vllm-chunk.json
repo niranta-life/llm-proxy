@@ -1,0 +1,15 @@
+{
+  "id": "chatcmpl-vllm-fixture",
+  "object": "chat.completion.chunk",
+  "created": 1700000000,
+  "model": "meta-llama/Meta-Llama-3-8B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "content": "vllm-ok"
+      },
+      "finish_reason": null
+    }
+  ]
+}

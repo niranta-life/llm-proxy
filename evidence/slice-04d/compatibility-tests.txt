@@ -1,0 +1,18 @@
+Compatibility tests.
+
+vLLM and NIM compatibility is fixture only.
+The fixtures are test/fixtures/private/vllm-chat.json, nim-chat.json, vllm-chunk.json, nim-chunk.json, and missing-usage.json.
+The contract is test/fixtures/private/openai-contract.md.
+The test feeds those fixtures through the shipped validateCompletion and eventsFromOpenAiChunk functions.
+The test does not open a socket to vLLM, NIM, or DGX.
+The contract says live DGX is not verified.
+The contract does not mark a deployment validated_live.
+
+Command: ./node_modules/.bin/vitest run test/private-contract.test.ts test/private-chat.test.ts test/private-security.test.ts
+Runtime: v24.22.0
+Result: test/private-contract.test.ts > private OpenAI-compatible contract > accepts vLLM and NIM text fixtures and does not invent missing usage
+Test Files  3 passed (3)
+Tests  14 passed (14)
+Duration  33.14s
+Start at  00:58:45
+None of these tests were skipped.

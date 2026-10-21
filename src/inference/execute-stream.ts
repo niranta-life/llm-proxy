@@ -8,7 +8,7 @@ import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
-import { providerChatBaseUrl } from './compatible.js';
+import { bindRouteTransport } from './private-serve.js';
 import { finishAttempt, insertPending, markStream } from './store.js';
 import {
   attemptStatusFor,
@@ -67,21 +67,33 @@ export async function runChatStream(input: {
   gate: StreamGate;
   vertexClientFactory?: VertexClientFactory;
   fetchImpl?: typeof fetch;
+  resolveHost?: (host: string) => Promise<readonly string[]>;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
     input.route.provider !== 'openai' &&
     input.route.provider !== 'vertex' &&
     input.route.provider !== 'xai' &&
-    input.route.provider !== 'openrouter'
+    input.route.provider !== 'openrouter' &&
+    input.route.provider !== 'dgx'
   ) {
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
+  const transport = await bindRouteTransport({
+    runtimePool: input.runtimePool,
+    tenantId: input.tenantId,
+    route: input.route,
+    upstreamBaseUrl: input.upstreamBaseUrl,
+    fetchImpl: input.fetchImpl,
+    resolveHost: input.resolveHost,
+  });
   const admission = input.gate.tryAcquire(input.tenantId);
   if (admission === 'shutting_down') {
+    await transport.release();
     throw proxyError(503, 'server_error', 'shutting_down', null, 'The service is unavailable.');
   }
   if (admission !== 'admitted') {
+    await transport.release();
     throw proxyError(503, 'server_error', 'stream_capacity', null, 'The service is unavailable.');
   }
 
@@ -152,7 +164,7 @@ export async function runChatStream(input: {
       } else {
       const call = {
         apiKey,
-        baseURL: providerChatBaseUrl(input.route.provider, input.route.endpoint, input.upstreamBaseUrl),
+        baseURL: transport.baseURL,
         request: input.request,
         route: input.route,
         signal: input.signal,
@@ -160,7 +172,7 @@ export async function runChatStream(input: {
         deadline,
         tenantId: input.tenantId,
         vertexClientFactory: input.vertexClientFactory,
-        fetchImpl: input.fetchImpl,
+        fetchImpl: transport.fetchImpl,
       };
       const iterable =
         input.route.provider === 'anthropic'
@@ -305,6 +317,7 @@ export async function runChatStream(input: {
     apiKey = '';
     untrack();
     input.gate.release(input.tenantId);
+    await transport.release();
   }
 }
 

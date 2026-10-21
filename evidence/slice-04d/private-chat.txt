@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/private-chat.test.ts > private endpoint chat > keeps a new deployment disabled, then serves the stored model on the approved endpoint 1959ms
+ ✓ test/private-chat.test.ts > private endpoint chat > ends a stream and a delayed first token with one DONE marker 2096ms
+ ✓ test/private-chat.test.ts > private endpoint chat > normalizes malformed SSE, missing usage, timeout, refusal, 429, and 5xx without a second call 3006ms
+ ✓ test/private-chat.test.ts > private endpoint chat > omits DONE when the caller cancels or the consumer stalls 2325ms
+ ✓ test/private-chat.test.ts > private endpoint chat > records validated_mock and rejects validated_live 1727ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  00:58:01
+   Duration  20.66s (transform 261ms, setup 4ms, collect 619ms, tests 11.11s, environment 0ms, prepare 82ms)
+

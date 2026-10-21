@@ -101,6 +101,7 @@ export async function createTestApp(
     maxStreamsPerTenant?: number;
     vertexClientFactory?: import('../src/inference/vertex-client.js').VertexClientFactory;
     compatibleFetch?: typeof fetch;
+    privateResolve?: (host: string) => Promise<readonly string[]>;
   } = {},
 ) {
   const config = configFor(db);
@@ -119,6 +120,7 @@ export async function createTestApp(
     maxStreamsPerTenant: options.maxStreamsPerTenant ?? config.maxStreamsPerTenant,
     vertexClientFactory: options.vertexClientFactory,
     compatibleFetch: options.compatibleFetch,
+    privateResolve: options.privateResolve,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

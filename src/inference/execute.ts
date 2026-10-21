@@ -4,7 +4,7 @@ import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
-import { providerChatBaseUrl } from './compatible.js';
+import { bindRouteTransport } from './private-serve.js';
 import type { ProviderAdapter } from './contract.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
@@ -17,7 +17,7 @@ import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './
 
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
-  if (provider === 'openai' || provider === 'xai' || provider === 'openrouter') return openAiAdapter;
+  if (provider === 'openai' || provider === 'xai' || provider === 'openrouter' || provider === 'dgx') return openAiAdapter;
   if (provider === 'vertex') return vertexAdapter;
   throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
 }
@@ -49,6 +49,7 @@ export async function executeChat(input: {
   gate: StreamGate;
   vertexClientFactory?: VertexClientFactory;
   fetchImpl?: typeof fetch;
+  resolveHost?: (host: string) => Promise<readonly string[]>;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
@@ -84,10 +85,19 @@ export async function executeChat(input: {
       gate: input.gate,
       vertexClientFactory: input.vertexClientFactory,
       fetchImpl: input.fetchImpl,
+      resolveHost: input.resolveHost,
     });
     return undefined;
   }
-  const baseURL = providerChatBaseUrl(route.provider, route.endpoint, input.upstreamBaseUrl);
+  const transport = await bindRouteTransport({
+    runtimePool: input.runtimePool,
+    tenantId: input.tenantId,
+    route,
+    upstreamBaseUrl: input.upstreamBaseUrl,
+    fetchImpl: input.fetchImpl,
+    resolveHost: input.resolveHost,
+  });
+  const baseURL = transport.baseURL;
 
   let requestId = '';
   let attemptId = '';
@@ -106,6 +116,7 @@ export async function executeChat(input: {
     attemptId = created.attemptId;
     apiKey = created.apiKey;
   } catch (error) {
+    await transport.release();
     if (error instanceof ProxyError) throw error;
     input.logger.error('request persistence failed', { message: errorMessage(error) });
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
@@ -121,7 +132,7 @@ export async function executeChat(input: {
       signal: input.signal,
       tenantId: input.tenantId,
       vertexClientFactory: input.vertexClientFactory,
-      fetchImpl: input.fetchImpl,
+      fetchImpl: transport.fetchImpl,
     });
     await recordResult(input, {
       requestId,
@@ -168,6 +179,7 @@ export async function executeChat(input: {
     throw normalized;
   } finally {
     apiKey = '';
+    await transport.release();
   }
 }
 

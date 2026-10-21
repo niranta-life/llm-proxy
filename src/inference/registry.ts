@@ -45,6 +45,8 @@ function approvedDgxEndpoint(value: string): string | undefined {
     return undefined;
   }
   if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.hostname === '') return undefined;
+  if (url.search !== '' || url.hash !== '') return undefined;
+  if (url.pathname.replace(/\/+$/, '') !== '/v1') return undefined;
   if (publicProviderHost(url.hostname)) return undefined;
   return trimmed;
 }

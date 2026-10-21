@@ -346,6 +346,41 @@ export async function setDeploymentValidation(
   };
 }
 
+export async function approvePrivateEndpoint(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    host: string;
+    port: number;
+    addresses: readonly string[];
+    tlsVerify: boolean;
+    healthEndpoint: string | null;
+  },
+): Promise<string> {
+  const result = await pool.query<{ approve_private_endpoint: string }>(
+    'SELECT approve_private_endpoint($1::uuid, $2, $3, $4::text[], $5, $6) AS approve_private_endpoint',
+    [input.tenantId, input.host, input.port, input.addresses, input.tlsVerify, input.healthEndpoint],
+  );
+  const id = result.rows[0]?.approve_private_endpoint;
+  if (id === undefined) throw new Error('endpoint was not approved');
+  return id;
+}
+
+export async function setDeploymentConcurrency(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+  limit: number | null,
+): Promise<number> {
+  const result = await pool.query<{ set_deployment_concurrency: number }>(
+    'SELECT set_deployment_concurrency($1::uuid, $2, $3) AS set_deployment_concurrency',
+    [tenantId, name, limit],
+  );
+  const version = result.rows[0]?.set_deployment_concurrency;
+  if (version === undefined) throw new Error('deployment concurrency was not updated');
+  return version;
+}
+
 export async function setDeploymentHealth(
   pool: Pool,
   tenantId: string,

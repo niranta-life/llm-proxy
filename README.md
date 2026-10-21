@@ -117,7 +117,11 @@ A new xAI deployment stays disabled until you enable it.
 A new OpenRouter deployment stays disabled until you enable it.
 Enable one of those providers at a time.
 The proxy can store 1 private DGX endpoint for a tenant.
-A chat completion for DGX is not sent.
+The proxy can send a text chat to an enabled DGX deployment after that endpoint is approved.
+The proxy can stream that chat when the tenant and the deployment both enable streaming.
+A new DGX deployment stays disabled until you enable it.
+Live DGX is not verified.
+A DGX deployment is not `validated_live`.
 
 You can start the local Compose project with Colima.
 You can stop that project with Colima.
@@ -639,18 +643,28 @@ docker compose run --rm app node dist/cli.js set-deployment-streaming \
 ## Record a private DGX endpoint
 
 The proxy stores 1 private DGX endpoint for a tenant.
-A chat completion does not use DGX.
+An approved DGX endpoint can serve a text chat.
+The chat uses the stored endpoint, the stored model, the stored API key, and the stored authentication mode.
 DGX uses an API key and 1 `https` endpoint.
 The endpoint has no user name and no password.
 The host is not a public provider host.
+The endpoint is on an allowlist for that tenant.
+The allowlist pins the addresses for that host.
+A production endpoint keeps TLS verification on.
+A chat uses `/v1/models` and `/v1/chat/completions`.
+A health check uses only the stored health endpoint.
 The caller cannot select a provider URL.
 Do not pass `--default-max-output-tokens` for DGX.
 Do not pass an OpenRouter routing flag for DGX.
-`validate-deployment` records `valid`, `invalid`, or `unvalidated`.
+A new DGX deployment stays disabled until you enable it.
+You can set a concurrency limit on that deployment.
+DGX can stream when the tenant and the deployment both enable streaming.
+`validate-deployment` records `unvalidated`, `valid`, `invalid`, or `validated_mock`.
+`validate-deployment` does not record `validated_live`.
+Live DGX is not verified.
 The health status stays as it was.
 `set-deployment-health` records `unknown`, `healthy`, or `unhealthy`.
 The configuration version stays as it was.
-DGX raises `streaming is not supported`.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-dgx-connection \
@@ -665,6 +679,17 @@ docker compose run --rm app node dist/cli.js register-deployment \
   --timeout-ms 30000 \
   --capabilities temperature \
   --enabled false
+docker compose run --rm app node dist/cli.js approve-private-endpoint \
+  --tenant-id <tenant-id> \
+  --host dgx.lab.internal \
+  --port 443 \
+  --addresses 10.0.0.8 \
+  --tls-verify true \
+  --health-endpoint https://dgx.lab.internal/health
+docker compose run --rm app node dist/cli.js set-deployment-concurrency \
+  --tenant-id <tenant-id> \
+  --deployment dgx-chat \
+  --max-concurrency 2
 docker compose run --rm app node dist/cli.js validate-deployment \
   --tenant-id <tenant-id> --deployment dgx-chat --status valid
 docker compose run --rm app node dist/cli.js set-deployment-health \
@@ -687,6 +712,7 @@ The proxy accepts `stream` set to `true` for Anthropic.
 The proxy accepts `stream` set to `true` for Vertex.
 The proxy accepts `stream` set to `true` for xAI.
 The proxy accepts `stream` set to `true` for OpenRouter.
+The proxy accepts `stream` set to `true` for an approved DGX deployment.
 The tenant must have streaming enabled.
 The deployment must have streaming enabled.
 When `stream` is `true`, you can set `stream_options` to `{"include_usage":true}`.
@@ -1171,6 +1197,7 @@ The new function allows Anthropic.
 At that migration, another provider still raises `streaming is not supported`.
 Migration `009_vertex_provider.sql` later allows Vertex.
 Migration `010_compatible_providers.sql` later allows xAI and OpenRouter.
+Migration `011_private_endpoint.sql` later allows an approved DGX deployment to stream.
 The file does not drop a column.
 The file does not change an existing row.
 Streaming stays off until you enable it for that tenant and that deployment.
@@ -1366,6 +1393,9 @@ The file does not drop a column.
 The file does not drop a table.
 The file does not edit migrations `001` through `009`.
 DGX still raises `streaming is not supported`.
+`011_private_endpoint.sql` allows an approved DGX deployment to stream.
+That file can record `validated_mock`.
+That file does not record `validated_live`.
 
 The image `a0d8156` stays ready on this database.
 A tenant that stores OpenAI, Anthropic, and Vertex can still send a chat completion.
@@ -1520,16 +1550,22 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Limits
 
-- A chat completion uses OpenAI, Anthropic, an enabled Vertex deployment, an enabled xAI deployment, or an enabled OpenRouter deployment.
-- The registry can also store 1 private DGX endpoint.
-- The proxy does not send a chat completion to DGX.
+- A chat completion uses OpenAI, Anthropic, an enabled Vertex deployment, an enabled xAI deployment, an enabled OpenRouter deployment, or an enabled approved DGX deployment.
+- The registry can store 1 private DGX endpoint.
+- An approved DGX deployment can serve a text chat.
+- DGX uses the stored tenant endpoint.
+- DGX does not use `OPENAI_BASE_URL`.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
 - Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
 - Vertex can stream a text chat when that tenant and that deployment both enable streaming.
 - xAI can stream a text chat when that tenant and that deployment both enable streaming.
 - OpenRouter can stream a text chat when that tenant and that deployment both enable streaming.
+- DGX can stream a text chat when that tenant and that deployment both enable streaming.
 - A new xAI deployment stays disabled until you enable it.
 - A new OpenRouter deployment stays disabled until you enable it.
+- A new DGX deployment stays disabled until you enable it.
+- Live DGX is not verified.
+- A DGX deployment is not `validated_live`.
 - OpenRouter sends only the downstream providers that you stored.
 - OpenRouter sends a stored data-collection value.
 - OpenRouter sends a stored fallback value.
@@ -1619,7 +1655,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Work that is not complete
 
-- A chat completion for a private DGX endpoint.
+- A live call to a DGX host.
 - Input that is not text.
 - A tool call.
 - A second provider after an error.

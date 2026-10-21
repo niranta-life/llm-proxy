@@ -12,6 +12,8 @@ import {
   registerRegistryConnection,
   replaceAnthropicCredential,
   replaceOpenAiCredential,
+  approvePrivateEndpoint,
+  setDeploymentConcurrency,
   setDeploymentHealth,
   setDeploymentStreaming,
   setDeploymentValidation,
@@ -21,6 +23,8 @@ import {
   setProviderConnectionEnabled,
   setTenantStreamingEnabled,
 } from './db/inference-admin.js';
+import { listPrivateModels, probePrivateHealth } from './inference/private-serve.js';
+import { normalizeApproval } from './inference/private.js';
 import { prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
@@ -85,6 +89,12 @@ type Flags = {
   'data-collection'?: string;
   'allow-fallbacks'?: string;
   'require-serving-provider'?: string;
+  host?: string;
+  port?: string;
+  addresses?: string;
+  'tls-verify'?: string;
+  'health-endpoint'?: string;
+  'max-concurrency'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -213,6 +223,12 @@ async function main(): Promise<void> {
         'data-collection': { type: 'string' },
         'allow-fallbacks': { type: 'string' },
         'require-serving-provider': { type: 'string' },
+        host: { type: 'string' },
+        port: { type: 'string' },
+        addresses: { type: 'string' },
+        'tls-verify': { type: 'string' },
+        'health-endpoint': { type: 'string' },
+        'max-concurrency': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -220,6 +236,19 @@ async function main(): Promise<void> {
     command = parsed.positionals[0] ?? '';
     values = parsed.values;
   } catch {
+    logger.error('invalid command arguments');
+    process.exit(1);
+  }
+
+  const strayPrivateFlag = (
+    (values.host !== undefined && command !== 'approve-private-endpoint')
+    || (values.port !== undefined && command !== 'approve-private-endpoint')
+    || (values.addresses !== undefined && command !== 'approve-private-endpoint')
+    || (values['tls-verify'] !== undefined && command !== 'approve-private-endpoint')
+    || (values['health-endpoint'] !== undefined && command !== 'approve-private-endpoint')
+    || (values['max-concurrency'] !== undefined && command !== 'set-deployment-concurrency')
+  );
+  if (strayPrivateFlag) {
     logger.error('invalid command arguments');
     process.exit(1);
   }
@@ -660,6 +689,66 @@ async function main(): Promise<void> {
       credentialJson = '';
       spec.credentialJson = null;
       process.stdout.write(`${JSON.stringify(result)}\n`);
+      return;
+    }
+
+    if (command === 'approve-private-endpoint') {
+      const tenantId = requireTenant(values);
+      const host = values.host?.trim() ?? '';
+      const port = Number(values.port);
+      const addresses = (values.addresses ?? '').split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+      const tlsVerify = values['tls-verify'] === undefined ? true : parseEnabled(values['tls-verify']);
+      const healthText = values['health-endpoint']?.trim() ?? '';
+      if (tenantId === undefined || host.length === 0 || !Number.isInteger(port) || addresses.length === 0 || tlsVerify === undefined) {
+        logger.error('endpoint is invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const approval = normalizeApproval({
+        host,
+        port,
+        addresses,
+        tlsVerify,
+        healthEndpoint: healthText.length === 0 ? null : healthText,
+      });
+      const approvalId = await approvePrivateEndpoint(pool, { tenantId, ...approval });
+      process.stdout.write(`${JSON.stringify({ tenantId, approvalId, ...approval })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-concurrency') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const raw = values['max-concurrency']?.trim() ?? '';
+      const limit = raw === 'none' ? null : Number(raw);
+      if (tenantId === undefined || name.length === 0 || (limit !== null && !Number.isInteger(limit))) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const configVersion = await setDeploymentConcurrency(pool, tenantId, name, limit);
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, maxConcurrency: limit, configVersion })}\n`);
+      return;
+    }
+
+    if (command === 'list-private-models' || command === 'probe-private-health') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      if (tenantId === undefined || name.length === 0) {
+        logger.error('tenant-id and deployment are required');
+        process.exitCode = 1;
+        return;
+      }
+      const runtimePool = createPool(config, 'runtime', logger, 1);
+      const store = credentialStore(config.providerCredentialKey);
+      try {
+        const result = command === 'list-private-models'
+          ? await listPrivateModels({ runtimePool, store, tenantId, deployment: name })
+          : await probePrivateHealth({ runtimePool, store, tenantId, deployment: name });
+        process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...result })}\n`);
+      } finally {
+        await runtimePool.end();
+      }
       return;
     }
 

@@ -1,0 +1,36 @@
+Mock server.
+
+The mock is test/mock-private.ts.
+It listens on 127.0.0.1 with an ephemeral port.
+It is not a DGX host.
+The tests call the shipped proxy.
+The proxy calls the mock through the private endpoint guard.
+The stored endpoint in the test remains https://dgx.lab.internal:8443/v1.
+The test bridge rewrites the forwarded connection to the mock after that guard.
+
+The mock serves GET /v1/models.
+The mock serves POST /v1/chat/completions as one JSON body.
+The mock serves POST /v1/chat/completions as SSE.
+A success stream sends finish_reason stop and then usage.
+A success stream ends with data: [DONE].
+The delay scene waits before the first token.
+The bad scene sends one valid chunk and then malformed SSE.
+The nousage scene omits usage.
+The timeout scene holds the socket until the client aborts.
+The refuse scene is a closed local port.
+The rate scene returns HTTP 429.
+The down scene returns HTTP 500.
+The redirect scene returns HTTP 302 and is not followed.
+The hold scene stays open until the test releases it.
+The pressure scene writes large frames.
+
+Command: ./node_modules/.bin/vitest run test/private-chat.test.ts
+Runtime: v24.22.0
+Test Files  1 passed (1)
+Tests  5 passed (5)
+Duration  20.66s
+Start at  00:58:01
+
+The caller catalog GET /v1/models does not hit the mock.
+The operator list uses the stored endpoint path /v1/models and does hit the mock.
+No caller request was sent to a real DGX host.

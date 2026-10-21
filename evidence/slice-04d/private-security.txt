@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/private-security.test.ts > private endpoint security > rejects a caller endpoint before any upstream call 2153ms
+ ✓ test/private-security.test.ts > private endpoint security > does not resolve or contact a host that the tenant has not approved 1425ms
+ ✓ test/private-security.test.ts > private endpoint security > does not follow a DNS rebind or a redirect 1343ms
+ ✓ test/private-security.test.ts > private endpoint security > keeps TLS verification on and blocks management and health paths from chat 1727ms
+ ✓ test/private-security.test.ts > private endpoint security > rejects disabled TLS on a production host through the operator command 732ms
+ ✓ test/private-security.test.ts > private endpoint security > uses the stored health endpoint only for an operator probe and hides the credential 1714ms
+ ✓ test/private-security.test.ts > private endpoint security > isolates tenant endpoints and credentials 3225ms
+ ✓ test/private-security.test.ts > private endpoint security > stops an extra request at the concurrency limit before upstream work 1659ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  00:58:23
+   Duration  20.63s (transform 292ms, setup 3ms, collect 581ms, tests 13.98s, environment 0ms, prepare 80ms)
+

@@ -1,0 +1,44 @@
+Rollback verification.
+
+Image llm-proxy:9f21f94 was built from git archive 9f21f941d08f65dcb39dc5a67129fa94c3159140.
+Image id: sha256:8b9559324a2e0455ae0a190d797ced0e4d3c663c28c7a303bdc0d25fc7529f25
+docker image inspect llm-proxy:9f21f94 Id matches that digest.
+The started container image was sha256:8b9559324a2e0455ae0a190d797ced0e4d3c663c28c7a303bdc0d25fc7529f25.
+The container config image was llm-proxy:9f21f94.
+That same container image was still that digest when readiness returned HTTP 200.
+The image ran on the same database.
+Inference was off.
+No provider key was supplied.
+PROVIDER_CREDENTIAL_KEY was unset on that container.
+The first readiness probe returned an empty reply while the process started.
+rollback_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+rollback_image_try 2 200
+rollback_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+schema_migrations kept versions 001 through 011.
+schema_migrations kept 011_private_endpoint.sql.
+010_compatible_providers.sql remained applied.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The query did not select protected credential text.
+
+git diff --exit-code for migrations 001 through 010 was empty.
+Migration 011 has no DROP COLUMN and no DROP TABLE.
+The rollback container was removed.
+The Compose app was started again on llm-proxy:slice-04d.
+docker image inspect llm-proxy:slice-04d Id is sha256:2575aa88ef1cd9fd74c0902d1aa325a5a59fa4855638865b9229ddad3f27e7c1.
+docker inspect llm-proxy-app-1 Image matched that digest after restore.
+The first restored probe returned an empty reply while the process started.
+restored_app_try 1 curl_rc=52 curl: (52) Empty reply from server
+restored_app_try 2 200
+restored_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+The database volume llm-proxy_pgdata was not removed.
+Colima was not stopped.
+ycrest6 postgres stayed running.
+gemba postgres stayed running.
+ROLLBACK_KEPT_ROWS_AND_MIGRATION_011
+DEPLOY_EXIT:0

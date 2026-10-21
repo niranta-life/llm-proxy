@@ -1,0 +1,32 @@
+Security tests.
+
+Command: ./node_modules/.bin/vitest run test/private-security.test.ts
+Runtime: v24.22.0
+Test Files  1 passed (1)
+Tests  8 passed (8)
+Duration  20.63s
+Start at  00:58:23
+None of these tests were skipped.
+
+Passed cases:
+rejects a caller endpoint before any upstream call
+does not resolve or contact a host that the tenant has not approved
+does not follow a DNS rebind or a redirect
+keeps TLS verification on and blocks management and health paths from chat
+rejects disabled TLS on a production host through the operator command
+uses the stored health endpoint only for an operator probe and hides the credential
+isolates tenant endpoints and credentials
+stops an extra request at the concurrency limit before upstream work
+
+A caller field named endpoint, base_url, or health_endpoint is rejected before an upstream call.
+A host outside the tenant allowlist is rejected before DNS.
+A DNS answer outside the pinned address set is rejected.
+An HTTP redirect is not followed.
+The client error for that redirect is endpoint_redirect.
+Production TLS verification stays on.
+Chat fetch mode allows only /v1/models and /v1/chat/completions.
+Health fetch mode allows only the stored health URL.
+The stored credential is absent from the caller response and from the captured logs.
+One tenant cannot use another tenant endpoint or credential.
+A concurrency limit of 1 rejects the extra request before the mock sees it.
+The full suite also kept the unapproved DGX chat unavailable and still served OpenAI.

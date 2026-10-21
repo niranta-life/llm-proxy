@@ -1,0 +1,24 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/private-security.test.ts > private endpoint security > rejects a caller endpoint before any upstream call 1579ms
+ ✓ test/private-security.test.ts > private endpoint security > does not resolve or contact a host that the tenant has not approved 1360ms
+ ✓ test/private-security.test.ts > private endpoint security > does not follow a DNS rebind or a redirect 1236ms
+ ✓ test/private-security.test.ts > private endpoint security > keeps TLS verification on and blocks management and health paths from chat 1131ms
+ ✓ test/private-security.test.ts > private endpoint security > rejects disabled TLS on a production host through the operator command 432ms
+ ✓ test/private-security.test.ts > private endpoint security > uses the stored health endpoint only for an operator probe and hides the credential 1561ms
+ ✓ test/private-security.test.ts > private endpoint security > isolates tenant endpoints and credentials 3674ms
+ ✓ test/private-security.test.ts > private endpoint security > stops an extra request at the concurrency limit before upstream work 1646ms
+ ✓ test/private-chat.test.ts > private endpoint chat > keeps a new deployment disabled, then serves the stored model on the approved endpoint 1911ms
+ ✓ test/private-chat.test.ts > private endpoint chat > ends a stream and a delayed first token with one DONE marker 2609ms
+ ✓ test/private-chat.test.ts > private endpoint chat > normalizes malformed SSE, missing usage, timeout, refusal, 429, and 5xx without a second call 3123ms
+ ✓ test/private-chat.test.ts > private endpoint chat > omits DONE when the caller cancels or the consumer stalls 2339ms
+ ✓ test/private-chat.test.ts > private endpoint chat > records validated_mock and rejects validated_live 2153ms
+ ✓ test/private-contract.test.ts > private OpenAI-compatible contract > accepts vLLM and NIM text fixtures and does not invent missing usage 4ms
+
+ Test Files  3 passed (3)
+      Tests  14 passed (14)
+   Start at  00:58:45
+   Duration  33.14s (transform 657ms, setup 12ms, collect 1.48s, tests 24.76s, environment 0ms, prepare 240ms)
+

@@ -30,6 +30,7 @@ export type DeploymentCandidate = {
   dataCollection: 'allow' | 'deny' | null;
   allowFallbacks: boolean | null;
   requireServingProvider: boolean;
+  maxConcurrency: number | null;
 };
 
 export type AliasCandidate = {
@@ -66,6 +67,7 @@ export type ResolvedRoute = {
   dataCollection: 'allow' | 'deny' | null;
   allowFallbacks: boolean | null;
   requireServingProvider: boolean;
+  maxConcurrency: number | null;
 };
 
 export function resolveModel(
@@ -107,5 +109,6 @@ export function resolveModel(
     dataCollection: deployment.dataCollection ?? null,
     allowFallbacks: deployment.allowFallbacks ?? null,
     requireServingProvider: deployment.requireServingProvider ?? false,
+    maxConcurrency: deployment.maxConcurrency ?? null,
   };
 }

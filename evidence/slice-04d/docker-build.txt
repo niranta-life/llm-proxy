@@ -1,0 +1,45 @@
+Docker build.
+
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Image: llm-proxy-app:latest
+Tag: llm-proxy:slice-04d
+Image id: sha256:2575aa88ef1cd9fd74c0902d1aa325a5a59fa4855638865b9229ddad3f27e7c1
+docker image inspect llm-proxy:slice-04d Id matches that digest.
+docker image inspect llm-proxy-app:latest Id matches that digest.
+docker inspect llm-proxy-app-1 Image matches that digest.
+
+An earlier image exited before it listened.
+That image could not import undici from the production install.
+That image was not treated as ready.
+undici 7.30.1 is now a production dependency.
+The image above was built after that change.
+
+The image file migrations/011_private_endpoint.sql is present.
+The image file migrations/010_compatible_providers.sql is present.
+The image file dist/inference/private.js is present.
+The image does not contain .env.live.
+Result: MIGRATION_011_PRESENT
+Result: MIGRATION_010_PRESENT
+Result: PRIVATE_ADAPTER_PRESENT
+Result: LIVE_FILE_ABSENT
+
+A gcloud credential helper printed a reauthentication error during the image content check.
+The check still listed migration 011 and the private adapter.
+
+The same image was started on the existing database.
+Inference stayed off.
+PROVIDER_CREDENTIAL_KEY was empty on that container.
+The first readiness probe returned an empty reply while the process started.
+new_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+new_image_try 2 200
+new_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+schema_migrations contained versions 001 through 011.
+schema_migrations contains 011_private_endpoint.sql.
+schema_migrations contains 010_compatible_providers.sql.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The database volume was not removed.
+DEPLOY_EXIT:0

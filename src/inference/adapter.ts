@@ -176,6 +176,7 @@ export async function completeChat(input: {
   } catch (error) {
     if (input.signal.aborted) throw normalizeUpstreamError(error, true);
     if (error instanceof ProxyError) throw error;
+    if (error instanceof Error && error.cause instanceof ProxyError) throw error.cause;
     if (controller.signal.aborted) {
       throw proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.');
     }
@@ -193,7 +194,7 @@ export const openAiAdapter: ProviderAdapter & {
   prepare(): void {},
   async execute(call) {
     const policy = routePolicy(call.route);
-    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter';
+    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter' || call.route.provider === 'dgx';
     const completion = await completeChat({
       apiKey: call.apiKey,
       baseURL: call.baseURL,
@@ -223,7 +224,7 @@ export const openAiAdapter: ProviderAdapter & {
   },
   stream(call) {
     const policy = routePolicy(call.route);
-    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter';
+    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter' || call.route.provider === 'dgx';
     return streamOpenAiChat({
       apiKey: call.apiKey,
       baseURL: call.baseURL,

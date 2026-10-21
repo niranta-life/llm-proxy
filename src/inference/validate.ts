@@ -129,7 +129,8 @@ export function assertStreamAllowed(
       route.provider === 'anthropic' ||
       route.provider === 'vertex' ||
       route.provider === 'xai' ||
-      route.provider === 'openrouter') &&
+      route.provider === 'openrouter' ||
+      route.provider === 'dgx') &&
     tenantStreamingEnabled &&
     route.streamingEnabled
   ) {

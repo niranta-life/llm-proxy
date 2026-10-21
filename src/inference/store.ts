@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { DataCollection } from './compatible.js';
 import { proxyError } from './errors.js';
+import type { PrivateApproval } from './private.js';
 import type { RegistryProviderName } from './contract.js';
 import type { AliasCandidate, DeploymentCandidate, ResolvedRoute } from './resolve.js';
 import type { TokenUsage } from './adapter.js';
@@ -36,6 +37,7 @@ type DeploymentRow = {
   data_collection: string | null;
   allow_fallbacks: boolean | null;
   require_serving_provider: boolean;
+  max_concurrency: number | null;
 };
 
 function providerName(value: string): RegistryProviderName {
@@ -86,7 +88,7 @@ export async function loadCatalog(client: PoolClient): Promise<{
             d.stream_connect_timeout_ms, d.stream_idle_timeout_ms,
             d.stream_total_timeout_ms, d.stream_backpressure_timeout_ms,
             d.downstream_providers, d.data_collection, d.allow_fallbacks,
-            d.require_serving_provider
+            d.require_serving_provider, d.max_concurrency
      FROM model_deployments d
      JOIN provider_connections c
        ON c.tenant_id = d.tenant_id AND c.id = d.connection_id`,
@@ -125,9 +127,34 @@ export async function loadCatalog(client: PoolClient): Promise<{
       dataCollection: readDataCollection(row.data_collection),
       allowFallbacks: row.allow_fallbacks,
       requireServingProvider: row.require_serving_provider,
+      maxConcurrency: row.max_concurrency,
     })),
     aliases: aliases.rows.map((row) => ({ alias: row.alias, deploymentId: row.deployment_id })),
     streamingEnabled: tenant.rows[0]?.streaming_enabled ?? false,
+  };
+}
+
+export async function loadPrivateApproval(client: PoolClient, host: string, port: number): Promise<PrivateApproval | null> {
+  const result = await client.query<{
+    host: string;
+    port: number;
+    addresses: string[] | null;
+    tls_verify: boolean;
+    health_endpoint: string | null;
+  }>(
+    `SELECT host, port, addresses, tls_verify, health_endpoint
+     FROM private_endpoint_allowlist
+     WHERE host = $1 AND port = $2`,
+    [host, port],
+  );
+  const row = result.rows[0];
+  if (row === undefined || row.addresses === null || row.addresses.length === 0) return null;
+  return {
+    host: row.host,
+    port: row.port,
+    addresses: row.addresses,
+    tlsVerify: row.tls_verify,
+    healthEndpoint: row.health_endpoint,
   };
 }
 

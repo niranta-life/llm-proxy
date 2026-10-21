@@ -71,7 +71,8 @@ An OpenAI deployment continues to operate after you add Anthropic.
 
 The proxy can stream a text chat for an OpenAI deployment.
 The proxy can stream a text chat for an Anthropic deployment.
-The same caller can use both.
+The proxy can stream a text chat for an enabled Vertex deployment.
+The same caller can use each of those deployments.
 The caller changes only the model.
 Streaming stays off until that tenant and that deployment both have streaming enabled.
 One accepted stream makes one upstream attempt.
@@ -103,6 +104,7 @@ The proxy does not use the Anthropic fields `inference_geo` and `speed`.
 
 The proxy can store a Vertex connection for a tenant.
 The proxy can send a text chat to an enabled Vertex deployment.
+The proxy can stream that chat when the tenant and the deployment both enable streaming.
 The proxy can store an xAI connection for a tenant.
 The proxy can store an OpenRouter connection for a tenant.
 The proxy can store 1 private DGX endpoint for a tenant.
@@ -305,12 +307,14 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled --tenant-id 
 
 Streaming stays off until you enable it for that tenant.
 Streaming stays off until you enable it for that deployment.
-The deployment can be OpenAI or Anthropic.
+The deployment can be OpenAI, Anthropic, or Vertex.
 When you omit a timeout flag, the proxy uses the deployment timeout.
 That timeout applies to the connection.
 That timeout applies when the provider sends no text.
 That timeout applies to the full stream.
 That timeout applies when the caller does not read.
+Each text chunk resets the idle timer.
+The total timer can end the stream while text is still arriving.
 A timeout that you set is an integer from 100 through 600000.
 The unit is milliseconds.
 
@@ -383,7 +387,7 @@ docker compose run --rm app node dist/cli.js set-connection-enabled \
 
 `set-connection-enabled` changes the OpenAI connection when you omit `--provider`.
 
-The same caller code can reach OpenAI or Anthropic.
+The same caller code can reach OpenAI, Anthropic, or an enabled Vertex deployment.
 Change only `model`.
 `auto` selects the deployment from `set-alias`.
 The proxy keeps the deployment name that you write in `model`.
@@ -434,6 +438,8 @@ A chat request does not run `gcloud`.
 A chat request does not change `GOOGLE_CLOUD_PROJECT`.
 A chat request does not change `GOOGLE_CLOUD_LOCATION`.
 A chat request does not change a credential path.
+The proxy caches a Vertex client by tenant, connection, identity, and config version.
+The proxy mints a new token before that token expires.
 
 Use this setup on a development machine:
 
@@ -509,6 +515,8 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
 `validate-vertex-credential` checks that a token can be minted.
 It does not print the token.
 `validate-vertex-access` lists models in the stored project and location.
+That list is not the publisher catalog.
+A failed list does not report the project as valid.
 `test-vertex-inference` sends 1 small text request to the named deployment.
 That command can run while the deployment is disabled.
 A disabled deployment still does not serve `POST /v1/chat/completions`.
@@ -655,7 +663,7 @@ When the provider does not send usage, the body has no `usage`.
 The proxy does not invent a token count.
 
 An enabled stream uses `text/event-stream`.
-The deployment can be OpenAI or Anthropic.
+The deployment can be OpenAI, Anthropic, or Vertex.
 The caller changes only the configured model.
 Each event is a `chat.completion.chunk`.
 The completion id does not change in that response.
@@ -671,6 +679,8 @@ The proxy sends that marker only after the provider finish event.
 The proxy sends that marker only after the provider terminal event.
 For OpenAI, that event is `[DONE]`.
 For Anthropic, that event is `message_stop`.
+For Vertex, that event is a finish reason.
+A timeout does not write `[DONE]`.
 The proxy does not record the generated text.
 The proxy does not record the raw event stream.
 

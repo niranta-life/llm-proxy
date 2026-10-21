@@ -1,0 +1,57 @@
+Rollback proof.
+
+Image llm-proxy:832d8ac was built from git archive 832d8ac782b1844afca422ed9bb2acaf4e6235cc.
+Image id: sha256:bbc37255a156dae7c12cfe5005313c51562fb67c0e438350454649c4d9fde784
+docker image inspect --format '{{.Id}}' returned that id for llm-proxy:832d8ac.
+The started container image was sha256:bbc37255a156dae7c12cfe5005313c51562fb67c0e438350454649c4d9fde784.
+The container config image was llm-proxy:832d8ac.
+
+The build log also printed config digest sha256:8946a2a4e8263d42aeaa13cfd13443ba96e67a7a91aa1f149301b386a99dfccf.
+The build log also printed attestation digest sha256:fb5196c15120036c544f50fb3952e8d01ef7ad5c3b87c29c2c9c0cf6d3df696f.
+The recorded image id is the inspect id.
+That id is the manifest list sha256:bbc37255a156dae7c12cfe5005313c51562fb67c0e438350454649c4d9fde784.
+
+That image contains migrations/011_private_endpoint.sql.
+That image does not contain migrations/012_cost_accounting.sql.
+That image does not contain dist/inference/cost.js.
+Result: OLD_FILES_OK
+
+The image ran on the same database.
+Inference was off.
+No provider key was supplied.
+PROVIDER_CREDENTIAL_KEY was unset on that container.
+ROLLBACK_KEY UNSET
+ROLLBACK_INFERENCE false
+
+The first readiness probe returned an empty reply while the process started.
+rollback_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+rollback_image_try 2 200
+rollback_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Image 832d8ac stayed ready while 012_cost_accounting.sql remained applied.
+
+schema_migrations kept versions 001 through 011.
+schema_migrations kept 011_private_endpoint.sql.
+schema_migrations kept 012_cost_accounting.sql.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The query did not select protected credential text.
+
+The rollback container was removed.
+The Compose app was started again.
+docker inspect llm-proxy-app-1 Image matched sha256:f0bca6297d8dc971ca0fe10d3e2be9b47dc322ece6ec1218642858754f9aef09 after restore.
+The first two restored probes returned an empty reply while the process started.
+restored_app_try 1 curl_rc=52 curl: (52) Empty reply from server
+restored_app_try 2 curl_rc=52 curl: (52) Empty reply from server
+restored_app_try 3 200
+restored_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+
+Counts after restore stayed 20 tenants, 28 deployments, and 23 connections.
+schema_migrations still contained 011_private_endpoint.sql and 012_cost_accounting.sql.
+ycrest and gemba containers stayed running.
+OTHER_CONTAINERS_UNCHANGED
+The database volume llm-proxy_pgdata was not removed.
+Colima was not stopped.
+DEPLOY_EXIT:0

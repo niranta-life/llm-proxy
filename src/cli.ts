@@ -29,6 +29,7 @@ import { prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
+import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
 
@@ -95,6 +96,18 @@ type Flags = {
   'tls-verify'?: string;
   'health-endpoint'?: string;
   'max-concurrency'?: string;
+  'effective-at'?: string;
+  source?: string;
+  'service-tier'?: string;
+  'serving-provider'?: string;
+  'input-rate'?: string;
+  'output-rate'?: string;
+  'cache-read-rate'?: string;
+  'cache-write-rate'?: string;
+  'thinking-rate'?: string;
+  'request-fee'?: string;
+  'allocated-rate'?: string;
+  'attempt-id'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -173,6 +186,99 @@ function credentialStore(key: Buffer | null) {
   return createCredentialStore(key);
 }
 
+const RATE = /^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/;
+const PRICE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
+const REGION = /^(?:global|[a-z]+(?:-[a-z0-9]+){1,3})$/;
+const SERVICE_TIER = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const SERVING_PROVIDER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+const PRICE_PROVIDERS = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
+
+function parseOptionalRate(value: string | undefined): string | null | undefined {
+  if (value === undefined) return null;
+  return RATE.test(value) ? value : undefined;
+}
+
+function parseServiceTier(value: string | undefined, required: boolean): string | null | undefined {
+  if (value === undefined) return required ? undefined : null;
+  if (required && value === 'none') return null;
+  return SERVICE_TIER.test(value) ? value : undefined;
+}
+
+function parsePrice(values: Flags): {
+  provider: string;
+  model: string;
+  region: string | null;
+  serviceTier: string | null;
+  servingProvider: string | null;
+  effectiveAt: string;
+  priceSource: string;
+  verificationStatus: string;
+  inputRate: string | null;
+  outputRate: string | null;
+  cacheReadRate: string | null;
+  cacheWriteRate: string | null;
+  thinkingRate: string | null;
+  requestFee: string | null;
+  allocatedRate: string | null;
+} | undefined {
+  const provider = values.provider ?? '';
+  const model = values['upstream-model'] ?? '';
+  const effectiveAt = values['effective-at'] ?? '';
+  const priceSource = values.source ?? '';
+  const verificationStatus = values.status ?? '';
+  const serviceTier = parseServiceTier(values['service-tier'], false);
+  const inputRate = parseOptionalRate(values['input-rate']);
+  const outputRate = parseOptionalRate(values['output-rate']);
+  const cacheReadRate = parseOptionalRate(values['cache-read-rate']);
+  const cacheWriteRate = parseOptionalRate(values['cache-write-rate']);
+  const thinkingRate = parseOptionalRate(values['thinking-rate']);
+  const requestFee = parseOptionalRate(values['request-fee']);
+  const allocatedRate = parseOptionalRate(values['allocated-rate']);
+  const region = values.location === undefined ? null : values.location;
+  const servingProvider = values['serving-provider'] === undefined ? null : values['serving-provider'];
+  if (
+    !PRICE_PROVIDERS.has(provider) ||
+    model.length < 1 ||
+    model.length > 128 ||
+    /\s/.test(model) ||
+    !PRICE_TIME.test(effectiveAt) ||
+    Number.isNaN(Date.parse(effectiveAt)) ||
+    priceSource.length < 1 ||
+    priceSource.length > 128 ||
+    /[\u0000-\u001F\u007F]/.test(priceSource) ||
+    (verificationStatus !== 'verified' && verificationStatus !== 'unverified') ||
+    (region !== null && !REGION.test(region)) ||
+    (servingProvider !== null && !SERVING_PROVIDER.test(servingProvider)) ||
+    serviceTier === undefined ||
+    inputRate === undefined ||
+    outputRate === undefined ||
+    cacheReadRate === undefined ||
+    cacheWriteRate === undefined ||
+    thinkingRate === undefined ||
+    requestFee === undefined ||
+    allocatedRate === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    provider,
+    model,
+    region,
+    serviceTier,
+    servingProvider,
+    effectiveAt,
+    priceSource,
+    verificationStatus,
+    inputRate,
+    outputRate,
+    cacheReadRate,
+    cacheWriteRate,
+    thinkingRate,
+    requestFee,
+    allocatedRate,
+  };
+}
+
 async function main(): Promise<void> {
   let config;
   try {
@@ -229,6 +335,18 @@ async function main(): Promise<void> {
         'tls-verify': { type: 'string' },
         'health-endpoint': { type: 'string' },
         'max-concurrency': { type: 'string' },
+        'effective-at': { type: 'string' },
+        source: { type: 'string' },
+        'service-tier': { type: 'string' },
+        'serving-provider': { type: 'string' },
+        'input-rate': { type: 'string' },
+        'output-rate': { type: 'string' },
+        'cache-read-rate': { type: 'string' },
+        'cache-write-rate': { type: 'string' },
+        'thinking-rate': { type: 'string' },
+        'request-fee': { type: 'string' },
+        'allocated-rate': { type: 'string' },
+        'attempt-id': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -247,6 +365,22 @@ async function main(): Promise<void> {
     || (values['tls-verify'] !== undefined && command !== 'approve-private-endpoint')
     || (values['health-endpoint'] !== undefined && command !== 'approve-private-endpoint')
     || (values['max-concurrency'] !== undefined && command !== 'set-deployment-concurrency')
+    || (values['effective-at'] !== undefined && command !== 'register-price')
+    || (values.source !== undefined && command !== 'register-price')
+    || (values['serving-provider'] !== undefined && command !== 'register-price')
+    || (values['input-rate'] !== undefined && command !== 'register-price')
+    || (values['output-rate'] !== undefined && command !== 'register-price')
+    || (values['cache-read-rate'] !== undefined && command !== 'register-price')
+    || (values['cache-write-rate'] !== undefined && command !== 'register-price')
+    || (values['thinking-rate'] !== undefined && command !== 'register-price')
+    || (values['request-fee'] !== undefined && command !== 'register-price')
+    || (values['allocated-rate'] !== undefined && command !== 'register-price')
+    || (
+      values['service-tier'] !== undefined
+      && command !== 'register-price'
+      && command !== 'set-deployment-service-tier'
+    )
+    || (values['attempt-id'] !== undefined && command !== 'reconcile-attempt-cost')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');
@@ -749,6 +883,45 @@ async function main(): Promise<void> {
       } finally {
         await runtimePool.end();
       }
+      return;
+    }
+
+    if (command === 'register-price') {
+      const parsed = parsePrice(values);
+      if (parsed === undefined) {
+        logger.error('price arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const registered = await registerPrice(pool, parsed);
+      process.stdout.write(`${JSON.stringify(registered)}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-service-tier') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const tier = parseServiceTier(values['service-tier'], true);
+      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || tier === undefined) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const serviceTier = await setDeploymentServiceTier(pool, tenantId, name, tier);
+      process.stdout.write(`${JSON.stringify({ serviceTier })}\n`);
+      return;
+    }
+
+    if (command === 'reconcile-attempt-cost') {
+      const tenantId = requireTenant(values);
+      const attemptId = values['attempt-id'] ?? '';
+      if (tenantId === undefined || !UUID.test(attemptId)) {
+        logger.error('attempt-id is required');
+        process.exitCode = 1;
+        return;
+      }
+      const reconciled = await reconcileAttemptCost(pool, tenantId, attemptId);
+      process.stdout.write(`${JSON.stringify(reconciled)}\n`);
       return;
     }
 

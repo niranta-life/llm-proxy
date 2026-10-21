@@ -11,6 +11,7 @@ import { vertexAdapter } from './vertex.js';
 import { runChatStream, type StreamHttp } from './execute-stream.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode } from './errors.js';
 import { resolveModel } from './resolve.js';
+import { recordAttemptCostSafely } from './cost-store.js';
 import { finishAttempt, insertPending, loadCatalog } from './store.js';
 import type { StreamGate } from './stream.js';
 import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './validate.js';
@@ -205,6 +206,7 @@ async function recordResult(
   try {
     await withTenant(input.runtimePool, input.tenantId, async (client) => {
       await finishAttempt(client, { tenantId: input.tenantId, ...result });
+      await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
   } catch (error) {
     input.logger.error('attempt result was not recorded', {

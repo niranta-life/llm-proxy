@@ -1,0 +1,41 @@
+Live provider cost check.
+
+The check read .env.live.
+The file supplies OPENAI_API_KEY and ANTHROPIC_API_KEY.
+It does not supply a Vertex key, an xAI key, or an OpenRouter key.
+No key was printed.
+The check log was scanned and did not contain either key.
+
+Command: ./node_modules/.bin/vitest run --config scripts/vitest.live.config.ts
+Node: v24.22.0
+Vitest: v3.2.7
+The test boots the shipped proxy against real PostgreSQL.
+It registers the keys on a new tenant.
+It sends one OpenAI chat and one Anthropic chat.
+Both prices include cache and thinking rates.
+EXIT:0.
+
+Test Files 1 passed (1).
+Tests 1 passed (1).
+Duration 17.69s.
+Start at 09:17:00.
+
+LIVE_ENV_COST {"calls":[{"provider":"openai","deployment":"live-openai","model":"gpt-4o-mini","usage":{"promptTokens":13,"completionTokens":2,"totalTokens":15,"uncachedInputTokens":null,"cacheCreationInputTokens":null,"cacheReadInputTokens":null,"thoughtsTokens":null},"costStatus":"estimated","amount":"0.000017"},{"provider":"anthropic","deployment":"live-anthropic","model":"claude-sonnet-4-5","usage":{"promptTokens":13,"completionTokens":4,"totalTokens":17,"uncachedInputTokens":13,"cacheCreationInputTokens":0,"cacheReadInputTokens":0,"thoughtsTokens":null},"costStatus":"estimated","amount":"0.000021"}],"currency":"USD"}
+
+OpenAI stored no cache counts.
+The estimated amount is 0.000017.
+That is 13 input tokens at 0.000001 plus 2 output tokens at 0.000002.
+The cache and thinking rates were not applied.
+
+Anthropic stored cache write 0 and cache read 0.
+The thinking count was absent.
+The estimated amount is 0.000021.
+That is 13 uncached input tokens at 0.000001 plus 4 output tokens at 0.000002.
+The zero cache counts add nothing.
+The absent thinking count does not make the result provisional.
+
+Both chats returned HTTP 200.
+The public body has no cost field.
+The cost route listed live-openai and live-anthropic for that tenant.
+
+Result: LIVE_ENV_COST_PASSED

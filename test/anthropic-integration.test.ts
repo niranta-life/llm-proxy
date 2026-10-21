@@ -290,6 +290,7 @@ describe('Anthropic integration', () => {
       '009_vertex_provider.sql',
       '010_compatible_providers.sql',
       '011_private_endpoint.sql',
+      '012_cost_accounting.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

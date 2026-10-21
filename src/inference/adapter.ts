@@ -1,4 +1,12 @@
 import OpenAI from 'openai';
+import {
+  OPENROUTER_METADATA_HEADER,
+  OPENROUTER_METADATA_VALUE,
+  assertServingIdentity,
+  compatibleRequestFields,
+  readReportedProvider,
+  routePolicy,
+} from './compatible.js';
 import type { ProviderAdapter, ProviderCall } from './contract.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
 import { streamOpenAiChat, type UpstreamStreamItem } from './openai-stream.js';
@@ -23,6 +31,7 @@ export type UpstreamCompletion = {
       finish_reason: string | null;
     }>;
     usage?: Record<string, number>;
+    provider?: string;
   };
   usage: TokenUsage;
   providerRequestId: string | null;
@@ -31,6 +40,8 @@ export type UpstreamCompletion = {
   cacheCreationInputTokens: number | null;
   cacheReadInputTokens: number | null;
   thoughtsTokens?: number | null;
+  servingModel?: string | null;
+  servingProvider?: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,12 +140,18 @@ export async function completeChat(input: {
   timeoutMs: number;
   signal: AbortSignal;
   optional: Record<string, unknown>;
+  fetchImpl?: typeof fetch;
+  defaultHeaders?: Record<string, string>;
+  parseRouterMetadata?: boolean;
 }): Promise<UpstreamCompletion> {
   const client = new OpenAI({
     apiKey: input.apiKey,
     baseURL: input.baseURL,
     maxRetries: 0,
     timeout: input.timeoutMs,
+    // The SDK fetch type is node-fetch. Runtime global fetch is undici.
+    ...(input.fetchImpl ? { fetch: input.fetchImpl as never } : {}),
+    ...(input.defaultHeaders ? { defaultHeaders: input.defaultHeaders } : {}),
   });
   const controller = new AbortController();
   const abort = (): void => controller.abort();
@@ -147,10 +164,15 @@ export async function completeChat(input: {
         upstreamModel: input.upstreamModel,
         messages: input.messages,
         optional: input.optional,
-      }),
+      }) as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
       { maxRetries: 0, timeout: input.timeoutMs, signal: controller.signal },
     );
-    return validateCompletion(response);
+    const completion = validateCompletion(response);
+    return {
+      ...completion,
+      servingModel: completion.response.model,
+      servingProvider: readReportedProvider(response, input.parseRouterMetadata === true),
+    };
   } catch (error) {
     if (input.signal.aborted) throw normalizeUpstreamError(error, true);
     if (error instanceof ProxyError) throw error;
@@ -169,30 +191,53 @@ export const openAiAdapter: ProviderAdapter & {
 } = {
   provider: 'openai',
   prepare(): void {},
-  execute(call) {
-    return completeChat({
+  async execute(call) {
+    const policy = routePolicy(call.route);
+    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter';
+    const completion = await completeChat({
       apiKey: call.apiKey,
       baseURL: call.baseURL,
       upstreamModel: call.route.upstreamModel,
       messages: call.request.messages,
       timeoutMs: call.route.timeoutMs,
       signal: call.signal,
-      optional: call.request.optional,
+      optional: compatibleRequestFields(call.route.provider, policy, call.request.optional),
+      fetchImpl: compatible ? call.fetchImpl : undefined,
+      ...(call.route.provider === 'openrouter'
+        ? {
+            defaultHeaders: { [OPENROUTER_METADATA_HEADER]: OPENROUTER_METADATA_VALUE },
+            parseRouterMetadata: true,
+          }
+        : {}),
     });
+    if (call.route.provider === 'openrouter') {
+      assertServingIdentity(policy, completion.servingProvider ?? null);
+    }
+    if (typeof completion.servingProvider === 'string') {
+      return {
+        ...completion,
+        response: { ...completion.response, provider: completion.servingProvider },
+      };
+    }
+    return completion;
   },
   stream(call) {
+    const policy = routePolicy(call.route);
+    const compatible = call.route.provider === 'xai' || call.route.provider === 'openrouter';
     return streamOpenAiChat({
       apiKey: call.apiKey,
       baseURL: call.baseURL,
       upstreamModel: call.route.upstreamModel,
       messages: call.request.messages,
       signal: call.signal,
-      optional: call.request.optional,
+      optional: compatibleRequestFields(call.route.provider, policy, call.request.optional),
       includeUsage: call.request.includeUsage,
       connectTimeoutMs: call.timeouts.connect,
       idleTimeoutMs: call.timeouts.idle,
       totalTimeoutMs: call.timeouts.total,
       deadline: call.deadline,
+      fetchImpl: compatible ? call.fetchImpl : undefined,
+      identity: call.route.provider === 'openrouter' ? policy : undefined,
     });
   },
 };

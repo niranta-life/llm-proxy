@@ -1,0 +1,41 @@
+Security tests.
+
+Each tenant uses its own API key.
+The xAI request carries Bearer xai-alpha-key on the approved host.
+The OpenRouter request carries Bearer router-policy-key on the approved host.
+Alpha and Beta concurrent requests do not share a key, a model, or a routing rule.
+
+A disabled deployment is not called.
+A caller cannot select a base URL.
+A caller cannot select a downstream provider.
+A stored downstream list is not widened.
+A stored data_collection value is not dropped.
+A stored allow_fallbacks value is not dropped.
+An empty downstream list is not treated as unrestricted.
+A model slug is not treated as a serving provider.
+A routing object is not treated as a serving provider.
+
+A required serving provider that the response does not name does not succeed.
+A reported provider outside the approved list does not succeed.
+The proxy does not make a second request to discover that provider.
+The proxy reads the selected provider from openrouter_metadata.
+The proxy does not treat a summary sentence as that provider.
+The proxy does not treat an unselected endpoint as that provider.
+Conflicting selected providers fail closed.
+A display name matches a stored slug only when the letters agree.
+The match ignores letter case.
+The name OpenAI matches the slug openai.
+The name OpenAI does not match the slug anthropic.
+The proxy keeps the reported spelling.
+Automatic retries stay off.
+A provider error does not switch model or provider.
+A stream failure does not write a false [DONE].
+
+The upstream secret text is absent from the proxy body.
+The tests do not print a provider key, a tenant secret, or PROVIDER_CREDENTIAL_KEY.
+Migrations 001 through 009 are unchanged.
+Migration 010 does not drop a column or a table.
+
+These cases passed in evidence/slice-04c/regression-after.txt.
+The pure policy cases are in test/compatible-policy.test.ts.
+The chat cases are in test/compatible-chat.test.ts.

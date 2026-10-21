@@ -6,6 +6,7 @@ import {
   registerAnthropicConnection,
   registerModelDeployment,
   registerOpenAiConnection,
+  registerOpenRouterDeployment,
   registerProviderDeployment,
   loadVertexOperatorConnection,
   registerRegistryConnection,
@@ -80,6 +81,10 @@ type Flags = {
   status?: string;
   'service-account'?: string;
   'api-version'?: string;
+  'downstream-providers'?: string;
+  'data-collection'?: string;
+  'allow-fallbacks'?: string;
+  'require-serving-provider'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -99,6 +104,51 @@ function parseTimeout(value: string | undefined): number | null | undefined {
   const parsed = Number(value);
   if (parsed < 100 || parsed > 600000) return undefined;
   return parsed;
+}
+
+const DOWNSTREAM = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+function parseOpenRouterRouting(
+  provider: string,
+  values: Flags,
+):
+  | null
+  | 'invalid'
+  | {
+      downstreamProviders: string[] | null;
+      dataCollection: 'allow' | 'deny' | null;
+      allowFallbacks: boolean | null;
+      requireServingProvider: boolean;
+    } {
+  const present =
+    values['downstream-providers'] !== undefined ||
+    values['data-collection'] !== undefined ||
+    values['allow-fallbacks'] !== undefined ||
+    values['require-serving-provider'] !== undefined;
+  if (provider !== 'openrouter') return present ? 'invalid' : null;
+  let downstreamProviders: string[] | null = null;
+  if (values['downstream-providers'] !== undefined) {
+    const parts = values['downstream-providers'].split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+    if (parts.length === 0 || parts.length > 8 || parts.length !== new Set(parts).size || parts.some((item) => !DOWNSTREAM.test(item))) {
+      return 'invalid';
+    }
+    downstreamProviders = parts;
+  }
+  let dataCollection: 'allow' | 'deny' | null = null;
+  if (values['data-collection'] !== undefined) {
+    if (values['data-collection'] !== 'allow' && values['data-collection'] !== 'deny') return 'invalid';
+    dataCollection = values['data-collection'];
+  }
+  const allowFallbacks = parseEnabled(values['allow-fallbacks']);
+  if (values['allow-fallbacks'] !== undefined && allowFallbacks === undefined) return 'invalid';
+  const requireServingProvider = parseEnabled(values['require-serving-provider']);
+  if (values['require-serving-provider'] !== undefined && requireServingProvider === undefined) return 'invalid';
+  return {
+    downstreamProviders,
+    dataCollection,
+    allowFallbacks: values['allow-fallbacks'] === undefined ? null : allowFallbacks ?? null,
+    requireServingProvider: requireServingProvider ?? false,
+  };
 }
 
 function parseCapabilities(value: string | undefined): string[] | undefined {
@@ -159,6 +209,10 @@ async function main(): Promise<void> {
         status: { type: 'string' },
         'service-account': { type: 'string' },
         'api-version': { type: 'string' },
+        'downstream-providers': { type: 'string' },
+        'data-collection': { type: 'string' },
+        'allow-fallbacks': { type: 'string' },
+        'require-serving-provider': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -394,6 +448,7 @@ async function main(): Promise<void> {
       const capabilities = parseCapabilities(values.capabilities);
       const enabled = parseEnabled(values.enabled) ?? false;
       const provider = values.provider ?? 'openai';
+      const routing = parseOpenRouterRouting(provider, values);
       const defaultMaxText = values['default-max-output-tokens'];
       const defaultMaxOutputTokens = defaultMaxText === undefined ? null : Number(defaultMaxText);
       const deploymentProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
@@ -404,12 +459,29 @@ async function main(): Promise<void> {
         !Number.isInteger(timeoutMs) ||
         capabilities === undefined ||
         !deploymentProviders.has(provider) ||
+        routing === 'invalid' ||
         (values.enabled !== undefined && parseEnabled(values.enabled) === undefined) ||
         (defaultMaxOutputTokens !== null && !Number.isInteger(defaultMaxOutputTokens)) ||
         (provider !== 'anthropic' && defaultMaxText !== undefined)
       ) {
         logger.error('deployment arguments are invalid');
         process.exitCode = 1;
+        return;
+      }
+      if (provider === 'openrouter') {
+        const created = await registerOpenRouterDeployment(pool, {
+          tenantId,
+          name,
+          upstreamModel,
+          timeoutMs,
+          capabilities,
+          enabled,
+          downstreamProviders: routing?.downstreamProviders ?? null,
+          dataCollection: routing?.dataCollection ?? null,
+          allowFallbacks: routing?.allowFallbacks ?? null,
+          requireServingProvider: routing?.requireServingProvider ?? false,
+        });
+        process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
         return;
       }
       if (provider !== 'openai') {

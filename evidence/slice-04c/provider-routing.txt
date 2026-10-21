@@ -1,0 +1,55 @@
+Provider routing checks.
+
+xAI traffic uses https://api.x.ai/v1/chat/completions.
+OpenRouter traffic uses https://openrouter.ai/api/v1/chat/completions.
+Neither call uses the OpenAI base URL.
+The caller cannot choose either URL.
+
+An OpenRouter deployment with a stored policy sends this provider object.
+only is anthropic.
+data_collection is deny.
+allow_fallbacks is false.
+The body has no order, models, or route field.
+The outbound model is openai/gpt-4o-mini.
+The outbound credential is that tenant key.
+
+A caller provider field and a caller base_url return HTTP 400.
+That call makes no upstream request.
+Routing flags on an xAI deployment are rejected.
+The command status is not 0.
+The error text is deployment arguments are invalid.
+
+A response that omits the serving provider returns HTTP 502.
+The error code is serving_provider_unverified.
+The body does not contain the hidden completion text.
+A reported provider outside the approved list returns the same error.
+A named approved provider returns the reported model and that provider.
+A stream that names the provider on the last usage chunk returns the held text.
+That stream ends with data: [DONE].
+A stream that never names the provider returns HTTP 502.
+That body does not contain [DONE].
+That body does not contain the hidden text.
+
+The outbound OpenRouter request sends X-OpenRouter-Metadata with the value enabled.
+An xAI request does not send that header.
+The tested selected provider is OpenAI.
+The stored slug is openai.
+The match ignores letter case.
+The stored serving provider remains OpenAI.
+A stream of 300 text deltas names that provider only on the final chunk.
+That stream returns every text delta and ends with data: [DONE].
+The proxy does not stop that stream at 256 held events.
+
+Two concurrent tenants use different keys, models, and routing rules.
+Alpha sends only anthropic, data_collection deny, and allow_fallbacks false.
+Beta sends only google, data_collection allow, and allow_fallbacks true.
+Both requests use the OpenRouter host.
+
+An enabled DGX deployment returns HTTP 503 for chat.
+A DGX stream returns HTTP 400.
+Neither call uses the injected fetch.
+The same tenant still receives an OpenAI chat from the OpenAI base URL.
+That OpenAI call uses the OpenAI key.
+The injected fetch is not used for OpenAI.
+
+These cases passed in evidence/slice-04c/regression-after.txt.

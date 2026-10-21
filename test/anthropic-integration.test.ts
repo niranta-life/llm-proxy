@@ -288,6 +288,7 @@ describe('Anthropic integration', () => {
       '007_stream_interrupted.sql',
       '008_provider_registry.sql',
       '009_vertex_provider.sql',
+      '010_compatible_providers.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',
@@ -756,7 +757,7 @@ describe('Anthropic integration', () => {
            status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
            provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
            cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written,
-           thoughts_tokens
+           thoughts_tokens, serving_model, serving_provider
          ) ON model_attempts TO llm_runtime`,
       );
     }

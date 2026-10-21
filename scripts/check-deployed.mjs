@@ -1318,7 +1318,8 @@ async function runLocalChecks() {
         `GRANT UPDATE (
            status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
            provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
-           cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written
+           cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written,
+           thoughts_tokens, serving_model, serving_provider
          )
          ON model_attempts TO llm_runtime;`,
       );

@@ -1,0 +1,51 @@
+Contract tests.
+
+The suite drives the shipped chat and stream paths.
+The client is the official OpenAI SDK 4.104.0.
+A mock fetch records the outbound URL, credential, and body.
+The test app base URL is not the xAI host and is not the OpenRouter host.
+
+Enabled xAI text returns model grok-3-actual and content grok-ok.
+Public usage is prompt_tokens 11, completion_tokens 7, and total_tokens 40.
+The response provider is xai.
+The outbound URL is https://api.x.ai/v1/chat/completions.
+The outbound credential is that tenant key.
+The outbound model is grok-3.
+The outbound body has no provider object.
+The xAI stream contains grok-ok, the actual model, and the same usage counts.
+The xAI stream ends with data: [DONE].
+The attempt stores serving model grok-3-actual and serving provider xai.
+The configured upstream model stays grok-3.
+
+A disabled xAI deployment returns HTTP 404.
+That call makes no upstream request.
+An unsupported field returns HTTP 400 before any upstream request.
+One upstream HTTP 500 returns HTTP 502.
+The proxy body does not contain the upstream secret.
+That failure is one upstream request.
+
+A cancelled xAI call records request_cancelled.
+A stream that fails after partial text returns HTTP 200.
+That body contains partial.
+That body does not contain [DONE].
+That body does not contain the upstream secret.
+The attempt stream status is provider_failed.
+A stream total timeout returns HTTP 504.
+That body does not contain [DONE].
+The attempt error code is timeout.
+The attempt stream status is timed_out.
+
+An OpenRouter response can name the selected provider in openrouter_metadata.
+The selected provider in the tested payload is OpenAI.
+The stored downstream slug is openai.
+The public provider field is OpenAI.
+The attempt stores serving provider OpenAI.
+The outbound request sends X-OpenRouter-Metadata with the value enabled.
+A stream of 300 text deltas names that provider only on the final chunk.
+That stream returns every text delta.
+That stream ends with data: [DONE].
+The stream frames do not add a provider field.
+A summary sentence is not used as the provider.
+An unselected endpoint is not used as the provider.
+
+These cases passed in evidence/slice-04c/regression-after.txt.

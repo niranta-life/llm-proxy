@@ -19,6 +19,7 @@ export type ProviderCall = {
   signal: AbortSignal;
   tenantId: string;
   vertexClientFactory?: VertexClientFactory;
+  fetchImpl?: typeof fetch;
 };
 
 export type ProviderAdapter = {

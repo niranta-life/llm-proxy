@@ -1,0 +1,25 @@
+SDK compatibility.
+
+package.json depends on openai ^4.104.0.
+The installed package version is 4.104.0.
+test/compatible-chat.test.ts imports that SDK.
+The SDK posts the chat body to the proxy.
+The proxy posts the provider body with maxRetries 0.
+src/inference/adapter.ts sets maxRetries to 0 on the client and on the request.
+The xAI and OpenRouter stream uses one fetch.
+That fetch has no retry loop.
+The same SSE writer emits the OpenAI chunk frames.
+An OpenRouter chat sets the OpenAI client default header X-OpenRouter-Metadata to enabled.
+An OpenRouter stream sets that same header on the one fetch.
+An xAI chat does not set that header.
+The client still sets maxRetries to 0.
+
+A successful SDK read returns the reported model and the three usage counts.
+The proxy does not replace total_tokens 40 with the sum of 11 and 7.
+An extra provider string on a non-stream response remains available to the caller.
+The stream frames do not add a provider field.
+
+The OpenAI, Anthropic, and Vertex contract tests still passed.
+The full result is evidence/slice-04c/regression-after.txt.
+Node was v24.22.0.
+Vitest was 3.2.7.

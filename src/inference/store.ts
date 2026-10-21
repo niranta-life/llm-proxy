@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import type { DataCollection } from './compatible.js';
 import { proxyError } from './errors.js';
 import type { RegistryProviderName } from './contract.js';
 import type { AliasCandidate, DeploymentCandidate, ResolvedRoute } from './resolve.js';
@@ -31,6 +32,10 @@ type DeploymentRow = {
   service_account_identity: string | null;
   api_version: string;
   connection_config_version: number;
+  downstream_providers: string[] | null;
+  data_collection: string | null;
+  allow_fallbacks: boolean | null;
+  require_serving_provider: boolean;
 };
 
 function providerName(value: string): RegistryProviderName {
@@ -45,6 +50,20 @@ function providerName(value: string): RegistryProviderName {
     return value;
   }
   throw new Error('provider is invalid');
+}
+
+function readDataCollection(value: string | null): DataCollection | null {
+  if (value === null) return null;
+  if (value === 'allow' || value === 'deny') return value;
+  throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+}
+
+function readDownstream(value: string[] | null): readonly string[] | null {
+  if (value === null) return null;
+  if (value.length === 0) {
+    throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+  }
+  return value;
 }
 
 export async function loadCatalog(client: PoolClient): Promise<{
@@ -65,7 +84,9 @@ export async function loadCatalog(client: PoolClient): Promise<{
             c.config_version AS connection_config_version,
             d.default_max_output_tokens, d.streaming_enabled,
             d.stream_connect_timeout_ms, d.stream_idle_timeout_ms,
-            d.stream_total_timeout_ms, d.stream_backpressure_timeout_ms
+            d.stream_total_timeout_ms, d.stream_backpressure_timeout_ms,
+            d.downstream_providers, d.data_collection, d.allow_fallbacks,
+            d.require_serving_provider
      FROM model_deployments d
      JOIN provider_connections c
        ON c.tenant_id = d.tenant_id AND c.id = d.connection_id`,
@@ -100,6 +121,10 @@ export async function loadCatalog(client: PoolClient): Promise<{
       serviceAccountIdentity: row.service_account_identity,
       apiVersion: row.api_version,
       connectionConfigVersion: row.connection_config_version,
+      downstreamProviders: readDownstream(row.downstream_providers),
+      dataCollection: readDataCollection(row.data_collection),
+      allowFallbacks: row.allow_fallbacks,
+      requireServingProvider: row.require_serving_provider,
     })),
     aliases: aliases.rows.map((row) => ({ alias: row.alias, deploymentId: row.deployment_id })),
     streamingEnabled: tenant.rows[0]?.streaming_enabled ?? false,
@@ -171,6 +196,8 @@ export async function finishAttempt(
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
     thoughtsTokens: number | null;
+    servingModel?: string | null;
+    servingProvider?: string | null;
     streamStatus?: StreamStatus | null;
     firstTextDeltaMs?: number | null;
     chunkCount?: number | null;
@@ -186,7 +213,8 @@ export async function finishAttempt(
          cache_read_input_tokens = $13,
          stream_status = $14, first_text_delta_ms = $15,
          chunk_count = $16, bytes_written = $17,
-         thoughts_tokens = $18
+         thoughts_tokens = $18,
+         serving_model = $19, serving_provider = $20
      WHERE id = $1 AND tenant_id = $2`,
     [
       input.attemptId,
@@ -207,6 +235,8 @@ export async function finishAttempt(
       input.chunkCount ?? null,
       input.bytesWritten ?? null,
       input.thoughtsTokens,
+      input.servingModel ?? null,
+      input.servingProvider ?? null,
     ],
   );
   if ((attempt.rowCount ?? 0) !== 1) throw new Error('attempt was not updated');

@@ -4,6 +4,7 @@ import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
+import { providerChatBaseUrl } from './compatible.js';
 import type { ProviderAdapter } from './contract.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
@@ -16,7 +17,7 @@ import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './
 
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
-  if (provider === 'openai') return openAiAdapter;
+  if (provider === 'openai' || provider === 'xai' || provider === 'openrouter') return openAiAdapter;
   if (provider === 'vertex') return vertexAdapter;
   throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
 }
@@ -47,6 +48,7 @@ export async function executeChat(input: {
   reply: StreamHttp;
   gate: StreamGate;
   vertexClientFactory?: VertexClientFactory;
+  fetchImpl?: typeof fetch;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
@@ -81,10 +83,11 @@ export async function executeChat(input: {
       reply: input.reply,
       gate: input.gate,
       vertexClientFactory: input.vertexClientFactory,
+      fetchImpl: input.fetchImpl,
     });
     return undefined;
   }
-  const baseURL = route.provider === 'anthropic' ? route.endpoint ?? '' : input.upstreamBaseUrl;
+  const baseURL = providerChatBaseUrl(route.provider, route.endpoint, input.upstreamBaseUrl);
 
   let requestId = '';
   let attemptId = '';
@@ -118,6 +121,7 @@ export async function executeChat(input: {
       signal: input.signal,
       tenantId: input.tenantId,
       vertexClientFactory: input.vertexClientFactory,
+      fetchImpl: input.fetchImpl,
     });
     await recordResult(input, {
       requestId,
@@ -132,6 +136,8 @@ export async function executeChat(input: {
       cacheCreationInputTokens: completion.cacheCreationInputTokens,
       cacheReadInputTokens: completion.cacheReadInputTokens,
       thoughtsTokens: completion.thoughtsTokens ?? null,
+      servingModel: completion.servingModel ?? null,
+      servingProvider: completion.servingProvider ?? null,
     });
     return completion.response;
   } catch (error) {
@@ -180,6 +186,8 @@ async function recordResult(
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
     thoughtsTokens: number | null;
+    servingModel?: string | null;
+    servingProvider?: string | null;
   },
 ): Promise<void> {
   try {

@@ -8,6 +8,7 @@ import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
+import { providerChatBaseUrl } from './compatible.js';
 import { finishAttempt, insertPending, markStream } from './store.js';
 import {
   attemptStatusFor,
@@ -65,7 +66,17 @@ export async function runChatStream(input: {
   reply: StreamHttp;
   gate: StreamGate;
   vertexClientFactory?: VertexClientFactory;
+  fetchImpl?: typeof fetch;
 }): Promise<void> {
+  if (
+    input.route.provider !== 'anthropic' &&
+    input.route.provider !== 'openai' &&
+    input.route.provider !== 'vertex' &&
+    input.route.provider !== 'xai' &&
+    input.route.provider !== 'openrouter'
+  ) {
+    throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+  }
   const admission = input.gate.tryAcquire(input.tenantId);
   if (admission === 'shutting_down') {
     throw proxyError(503, 'server_error', 'shutting_down', null, 'The service is unavailable.');
@@ -132,6 +143,7 @@ export async function runChatStream(input: {
     };
     let explicitProviderRequestId = false;
     let providerRequestId: string | null = null;
+    let servingProvider: string | null = null;
     let failure: unknown = null;
 
     try {
@@ -140,7 +152,7 @@ export async function runChatStream(input: {
       } else {
       const call = {
         apiKey,
-        baseURL: input.route.provider === 'anthropic' ? input.route.endpoint ?? '' : input.upstreamBaseUrl,
+        baseURL: providerChatBaseUrl(input.route.provider, input.route.endpoint, input.upstreamBaseUrl),
         request: input.request,
         route: input.route,
         signal: input.signal,
@@ -148,6 +160,7 @@ export async function runChatStream(input: {
         deadline,
         tenantId: input.tenantId,
         vertexClientFactory: input.vertexClientFactory,
+        fetchImpl: input.fetchImpl,
       };
       const iterable =
         input.route.provider === 'anthropic'
@@ -165,6 +178,7 @@ export async function runChatStream(input: {
           break;
         }
         if (item.type === 'done') {
+          servingProvider = item.servingProvider ?? null;
           machine = reduceStream(machine, { type: 'provider_done' });
           break;
         }
@@ -274,6 +288,8 @@ export async function runChatStream(input: {
       firstTextDeltaMs,
       chunkCount,
       bytesWritten,
+      servingModel: header?.model ?? null,
+      servingProvider,
     });
 
     if (opened) {
@@ -329,6 +345,8 @@ async function recordStream(
     firstTextDeltaMs: number | null;
     chunkCount: number;
     bytesWritten: number;
+    servingModel?: string | null;
+    servingProvider?: string | null;
   },
 ): Promise<void> {
   try {
@@ -351,6 +369,8 @@ async function recordStream(
         firstTextDeltaMs: result.firstTextDeltaMs,
         chunkCount: result.chunkCount,
         bytesWritten: result.bytesWritten,
+        servingModel: result.servingModel ?? null,
+        servingProvider: result.servingProvider ?? null,
       });
     });
   } catch (error) {

@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
+import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter } from './adapter.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
@@ -49,7 +50,7 @@ export function streamTimeouts(route: ResolvedRoute): StreamTimeouts {
   };
 }
 
-export async function runOpenAiStream(input: {
+export async function runChatStream(input: {
   runtimePool: Pool;
   logger: Logger;
   upstreamBaseUrl: string;
@@ -102,19 +103,27 @@ export async function runOpenAiStream(input: {
     let firstTextDeltaMs: number | null = null;
     let providerCode: string | null = null;
     let stopReason: string | null = null;
-    let usage = { promptTokens: null as number | null, completionTokens: null as number | null, totalTokens: null as number | null };
+    let usage = {
+      promptTokens: null as number | null,
+      completionTokens: null as number | null,
+      totalTokens: null as number | null,
+      uncachedInputTokens: null as number | null,
+      cacheCreationInputTokens: null as number | null,
+      cacheReadInputTokens: null as number | null,
+    };
     let failure: unknown = null;
 
     try {
-      const iterable = openAiAdapter.stream({
+      const call = {
         apiKey,
-        baseURL: input.upstreamBaseUrl,
+        baseURL: input.route.provider === 'anthropic' ? input.route.endpoint ?? '' : input.upstreamBaseUrl,
         request: input.request,
         route: input.route,
         signal: input.signal,
         timeouts,
         deadline,
-      });
+      };
+      const iterable = input.route.provider === 'anthropic' ? anthropicAdapter.stream(call) : openAiAdapter.stream(call);
       for await (const item of iterable) {
         if (input.signal.aborted) {
           machine = reduceStream(machine, { type: 'client_abort' });
@@ -153,7 +162,7 @@ export async function runOpenAiStream(input: {
         }
         if (event.type === 'text_delta' && firstTextDeltaMs === null) firstTextDeltaMs = elapsedMs(started);
         if (event.type === 'finish') {
-          stopReason = safeNativeReason(event.finishReason);
+          stopReason = safeNativeReason(event.nativeReason ?? event.finishReason);
           machine = reduceStream(machine, { type: 'provider_finish' });
         }
         if (event.type === 'usage') {
@@ -161,6 +170,9 @@ export async function runOpenAiStream(input: {
             promptTokens: event.promptTokens,
             completionTokens: event.completionTokens,
             totalTokens: event.totalTokens,
+            uncachedInputTokens: event.uncachedInputTokens ?? null,
+            cacheCreationInputTokens: event.cacheCreationInputTokens ?? null,
+            cacheReadInputTokens: event.cacheReadInputTokens ?? null,
           };
         }
         const rendered = renderChunk(event, header, input.request.includeUsage);
@@ -204,6 +216,9 @@ export async function runOpenAiStream(input: {
       errorCode: recordedCode === null ? null : safeErrorCode(recordedCode),
       durationMs: elapsedMs(started),
       usage,
+      uncachedInputTokens: usage.uncachedInputTokens,
+      cacheCreationInputTokens: usage.cacheCreationInputTokens,
+      cacheReadInputTokens: usage.cacheReadInputTokens,
       providerRequestId: safeProviderRequestId(header?.id),
       stopReason,
       streamStatus: terminal,
@@ -251,6 +266,9 @@ async function recordStream(
     errorCode: string | null;
     durationMs: number;
     usage: { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null };
+    uncachedInputTokens: number | null;
+    cacheCreationInputTokens: number | null;
+    cacheReadInputTokens: number | null;
     providerRequestId: string | null;
     stopReason: string | null;
     streamStatus: TerminalStreamStatus;
@@ -271,9 +289,9 @@ async function recordStream(
         usage: result.usage,
         providerRequestId: result.providerRequestId,
         stopReason: result.stopReason,
-        uncachedInputTokens: null,
-        cacheCreationInputTokens: null,
-        cacheReadInputTokens: null,
+        uncachedInputTokens: result.uncachedInputTokens,
+        cacheCreationInputTokens: result.cacheCreationInputTokens,
+        cacheReadInputTokens: result.cacheReadInputTokens,
         streamStatus: result.streamStatus,
         firstTextDeltaMs: result.firstTextDeltaMs,
         chunkCount: result.chunkCount,

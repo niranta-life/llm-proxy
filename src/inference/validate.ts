@@ -124,7 +124,13 @@ export function assertStreamAllowed(
   tenantStreamingEnabled: boolean,
 ): void {
   if (!request.stream) return;
-  if (route.provider === 'openai' && tenantStreamingEnabled && route.streamingEnabled) return;
+  if (
+    (route.provider === 'openai' || route.provider === 'anthropic') &&
+    tenantStreamingEnabled &&
+    route.streamingEnabled
+  ) {
+    return;
+  }
   throw invalidRequest('stream', 'unsupported_parameter', 'Streaming is not supported.');
 }
 

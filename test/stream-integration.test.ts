@@ -628,9 +628,6 @@ describe('OpenAI streaming', () => {
     });
     expect(claude.statusCode).toBe(400);
     expect(claude.json().error.param).toBe('stream');
-    expect(() =>
-      enableStreaming(db, { tenantId: state.tenantId, deployment: 'claude-chat' }),
-    ).toThrow(/streaming is not supported/i);
     expect(hits).toHaveLength(before);
     expect(anthropicHits).toHaveLength(0);
   });

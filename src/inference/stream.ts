@@ -18,8 +18,16 @@ export type TerminalStreamStatus = Exclude<StreamStatus, 'connecting' | 'streami
 export type CanonicalEvent =
   | { type: 'start'; id: string; model: string; created: number }
   | { type: 'text_delta'; text: string }
-  | { type: 'usage'; promptTokens: number | null; completionTokens: number | null; totalTokens: number | null }
-  | { type: 'finish'; finishReason: string };
+  | {
+      type: 'usage';
+      promptTokens: number | null;
+      completionTokens: number | null;
+      totalTokens: number | null;
+      uncachedInputTokens?: number | null;
+      cacheCreationInputTokens?: number | null;
+      cacheReadInputTokens?: number | null;
+    }
+  | { type: 'finish'; finishReason: string; nativeReason?: string };
 
 export type ChunkCursor = {
   id: string | null;

@@ -1,0 +1,55 @@
+images
+current sha256:633b67b65742bda55e57879d2aa886f2f623779662f4c68226c86925f37a6072
+rollback sha256:83c5af04f8afd5dcb4433c84e3a52c18a74864761412100ac6028bbf07646bcf
+
+new image ready
+{"status":"ready","database":"ready"}
+
+flags off
+{"phase":"flags-off","before":{"openai":0,"anthropic":0},"openaiOff":{"status":400,"type":"application/json; charset=utf-8","code":"unsupported_parameter","finish":null,"contentPresent":false,"done":0},"anthropicOff":{"status":400,"type":"application/json; charset=utf-8","code":"unsupported_parameter","finish":null,"contentPresent":false,"done":0},"afterOff":{"openai":0,"anthropic":0}}
+
+openai streaming on, anthropic streaming off
+{"phase":"openai-on","before":{"openai":0,"anthropic":0},"openai":{"status":200,"code":null,"finish":"stop","contentPresent":true,"done":1},"anthropic":{"status":400,"code":"unsupported_parameter","finish":null,"contentPresent":false,"done":0},"after":{"openai":1,"anthropic":0}}
+
+both flags on
+{"phase":"anthropic-on","before":{"openai":1,"anthropic":0},"anthropic":{"status":200,"finish":"stop","contentPresent":true,"done":1,"prompt":1,"cacheFieldPresent":false},"after":{"openai":1,"anthropic":1}}
+
+migrations before rollback
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+006_anthropic_streaming.sql
+
+attempt rows before rollback: stream_status,status,stop_reason,error_code
+completed,succeeded,stop,
+completed,succeeded,end_turn,
+
+old image ready
+{"status":"ready","database":"ready"}
+
+rollback image llm-proxy:89f935a
+{"phase":"rollback-89f935a","before":{"openai":1,"anthropic":1},"openai":{"status":200,"code":null,"finish":"stop","contentPresent":true,"done":1},"anthropic":{"status":400,"code":"unsupported_parameter","finish":null,"contentPresent":false,"done":0},"after":{"openai":2,"anthropic":1}}
+
+migrations after rollback
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+006_anthropic_streaming.sql
+
+attempt count before rollback: 2
+attempt count after rollback: 3
+
+The proof database was a separate Postgres container.
+The proof did not remove llm-proxy_pgdata.
+The proof did not stop the Compose app.
+compose-volume llm-proxy_pgdata
+compose-containers llm-proxy-app-1 Up (healthy); llm-proxy-postgres-1 Up (healthy)
+
+The proof did not edit an applied migration.
+Image 89f935a still becomes ready because 005_openai_streaming.sql stays in schema_migrations.
+That image still streams an enabled OpenAI deployment.
+That image does not stream Anthropic.

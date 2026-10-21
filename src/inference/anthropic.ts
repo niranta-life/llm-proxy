@@ -1,5 +1,8 @@
 import Anthropic, { APIConnectionTimeoutError, APIError, APIUserAbortError } from '@anthropic-ai/sdk';
+import { streamAnthropic } from './anthropic-stream.js';
 import type { ProviderAdapter, ProviderCall } from './contract.js';
+import type { UpstreamStreamItem } from './openai-stream.js';
+import type { StreamTimeouts } from './stream.js';
 import {
   ProxyError,
   emptyAttemptFacts,
@@ -378,7 +381,9 @@ export async function executeAnthropic(call: ProviderCall): Promise<UpstreamComp
   }
 }
 
-export const anthropicAdapter: ProviderAdapter = {
+export const anthropicAdapter: ProviderAdapter & {
+  stream(call: ProviderCall & { timeouts: StreamTimeouts; deadline: AbortController }): AsyncGenerator<UpstreamStreamItem>;
+} = {
   provider: 'anthropic',
   prepare(request, route): void {
     if (route.endpoint === null || route.endpoint.trim() === '') {
@@ -387,4 +392,7 @@ export const anthropicAdapter: ProviderAdapter = {
     toAnthropicMessageBody(request, route.upstreamModel, route.defaultMaxOutputTokens);
   },
   execute: executeAnthropic,
+  stream(call) {
+    return streamAnthropic(call);
+  },
 };

@@ -5,7 +5,7 @@ import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
 import type { ProviderAdapter } from './contract.js';
-import { runOpenAiStream, type StreamHttp } from './execute-stream.js';
+import { runChatStream, type StreamHttp } from './execute-stream.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode } from './errors.js';
 import { resolveModel } from './resolve.js';
 import { finishAttempt, insertPending, loadCatalog } from './store.js';
@@ -60,7 +60,7 @@ export async function executeChat(input: {
   const adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {
-    await runOpenAiStream({
+    await runChatStream({
       runtimePool: input.runtimePool,
       logger: input.logger,
       upstreamBaseUrl: input.upstreamBaseUrl,

@@ -264,8 +264,8 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled --tenant-id 
 ```
 
 Streaming stays off until you enable it for that tenant.
-Streaming stays off until you enable it for that OpenAI deployment.
-The streaming command does not enable an Anthropic deployment.
+Streaming stays off until you enable it for that deployment.
+The deployment can be OpenAI or Anthropic.
 When you omit a timeout flag, the proxy uses the deployment timeout.
 That timeout applies to the connection.
 That timeout applies when the provider sends no text.
@@ -370,7 +370,8 @@ The JSON must contain text `messages`.
 `model` is `auto` or the name of an enabled deployment.
 You can omit `stream`.
 You can set `stream` to `false`.
-The proxy accepts `stream` set to `true` only for OpenAI.
+The proxy accepts `stream` set to `true` for OpenAI.
+The proxy accepts `stream` set to `true` for Anthropic.
 The tenant must have streaming enabled.
 The deployment must have streaming enabled.
 When `stream` is `true`, you can set `stream_options` to `{"include_usage":true}`.
@@ -434,21 +435,42 @@ The body contains `usage` only when the provider sent integer token counts.
 When the provider does not send usage, the body has no `usage`.
 The proxy does not invent a token count.
 
-An enabled OpenAI stream uses `text/event-stream`.
+An enabled stream uses `text/event-stream`.
+The deployment can be OpenAI or Anthropic.
+The caller changes only the configured model.
 Each event is a `chat.completion.chunk`.
 The completion id does not change in that response.
 The upstream model does not change in that response.
 The first chunk has the assistant role.
 The next chunks have the text in order.
-A later chunk has the finish reason from the provider.
+A later chunk has the finish reason.
 The proxy sends a usage chunk only when 2 conditions are true.
 `stream_options.include_usage` must be `true`.
 The provider must send at least 1 integer count.
 A complete stream ends with 1 `data: [DONE]`.
 The proxy sends that marker only after the provider finish event.
-The proxy sends that marker only after the provider `[DONE]` event.
+The proxy sends that marker only after the provider terminal event.
+For OpenAI, that event is `[DONE]`.
+For Anthropic, that event is `message_stop`.
 The proxy does not record the generated text.
 The proxy does not record the raw event stream.
+
+An Anthropic stream sends each `text_delta` in content-block order.
+An empty text block adds no text.
+A `ping` event adds no text.
+The proxy does not send `thinking_delta`.
+The proxy does not send `signature_delta`.
+A later usage count replaces the earlier count.
+The proxy does not add that count to the earlier count.
+The proxy stores a cache category when Anthropic reports that category.
+`usage.prompt_tokens` is the sum of the reported input categories.
+The attempt row stores the native stop reason.
+The proxy rejects a serving model that is not the deployment model.
+The proxy rejects a content block with type `fallback`.
+The proxy rejects a `tool_use` block.
+An Anthropic stream uses 1 HTTP request to the Messages API.
+That request does not use the SDK stream helper.
+A chat completion that is not a stream still uses the Anthropic SDK.
 
 The Anthropic Messages API does not send `created`.
 The proxy sets `created` from the proxy clock.
@@ -539,8 +561,7 @@ An error body is an OpenAI error object:
 For HTTP 400, the proxy does not send the field to the provider.
 The field can be one of these values:
 
-- `stream` set to `true` when streaming is off.
-- `stream` set to `true` for Anthropic.
+- `stream` set to `true` when that tenant or that deployment has streaming off.
 - A tool.
 - An image.
 - Audio.
@@ -759,6 +780,55 @@ docker compose start app
 
 Do not remove the database volume.
 
+`006_anthropic_streaming.sql` replaces `set_deployment_streaming`.
+The new function allows OpenAI.
+The new function allows Anthropic.
+Another provider still raises `streaming is not supported`.
+The file does not drop a column.
+The file does not change an existing row.
+Streaming stays off until you enable it for that tenant and that deployment.
+
+The image `89f935a` streams an enabled OpenAI deployment.
+That image does not stream Anthropic.
+Its latest migration file is `005_openai_streaming.sql`.
+After `006_anthropic_streaming.sql` is applied, `schema_migrations` keeps `005_openai_streaming.sql`.
+The readiness route on image `89f935a` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:89f935a`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar 89f935a | docker build -t llm-proxy:89f935a -
+docker compose stop app
+docker rm -f llm-proxy-89f935a
+docker run -d --name llm-proxy-89f935a --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=true \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:89f935a
+```
+
+That image sends a chat completion for OpenAI.
+That image sends a chat completion for Anthropic.
+That image streams OpenAI when both flags are on.
+That image does not stream Anthropic.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-89f935a
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -846,7 +916,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - You can use a different major version when that version has row-level security.
 - The OpenAI Node SDK is the OpenAI client in the proxy.
 - The same SDK is the client in the contract tests.
-- The Anthropic Node SDK is the Anthropic client in the proxy.
+- The Anthropic Node SDK is the Anthropic client for a chat completion that is not a stream.
+- An Anthropic stream uses 1 HTTP request to the Messages API.
+- That stream does not use the SDK stream helper.
 - Each client sets `maxRetries` to `0`.
 - Each adapter sets its base URL.
 - Anthropic records that URL on the tenant connection.
@@ -858,7 +930,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 - The providers are OpenAI and Anthropic.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
-- Anthropic does not stream.
+- Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
 - The proxy accepts a text chat completion in 1 response when `stream` is not `true`.
 - The proxy does not accept a tool.
 - The proxy does not accept an image.
@@ -923,14 +995,16 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The stream limit is a count in this process.
 - The count is not shared with another process.
 - A stream is `completed` only after the provider finish event.
-- A stream is `completed` only after the provider `[DONE]` event.
+- An OpenAI stream is `completed` only after the provider `[DONE]` event.
+- An Anthropic stream is `completed` only after `message_stop`.
 - The OpenAI SDK treats a closed socket as the end of a stream.
+- The Anthropic SDK stream helper treats a closed socket as the end of a stream.
+- An Anthropic stream does not use that helper.
 - The proxy reads the event bytes.
-- The proxy does not treat a missing `[DONE]` as success.
+- The proxy does not treat a missing terminal event as success.
 
 ## Work that is not complete
 
-- A stream from Anthropic.
 - Input that is not text.
 - A tool call.
 - A second provider after an error.

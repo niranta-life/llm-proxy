@@ -1,0 +1,21 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+stdout | test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller
+{"openaiContentPresent":true,"openaiOrderHeld":true,"openaiFinish":"stop","anthropicContentPresent":true,"anthropicFinish":"stop","secondMatchesFirst":true,"anthropicModel":"claude-permitted","openaiModel":"gpt-stream-actual"}
+
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller 282ms
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps cumulative usage and cache categories on the attempt
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > maps length and refusal and omits ping and thinking text
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > fails tool use, fallback, a foreign model, malformed input, a missing stop, and an in-stream error
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps a tenant off another tenant configuration and credential
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > makes no upstream call when either streaming flag is off
+ ↓ test/anthropic-stream-integration.test.ts > Anthropic streaming > records client cancellation and a slow downstream consumer
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 6 skipped (7)
+   Start at  15:48:55
+   Duration  7.56s (transform 189ms, setup 2ms, collect 341ms, tests 2.09s, environment 0ms, prepare 68ms)
+
+NPM_TEST_EXIT:0

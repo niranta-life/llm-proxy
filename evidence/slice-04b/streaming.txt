@@ -1,0 +1,28 @@
+Streaming evidence.
+
+stream() reads generateContentStream and writes the existing SSE frames.
+A finished stream records stream_status completed.
+A stream that ends without a finish does not write [DONE].
+That stream records stream_truncated.
+A caller abort records client_aborted.
+A connect timeout records timeout and does not write [DONE].
+An idle timeout records timed_out and does not write [DONE].
+A stream that keeps receiving chunks records timed_out when the total timer fires before idle.
+That stream does not write [DONE].
+A stalled caller records slow_consumer and does not write [DONE].
+The proxy does not retry or change the model after the stream starts.
+
+Passed tests:
+- vertex chat > streams text in order and records usage without a false done marker after failure
+- vertex chat > cancels, times out, and applies backpressure without writing done
+- vertex chat > stops a live stream on the total timer while chunks reset idle
+- vertex response conversion > converts stream chunks in order and keeps usage off the visible text
+
+The successful stream text was "Hello world".
+The attempt stored thoughts_tokens 2 and provider_request_id resp-stream.
+The truncated stream contained "partial" and did not contain [DONE].
+The total-timer case used connect 5000 ms, idle 5000 ms, and total 400 ms.
+The body contained more than one tick.
+The attempt finished before the idle timeout.
+The attempt stream_status was timed_out.
+The body did not contain [DONE].

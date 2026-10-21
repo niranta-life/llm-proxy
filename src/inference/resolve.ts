@@ -20,6 +20,12 @@ export type DeploymentCandidate = {
   streamIdleTimeoutMs: number | null;
   streamTotalTimeoutMs: number | null;
   streamBackpressureTimeoutMs: number | null;
+  projectId: string | null;
+  location: string | null;
+  authMode: string | null;
+  serviceAccountIdentity: string | null;
+  apiVersion: string | null;
+  connectionConfigVersion: number;
 };
 
 export type AliasCandidate = {
@@ -46,6 +52,12 @@ export type ResolvedRoute = {
   streamIdleTimeoutMs: number | null;
   streamTotalTimeoutMs: number | null;
   streamBackpressureTimeoutMs: number | null;
+  projectId: string | null;
+  location: string | null;
+  authMode: string | null;
+  serviceAccountIdentity: string | null;
+  apiVersion: string | null;
+  connectionConfigVersion: number;
 };
 
 export function resolveModel(
@@ -77,5 +89,11 @@ export function resolveModel(
     streamIdleTimeoutMs: deployment.streamIdleTimeoutMs,
     streamTotalTimeoutMs: deployment.streamTotalTimeoutMs,
     streamBackpressureTimeoutMs: deployment.streamBackpressureTimeoutMs,
+    projectId: deployment.projectId ?? null,
+    location: deployment.location ?? null,
+    authMode: deployment.authMode ?? null,
+    serviceAccountIdentity: deployment.serviceAccountIdentity ?? null,
+    apiVersion: deployment.apiVersion ?? null,
+    connectionConfigVersion: deployment.connectionConfigVersion ?? 0,
   };
 }

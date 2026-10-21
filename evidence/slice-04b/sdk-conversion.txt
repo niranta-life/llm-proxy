@@ -1,0 +1,23 @@
+SDK conversion fixtures.
+
+@google/genai is pinned at 2.30.0.
+google-auth-library is pinned at 10.9.1.
+The shipped functions are toVertexRequest, normalizeVertexResponse, and eventsFromVertexChunk.
+The tests call those functions.
+The tests do not reimplement them.
+
+Passed tests:
+- vertex request conversion > maps text messages, a leading system instruction, and supported sampling fields
+- vertex request conversion > rejects unsupported fields, a non-leading system message, and disagreeing token limits
+- vertex response conversion > keeps the serving model, visible text, safety finish, and separate token counts
+- vertex response conversion > does not invent a total when thinking tokens are present and the provider omits one
+- vertex response conversion > returns an empty safety outcome for a blocked prompt and rejects non-text parts
+- vertex response conversion > converts stream chunks in order and keeps usage off the visible text
+
+A leading system message becomes the system instruction.
+An assistant message becomes the Vertex role model.
+Message order is kept.
+automaticContinuation is false.
+top_p is rejected.
+A non-text part is rejected.
+Hidden thinking text is not copied into the visible text.

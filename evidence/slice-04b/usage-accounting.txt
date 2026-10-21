@@ -1,0 +1,21 @@
+Usage accounting.
+
+Public usage stays prompt_tokens, completion_tokens, and total_tokens.
+cachedContentTokenCount is a subset of the prompt count.
+The attempt stores that subset as cache_read_input_tokens.
+uncached_input_tokens is the prompt count minus the cached count.
+thoughtsTokenCount is stored as thoughts_tokens.
+Thinking text is not returned.
+When Vertex omits totalTokenCount and thinking tokens are present, total_tokens stays null.
+The proxy does not invent prompt plus visible output as the total.
+
+Passed tests:
+- vertex response conversion > keeps the serving model, visible text, safety finish, and separate token counts
+- vertex response conversion > does not invent a total when thinking tokens are present and the provider omits one
+- vertex chat > rejects unsupported fields and records thinking tokens without showing them
+
+The think-me attempt stored thoughts_tokens 8, cache_read_input_tokens 3, uncached_input_tokens 7, and total_tokens 20.
+The visible text was "visible".
+The body did not contain "hidden-thought".
+The no-total attempt stored total_tokens as null.
+An Anthropic tool-use failure still records thoughts_tokens as null.

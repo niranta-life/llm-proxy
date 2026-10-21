@@ -5,6 +5,8 @@ import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter, type TokenUsage, type UpstreamCompletion } from './adapter.js';
 import type { ProviderAdapter } from './contract.js';
+import type { VertexClientFactory } from './vertex-client.js';
+import { vertexAdapter } from './vertex.js';
 import { runChatStream, type StreamHttp } from './execute-stream.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode } from './errors.js';
 import { resolveModel } from './resolve.js';
@@ -15,7 +17,13 @@ import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
   if (provider === 'openai') return openAiAdapter;
+  if (provider === 'vertex') return vertexAdapter;
   throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+}
+
+function openedSecret(store: { open(value: string): string }, protectedCredential: string | null): string {
+  if (protectedCredential === null) return '';
+  return store.open(protectedCredential);
 }
 
 function errorMessage(error: unknown): string {
@@ -38,6 +46,7 @@ export async function executeChat(input: {
   signal: AbortSignal;
   reply: StreamHttp;
   gate: StreamGate;
+  vertexClientFactory?: VertexClientFactory;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
@@ -71,6 +80,7 @@ export async function executeChat(input: {
       signal: input.signal,
       reply: input.reply,
       gate: input.gate,
+      vertexClientFactory: input.vertexClientFactory,
     });
     return undefined;
   }
@@ -86,7 +96,7 @@ export async function executeChat(input: {
       return {
         requestId: pending.requestId,
         attemptId: pending.attemptId,
-        apiKey: store.open(pending.protectedCredential),
+        apiKey: openedSecret(store, pending.protectedCredential),
       };
     });
     requestId = created.requestId;
@@ -106,6 +116,8 @@ export async function executeChat(input: {
       request,
       route,
       signal: input.signal,
+      tenantId: input.tenantId,
+      vertexClientFactory: input.vertexClientFactory,
     });
     await recordResult(input, {
       requestId,
@@ -119,6 +131,7 @@ export async function executeChat(input: {
       uncachedInputTokens: completion.uncachedInputTokens,
       cacheCreationInputTokens: completion.cacheCreationInputTokens,
       cacheReadInputTokens: completion.cacheReadInputTokens,
+      thoughtsTokens: completion.thoughtsTokens ?? null,
     });
     return completion.response;
   } catch (error) {
@@ -144,6 +157,7 @@ export async function executeChat(input: {
       uncachedInputTokens: facts.uncachedInputTokens,
       cacheCreationInputTokens: facts.cacheCreationInputTokens,
       cacheReadInputTokens: facts.cacheReadInputTokens,
+      thoughtsTokens: facts.thoughtsTokens,
     });
     throw normalized;
   } finally {
@@ -165,6 +179,7 @@ async function recordResult(
     uncachedInputTokens: number | null;
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
+    thoughtsTokens: number | null;
   },
 ): Promise<void> {
   try {

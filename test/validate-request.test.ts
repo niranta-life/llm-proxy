@@ -37,6 +37,10 @@ describe('request validation', () => {
     );
     expect(() => assertStreamAllowed(parsed, { provider: 'anthropic', streamingEnabled: true }, true)).not.toThrow();
     expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: true }, true)).not.toThrow();
+    expect(() => assertStreamAllowed(parsed, { provider: 'vertex', streamingEnabled: true }, true)).not.toThrow();
+    expect(() => assertStreamAllowed(parsed, { provider: 'xai', streamingEnabled: true }, true)).toThrow(
+      /streaming is not supported/i,
+    );
     expect(() => validateChatRequest({ ...textRequest, stream: 'yes' })).toThrow(/stream must be false/i);
     expect(() => validateChatRequest({ ...textRequest, stream_options: { include_usage: true } })).toThrow(
       /stream_options is not supported/i,

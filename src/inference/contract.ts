@@ -1,6 +1,7 @@
 import type { UpstreamCompletion } from './adapter.js';
 import type { ResolvedRoute } from './resolve.js';
 import type { ChatRequest } from './validate.js';
+import type { VertexClientFactory } from './vertex-client.js';
 
 export type ProviderName = 'openai' | 'anthropic';
 
@@ -16,10 +17,12 @@ export type ProviderCall = {
   request: ChatRequest;
   route: ResolvedRoute;
   signal: AbortSignal;
+  tenantId: string;
+  vertexClientFactory?: VertexClientFactory;
 };
 
 export type ProviderAdapter = {
-  readonly provider: ProviderName;
+  readonly provider: RegistryProviderName;
   prepare(request: ChatRequest, route: ResolvedRoute): void;
   execute(call: ProviderCall): Promise<UpstreamCompletion>;
 };

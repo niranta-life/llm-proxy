@@ -1,0 +1,30 @@
+Auth validation.
+
+Vertex auth modes are service_account, adc, workload_identity, and impersonation.
+service_account stores encrypted key material that contains private_key.
+adc, workload_identity, and impersonation store no key.
+impersonation requires one approved service account identity.
+A chat request does not run gcloud.
+A chat request does not change GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, or a credential path.
+The client cache key includes the tenant, connection, identity, and config version.
+A token inside 60 seconds of expiry is minted again.
+HTTP 401 drops that cache entry.
+The proxy does not send the request again after that failure.
+
+Passed tests:
+- vertex client selection > checks access on the configured project and location
+- vertex client selection > refreshes a cached client by tenant, connection, and config version
+- vertex client selection > validates a credential, project access, and a small inference without returning hidden text
+- vertex chat > keeps provider failures on that tenant and refreshes an expired credential
+- vertex chat > registers secret-less auth and stops a probe before a network call
+
+validate-vertex-access lists models in the stored project and location.
+The outbound path contains /v1/projects/probe-vertex-proj/locations/global/models.
+The outbound path does not use publishers/google/models.
+A failed list does not return status valid.
+validate-vertex-credential checks that a token can be minted.
+The command result does not include the token.
+npm test does not call Google for that command.
+A missing Vertex connection returns "vertex connection was not found".
+An ADC connection rejects an API key with "api key is not allowed".
+Impersonation without an identity returns "service account identity is required".

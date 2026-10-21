@@ -1,0 +1,21 @@
+Request and response contract.
+
+The chat tests use the official OpenAI SDK against the proxy.
+The proxy converts the text subset and returns an OpenAI chat completion.
+The public usage object has prompt_tokens, completion_tokens, and total_tokens.
+thoughts_tokens is stored on the attempt.
+A cached token count stays inside the prompt count.
+The serving model is the provider modelVersion when Vertex sends one.
+
+Passed tests:
+- vertex chat > converts a text chat for the tenant project and records usage
+- vertex chat > rejects unsupported fields and records thinking tokens without showing them
+- vertex chat > serves OpenAI and Anthropic and refuses a disabled deployment and xAI
+
+The mapped chat returned alpha-ok from model gemini-alpha-served.
+top_p did not call the Vertex client.
+A blocked prompt returned an empty content_filter choice.
+A non-text part returned HTTP 502.
+A disabled Vertex deployment returned HTTP 404.
+An enabled xAI deployment returned HTTP 503.
+OpenAI and Anthropic chats on the same tenant still returned content.

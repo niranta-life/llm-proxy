@@ -4,6 +4,7 @@ import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
+import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { listVisibleModels, summarizeMetrics } from '../inference/store.js';
@@ -21,6 +22,7 @@ export type AppDeps = {
   credentialKey: Buffer | null;
   maxActiveStreams: number;
   maxStreamsPerTenant: number;
+  vertexClientFactory?: VertexClientFactory;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -191,6 +193,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         signal: controller.signal,
         reply: streamReply(reply),
         gate: streamGate,
+        vertexClientFactory: deps.vertexClientFactory,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;

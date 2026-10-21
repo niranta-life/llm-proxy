@@ -71,7 +71,8 @@ An OpenAI deployment continues to operate after you add Anthropic.
 
 The proxy can stream a text chat for an OpenAI deployment.
 The proxy can stream a text chat for an Anthropic deployment.
-The same caller can use both.
+The proxy can stream a text chat for an enabled Vertex deployment.
+The same caller can use each of those deployments.
 The caller changes only the model.
 Streaming stays off until that tenant and that deployment both have streaming enabled.
 One accepted stream makes one upstream attempt.
@@ -102,10 +103,12 @@ A different model fails the stream.
 The proxy does not use the Anthropic fields `inference_geo` and `speed`.
 
 The proxy can store a Vertex connection for a tenant.
+The proxy can send a text chat to an enabled Vertex deployment.
+The proxy can stream that chat when the tenant and the deployment both enable streaming.
 The proxy can store an xAI connection for a tenant.
 The proxy can store an OpenRouter connection for a tenant.
 The proxy can store 1 private DGX endpoint for a tenant.
-A chat completion still uses OpenAI or Anthropic.
+A chat completion for xAI, OpenRouter, or DGX is not sent.
 
 You can start the local Compose project with Colima.
 You can stop that project with Colima.
@@ -304,12 +307,14 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled --tenant-id 
 
 Streaming stays off until you enable it for that tenant.
 Streaming stays off until you enable it for that deployment.
-The deployment can be OpenAI or Anthropic.
+The deployment can be OpenAI, Anthropic, or Vertex.
 When you omit a timeout flag, the proxy uses the deployment timeout.
 That timeout applies to the connection.
 That timeout applies when the provider sends no text.
 That timeout applies to the full stream.
 That timeout applies when the caller does not read.
+Each text chunk resets the idle timer.
+The total timer can end the stream while text is still arriving.
 A timeout that you set is an integer from 100 through 600000.
 The unit is milliseconds.
 
@@ -382,7 +387,7 @@ docker compose run --rm app node dist/cli.js set-connection-enabled \
 
 `set-connection-enabled` changes the OpenAI connection when you omit `--provider`.
 
-The same caller code can reach OpenAI or Anthropic.
+The same caller code can reach OpenAI, Anthropic, or an enabled Vertex deployment.
 Change only `model`.
 `auto` selects the deployment from `set-alias`.
 The proxy keeps the deployment name that you write in `model`.
@@ -401,20 +406,128 @@ ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
   node scripts/anthropic-smoke.mjs
 ```
 
-## Record a provider that does not serve chat
+## Record a Vertex connection
 
-The proxy stores Vertex, xAI, OpenRouter, and 1 private DGX endpoint.
-Each tenant has 1 connection for each provider.
-A chat completion still uses OpenAI or Anthropic.
-The proxy encrypts the provider credential.
-`list-inference` does not show that credential.
+The proxy sends a text chat to Vertex when that deployment is enabled.
+A new deployment is disabled.
+Enable it with `--enabled true` or `set-deployment-enabled`.
+Each tenant has 1 Vertex connection.
+The caller cannot select a Google project, a location, or a credential.
+Vertex requires `--project` and `--location`.
+Vertex stores no endpoint.
+The proxy encrypts a service-account key.
+`list-inference` does not show that key.
 
-Vertex uses service-account key material.
+The default auth mode is `service_account`.
+That mode requires key material in `--api-key`.
 That material must contain `private_key`.
 An email address is not a credential.
 A resource name is not a credential.
-Vertex requires `--project` and `--location`.
-Vertex stores no endpoint.
+`--service-account` is optional for that mode.
+`--auth-mode adc` uses Application Default Credentials.
+`--auth-mode workload_identity` uses the metadata server.
+`--auth-mode impersonation` uses 1 approved service account.
+Impersonation requires `--service-account`.
+Those 3 modes store no key.
+Do not pass `--api-key` for those 3 modes.
+The default API version is `v1`.
+`v1` is the stable Vertex API.
+You can store `v1beta1` when the model requires it.
+
+A chat request does not run `gcloud`.
+A chat request does not change `GOOGLE_CLOUD_PROJECT`.
+A chat request does not change `GOOGLE_CLOUD_LOCATION`.
+A chat request does not change a credential path.
+The proxy caches a Vertex client by tenant, connection, identity, and config version.
+The proxy mints a new token before that token expires.
+
+Use this setup on a development machine:
+
+```bash
+export VERTEX_PROJECT_ID="your-project-id"
+export VERTEX_LOCATION="us-central1"
+
+gcloud auth login
+gcloud config set project "$VERTEX_PROJECT_ID"
+
+gcloud auth application-default login
+
+gcloud auth application-default \
+  set-quota-project "$VERTEX_PROJECT_ID"
+
+gcloud services enable aiplatform.googleapis.com \
+  --project "$VERTEX_PROJECT_ID"
+```
+
+The identity needs `roles/aiplatform.user` on that project.
+Impersonation also needs `roles/iam.serviceAccountTokenCreator` on the target service account.
+Application Default Credentials are for local development.
+Do not use a developer credential file as production auth.
+The image does not contain that file.
+The default Compose file does not mount a credential.
+
+For local Docker, mount the file read-only:
+
+```bash
+export VERTEX_ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
+docker compose -f docker-compose.yml -f docker-compose.adc.yml up
+```
+
+That overlay sets `GOOGLE_APPLICATION_CREDENTIALS` to `/var/run/gcp/adc.json`.
+Workload identity and approved impersonation are the production modes.
+
+```bash
+docker compose run --rm app node dist/cli.js register-vertex-connection \
+  --tenant-id <tenant-id> \
+  --api-key "$VERTEX_SERVICE_ACCOUNT_KEY" \
+  --project "$VERTEX_PROJECT_ID" \
+  --location "$VERTEX_LOCATION"
+docker compose run --rm app node dist/cli.js register-vertex-connection \
+  --tenant-id <tenant-id> \
+  --auth-mode adc \
+  --project "$VERTEX_PROJECT_ID" \
+  --location "$VERTEX_LOCATION" \
+  --api-version v1
+docker compose run --rm app node dist/cli.js register-deployment \
+  --tenant-id <tenant-id> \
+  --provider vertex \
+  --name vertex-chat \
+  --upstream-model gemini-2.5-flash \
+  --timeout-ms 30000 \
+  --capabilities temperature,max_tokens,stop
+docker compose run --rm app node dist/cli.js validate-vertex-credential \
+  --tenant-id <tenant-id>
+docker compose run --rm app node dist/cli.js validate-vertex-access \
+  --tenant-id <tenant-id>
+docker compose run --rm app node dist/cli.js test-vertex-inference \
+  --tenant-id <tenant-id> \
+  --deployment vertex-chat
+docker compose run --rm app node dist/cli.js set-deployment-enabled \
+  --tenant-id <tenant-id> \
+  --name vertex-chat \
+  --enabled true
+docker compose run --rm app node dist/cli.js set-deployment-enabled \
+  --tenant-id <tenant-id> \
+  --name vertex-chat \
+  --enabled false
+```
+
+`validate-vertex-credential` checks that a token can be minted.
+It does not print the token.
+`validate-vertex-access` lists models in the stored project and location.
+That list is not the publisher catalog.
+A failed list does not report the project as valid.
+`test-vertex-inference` sends 1 small text request to the named deployment.
+That command can run while the deployment is disabled.
+A disabled deployment still does not serve `POST /v1/chat/completions`.
+
+## Record a provider that does not serve chat
+
+The proxy stores xAI, OpenRouter, and 1 private DGX endpoint.
+Each tenant has 1 connection for each provider.
+A chat completion does not use those providers.
+The proxy encrypts the provider credential.
+`list-inference` does not show that credential.
 
 xAI uses an API key.
 OpenRouter uses an API key.
@@ -433,11 +546,6 @@ The health status stays as it was.
 The configuration version stays as it was.
 
 ```bash
-docker compose run --rm app node dist/cli.js register-vertex-connection \
-  --tenant-id <tenant-id> \
-  --api-key "$VERTEX_SERVICE_ACCOUNT_KEY" \
-  --project acme-vertex-proj \
-  --location us-central1
 docker compose run --rm app node dist/cli.js register-xai-connection \
   --tenant-id <tenant-id> --api-key "$XAI_API_KEY"
 docker compose run --rm app node dist/cli.js register-openrouter-connection \
@@ -448,18 +556,18 @@ docker compose run --rm app node dist/cli.js register-dgx-connection \
   --endpoint https://dgx.lab.internal/v1
 docker compose run --rm app node dist/cli.js register-deployment \
   --tenant-id <tenant-id> \
-  --provider vertex \
-  --name vertex-chat \
-  --upstream-model gemini-example \
+  --provider xai \
+  --name xai-chat \
+  --upstream-model grok-example \
   --timeout-ms 30000 \
   --capabilities temperature \
-  --enabled true
+  --enabled false
 docker compose run --rm app node dist/cli.js validate-deployment \
-  --tenant-id <tenant-id> --deployment vertex-chat --status valid
+  --tenant-id <tenant-id> --deployment xai-chat --status valid
 docker compose run --rm app node dist/cli.js set-deployment-health \
-  --tenant-id <tenant-id> --deployment vertex-chat --status healthy
+  --tenant-id <tenant-id> --deployment xai-chat --status healthy
 docker compose run --rm app node dist/cli.js set-connection-enabled \
-  --tenant-id <tenant-id> --provider vertex --enabled false
+  --tenant-id <tenant-id> --provider xai --enabled false
 docker compose run --rm app node dist/cli.js list-inference --tenant-id <tenant-id>
 ```
 
@@ -473,6 +581,7 @@ You can omit `stream`.
 You can set `stream` to `false`.
 The proxy accepts `stream` set to `true` for OpenAI.
 The proxy accepts `stream` set to `true` for Anthropic.
+The proxy accepts `stream` set to `true` for Vertex.
 The tenant must have streaming enabled.
 The deployment must have streaming enabled.
 When `stream` is `true`, you can set `stream_options` to `{"include_usage":true}`.
@@ -516,6 +625,23 @@ The proxy does not send the provider request for these values:
 - An image.
 - A field that the deployment does not list.
 
+A Vertex deployment accepts these fields:
+
+- `temperature` from 0 through 2
+- `stop`
+- `max_tokens`
+- `max_completion_tokens`
+
+Vertex keeps message order.
+Vertex accepts 1 system message, and that message must be first.
+Vertex sends an assistant message with the role `model`.
+Vertex does not require messages to alternate.
+Vertex does not use `--default-max-output-tokens`.
+Vertex does not return hidden thinking text.
+Vertex can record thinking tokens on the attempt.
+A cached token count stays inside the prompt count.
+The public `usage` object still has the 3 OpenAI token fields.
+
 An OpenAI deployment keeps each field that its capability list contains.
 The proxy does not remove a field that it does not accept.
 The proxy does not send the provider request for that field.
@@ -537,7 +663,7 @@ When the provider does not send usage, the body has no `usage`.
 The proxy does not invent a token count.
 
 An enabled stream uses `text/event-stream`.
-The deployment can be OpenAI or Anthropic.
+The deployment can be OpenAI, Anthropic, or Vertex.
 The caller changes only the configured model.
 Each event is a `chat.completion.chunk`.
 The completion id does not change in that response.
@@ -553,6 +679,8 @@ The proxy sends that marker only after the provider finish event.
 The proxy sends that marker only after the provider terminal event.
 For OpenAI, that event is `[DONE]`.
 For Anthropic, that event is `message_stop`.
+For Vertex, that event is a finish reason.
+A timeout does not write `[DONE]`.
 The proxy does not record the generated text.
 The proxy does not record the raw event stream.
 
@@ -931,7 +1059,8 @@ Do not remove the database volume.
 `006_anthropic_streaming.sql` replaces `set_deployment_streaming`.
 The new function allows OpenAI.
 The new function allows Anthropic.
-Another provider still raises `streaming is not supported`.
+At that migration, another provider still raises `streaming is not supported`.
+Migration `009_vertex_provider.sql` later allows Vertex.
 The file does not drop a column.
 The file does not change an existing row.
 Streaming stays off until you enable it for that tenant and that deployment.
@@ -1072,6 +1201,52 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`009_vertex_provider.sql` stores a Vertex identity and an API version.
+The file allows a Vertex deployment to stream.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `008`.
+xAI, OpenRouter, and DGX still raise `streaming is not supported`.
+
+The image `8020fb2` stays ready on this database.
+A tenant that stores only OpenAI and Anthropic can still send a chat completion.
+Its latest migration file is `008_provider_registry.sql`.
+After `009_vertex_provider.sql` is applied, `schema_migrations` keeps `008_provider_registry.sql`.
+The readiness route on image `8020fb2` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:8020fb2`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar 8020fb2 | docker build -t llm-proxy:8020fb2 -
+docker compose stop app
+docker rm -f llm-proxy-8020fb2
+docker run -d --name llm-proxy-8020fb2 --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=false \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:8020fb2
+```
+
+That image stays ready.
+Do not delete a Vertex row to roll back.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-8020fb2
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1081,6 +1256,8 @@ The tests start PostgreSQL with Testcontainers.
 The tests start a local mock OpenAI server.
 The tests start a local mock of the Anthropic Messages API.
 The tests do not send a request to a provider on the internet.
+A Vertex live test runs only when `VERTEX_LIVE` is `1`.
+`npm test` does not set `VERTEX_LIVE`.
 
 ```bash
 nvm use 24
@@ -1160,6 +1337,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - You can use a different major version when that version has row-level security.
 - The OpenAI Node SDK is the OpenAI client in the proxy.
 - The same SDK is the client in the contract tests.
+- The Vertex client is `@google/genai` version `2.30.0`.
+- The Google credential client is `google-auth-library` version `10.9.1`.
+- The Vertex client sets Vertex mode, the stored project, and the stored location.
 - The Anthropic Node SDK is the Anthropic client for a chat completion that is not a stream.
 - An Anthropic stream uses 1 HTTP request to the Messages API.
 - That stream does not use the SDK stream helper.
@@ -1172,11 +1352,12 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Limits
 
-- A chat completion uses OpenAI or Anthropic.
-- The registry can also store Vertex, xAI, OpenRouter, and 1 private DGX endpoint.
-- The proxy does not send a chat completion to those 4 providers.
+- A chat completion uses OpenAI, Anthropic, or an enabled Vertex deployment.
+- The registry can also store xAI, OpenRouter, and 1 private DGX endpoint.
+- The proxy does not send a chat completion to those 3 providers.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
 - Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
+- Vertex can stream a text chat when that tenant and that deployment both enable streaming.
 - The proxy accepts a text chat completion in 1 response when `stream` is not `true`.
 - The proxy does not accept a tool.
 - The proxy does not accept an image.
@@ -1255,7 +1436,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Work that is not complete
 
-- A chat completion for Vertex, xAI, OpenRouter, or a private DGX endpoint.
+- A chat completion for xAI, OpenRouter, or a private DGX endpoint.
 - Input that is not text.
 - A tool call.
 - A second provider after an error.

@@ -1,0 +1,15 @@
+Multi-tenant isolation.
+
+Two tenants used different projects, locations, models, and identities.
+Alpha used project alpha-vertex-proj, location us-central1, model gemini-2.5-flash, and a service account key.
+Beta used project beta-vertex-proj, location europe-west4, model gemini-2.5-pro, and impersonation.
+The calls ran with Promise.all.
+Each recorded call used only that tenant's project, model, and credential.
+The proxy did not switch a process-wide Google project or credential.
+A permission_denied result for Beta did not change Alpha's next success.
+An expired credential for Alpha minted a new client for Alpha only.
+
+Passed tests:
+- vertex chat > keeps two tenants on their own project, model, and identity
+- vertex chat > keeps provider failures on that tenant and refreshes an expired credential
+- provider registry > isolates tenant configuration, validation, and credential references

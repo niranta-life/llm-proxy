@@ -7,6 +7,7 @@ import {
   registerModelDeployment,
   registerOpenAiConnection,
   registerProviderDeployment,
+  loadVertexOperatorConnection,
   registerRegistryConnection,
   replaceAnthropicCredential,
   replaceOpenAiCredential,
@@ -20,12 +21,22 @@ import {
   setTenantStreamingEnabled,
 } from './db/inference-admin.js';
 import { prepareRegistryConnection } from './inference/registry.js';
+import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
+import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
+}
+
+function isVertexAuth(value: string): value is VertexAuthMode {
+  return value === 'service_account' || value === 'adc' || value === 'workload_identity' || value === 'impersonation';
+}
+
+function isVertexApi(value: string): value is VertexApiVersion {
+  return value === 'v1' || value === 'v1beta1';
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -67,6 +78,8 @@ type Flags = {
   location?: string;
   'auth-mode'?: string;
   status?: string;
+  'service-account'?: string;
+  'api-version'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -144,6 +157,8 @@ async function main(): Promise<void> {
         location: { type: 'string' },
         'auth-mode': { type: 'string' },
         status: { type: 'string' },
+        'service-account': { type: 'string' },
+        'api-version': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -228,8 +243,63 @@ async function main(): Promise<void> {
       return;
     }
 
+    if (command === 'register-vertex-connection') {
+      const tenantId = requireTenant(values);
+      const authMode = values['auth-mode']?.trim() || 'service_account';
+      const apiKey = values['api-key'] ?? '';
+      if (tenantId === undefined) {
+        logger.error('tenant-id is required');
+        process.exitCode = 1;
+        return;
+      }
+      if (authMode === 'service_account' && apiKey.length === 0) {
+        logger.error('tenant-id and api-key are required');
+        process.exitCode = 1;
+        return;
+      }
+      const prepared = prepareRegistryConnection({
+        provider: 'vertex',
+        authMode,
+        endpoint: values.endpoint,
+        projectId: values.project,
+        location: values.location,
+        credential: apiKey,
+        serviceAccountIdentity: values['service-account'],
+        apiVersion: values['api-version'],
+      });
+      const protectedCredential =
+        prepared.authMode === 'service_account'
+          ? credentialStore(config.providerCredentialKey).protect(apiKey, 'service_account')
+          : null;
+      const created = await registerRegistryConnection(pool, {
+        tenantId,
+        provider: prepared.provider,
+        protectedCredential,
+        authMode: prepared.authMode,
+        endpoint: prepared.endpoint,
+        projectId: prepared.projectId,
+        location: prepared.location,
+        serviceAccountIdentity: prepared.serviceAccountIdentity,
+        apiVersion: prepared.apiVersion,
+      });
+      process.stdout.write(
+        `${JSON.stringify({
+          ...created,
+          tenantId,
+          provider: prepared.provider,
+          authMode: prepared.authMode,
+          enabled: true,
+          endpoint: prepared.endpoint,
+          projectId: prepared.projectId,
+          location: prepared.location,
+          serviceAccountIdentity: prepared.serviceAccountIdentity,
+          apiVersion: prepared.apiVersion,
+        })}\n`,
+      );
+      return;
+    }
+
     if (
-      command === 'register-vertex-connection' ||
       command === 'register-xai-connection' ||
       command === 'register-openrouter-connection' ||
       command === 'register-dgx-connection'
@@ -249,8 +319,10 @@ async function main(): Promise<void> {
         projectId: values.project,
         location: values.location,
         credential: apiKey,
+        serviceAccountIdentity: values['service-account'],
+        apiVersion: values['api-version'],
       });
-      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, prepared.authMode);
+      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, 'api_key');
       const created = await registerRegistryConnection(pool, {
         tenantId,
         provider: prepared.provider,
@@ -259,6 +331,8 @@ async function main(): Promise<void> {
         endpoint: prepared.endpoint,
         projectId: prepared.projectId,
         location: prepared.location,
+        serviceAccountIdentity: prepared.serviceAccountIdentity,
+        apiVersion: prepared.apiVersion,
       });
       process.stdout.write(
         `${JSON.stringify({
@@ -452,6 +526,68 @@ async function main(): Promise<void> {
         backpressureTimeoutMs,
       });
       process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, streamingEnabled: enabled, configVersion })}\n`);
+      return;
+    }
+
+    if (
+      command === 'validate-vertex-credential' ||
+      command === 'validate-vertex-access' ||
+      command === 'test-vertex-inference'
+    ) {
+      const tenantId = requireTenant(values);
+      if (tenantId === undefined) {
+        logger.error('tenant-id is required');
+        process.exitCode = 1;
+        return;
+      }
+      const loaded = await loadVertexOperatorConnection(pool, tenantId);
+      if (loaded === null || !isVertexAuth(loaded.authMode) || !isVertexApi(loaded.apiVersion)) {
+        logger.error('vertex connection was not found');
+        process.exitCode = 1;
+        return;
+      }
+      let upstreamModel = '';
+      if (command === 'test-vertex-inference') {
+        const deploymentName = values.deployment?.trim() ?? '';
+        if (deploymentName.length === 0) {
+          logger.error('deployment is required');
+          process.exitCode = 1;
+          return;
+        }
+        const listing = await listTenantInference(pool, tenantId);
+        const deployment = listing.deployments.find((item) => item.name === deploymentName);
+        if (deployment === undefined || deployment.connectionId !== loaded.connectionId) {
+          logger.error('deployment was not found');
+          process.exitCode = 1;
+          return;
+        }
+        upstreamModel = deployment.upstreamModel;
+      }
+      let credentialJson: string | null = null;
+      if (loaded.protectedCredential !== null) {
+        credentialJson = credentialStore(config.providerCredentialKey).open(loaded.protectedCredential);
+      }
+      const spec: VertexClientSpec = {
+        tenantId,
+        connectionId: loaded.connectionId,
+        connectionConfigVersion: loaded.configVersion,
+        credentialVersion: loaded.credentialVersion,
+        projectId: loaded.projectId,
+        location: loaded.location,
+        apiVersion: loaded.apiVersion,
+        authMode: loaded.authMode,
+        serviceAccountIdentity: loaded.serviceAccountIdentity,
+        credentialJson,
+      };
+      const result =
+        command === 'validate-vertex-credential'
+          ? await validateVertexCredential(spec)
+          : command === 'validate-vertex-access'
+            ? await validateVertexAccess(await defaultVertexClientFactory(spec), spec)
+            : await testVertexInference(await defaultVertexClientFactory(spec), upstreamModel);
+      credentialJson = '';
+      spec.credentialJson = null;
+      process.stdout.write(`${JSON.stringify(result)}\n`);
       return;
     }
 

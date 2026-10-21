@@ -75,7 +75,7 @@ describe('provider registry', () => {
 
   it('keeps migrations 001 through 007 and adds the registry columns', async () => {
     const names = readdirSync(join(projectRoot, 'migrations')).filter((name) => name.endsWith('.sql')).sort();
-    expect(names).toEqual([...Object.keys(MIGRATION_SHA256), '008_provider_registry.sql']);
+    expect(names).toEqual([...Object.keys(MIGRATION_SHA256), '008_provider_registry.sql', '009_vertex_provider.sql']);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
       expect(createHash('sha256').update(body).digest('hex')).toBe(hash);
@@ -116,7 +116,7 @@ describe('provider registry', () => {
     expect(security.rows[0]).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
   });
 
-  it('serves OpenAI and Anthropic beside a registry deployment and does not call the new provider', async () => {
+  it('serves OpenAI, Anthropic, and an enabled Vertex deployment on one tenant', async () => {
     const openai = await startMockUpstream();
     const anthropic = await startMockAnthropic();
     try {
@@ -174,10 +174,28 @@ describe('provider registry', () => {
         '--enabled',
         'true',
       ]);
+      const seen: string[] = [];
       const ctx = await createTestApp(db, {
         inferenceEnabled: true,
         upstreamBaseUrl: openai.baseUrl,
         credentialKey,
+        vertexClientFactory: async (spec) => {
+          seen.push(spec.projectId);
+          return {
+            async generateContent() {
+              return {
+                responseId: 'vertex-registry-1',
+                modelVersion: 'gemini-registry',
+                candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'vertex-ok' }] } }],
+                usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 1, totalTokenCount: 3 },
+              };
+            },
+            generateContentStream() {
+              return (async function* empty() {})();
+            },
+            async listModels() {},
+          };
+        },
       });
       pools.push(ctx.authPool, ctx.runtimePool);
       const headers = {
@@ -212,8 +230,9 @@ describe('provider registry', () => {
       });
       expect(openaiResponse.statusCode).toBe(200);
       expect(anthropicResponse.statusCode).toBe(200);
-      expect(blocked.statusCode).toBe(503);
-      expect(blocked.json().error.code).toBe('service_unavailable');
+      expect(blocked.statusCode).toBe(200);
+      expect(blocked.json().choices[0].message.content).toBe('vertex-ok');
+      expect(seen).toEqual(['acme-vertex-proj']);
       expect(callerUrl.statusCode).toBe(400);
       expect(openai.hits.length + anthropic.hits.length).toBe(before);
       const admin = adminPool(db);
@@ -225,7 +244,7 @@ describe('provider registry', () => {
          WHERE r.tenant_id = $1 AND d.name = 'vertex-chat'`,
         [tenant.tenantId],
       );
-      expect(attempts.rows[0]?.count).toBe('0');
+      expect(attempts.rows[0]?.count).toBe('1');
       const stored = await admin.query<{ protected_credential: string; auth_mode: string }>(
         `SELECT protected_credential, auth_mode
          FROM provider_connections

@@ -4,6 +4,8 @@ import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter } from './adapter.js';
+import type { VertexClientFactory } from './vertex-client.js';
+import { vertexAdapter } from './vertex.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { finishAttempt, insertPending, markStream } from './store.js';
@@ -62,6 +64,7 @@ export async function runChatStream(input: {
   signal: AbortSignal;
   reply: StreamHttp;
   gate: StreamGate;
+  vertexClientFactory?: VertexClientFactory;
 }): Promise<void> {
   const admission = input.gate.tryAcquire(input.tenantId);
   if (admission === 'shutting_down') {
@@ -89,7 +92,7 @@ export async function runChatStream(input: {
         return {
           requestId: pending.requestId,
           attemptId: pending.attemptId,
-          apiKey: store.open(pending.protectedCredential),
+          apiKey: pending.protectedCredential === null ? '' : store.open(pending.protectedCredential),
         };
       });
       requestId = created.requestId;
@@ -125,7 +128,10 @@ export async function runChatStream(input: {
       uncachedInputTokens: null as number | null,
       cacheCreationInputTokens: null as number | null,
       cacheReadInputTokens: null as number | null,
+      thoughtsTokens: null as number | null,
     };
+    let explicitProviderRequestId = false;
+    let providerRequestId: string | null = null;
     let failure: unknown = null;
 
     try {
@@ -140,8 +146,15 @@ export async function runChatStream(input: {
         signal: input.signal,
         timeouts,
         deadline,
+        tenantId: input.tenantId,
+        vertexClientFactory: input.vertexClientFactory,
       };
-      const iterable = input.route.provider === 'anthropic' ? anthropicAdapter.stream(call) : openAiAdapter.stream(call);
+      const iterable =
+        input.route.provider === 'anthropic'
+          ? anthropicAdapter.stream(call)
+          : input.route.provider === 'vertex'
+            ? vertexAdapter.stream(call)
+            : openAiAdapter.stream(call);
       for await (const item of iterable) {
         if (input.signal.aborted) {
           machine = reduceStream(machine, { type: 'client_abort' });
@@ -160,7 +173,13 @@ export async function runChatStream(input: {
           break;
         }
         const event = item.event;
-        if (event.type === 'start') header = { id: event.id, model: event.model, created: event.created };
+        if (event.type === 'start') {
+          header = { id: event.id, model: event.model, created: event.created };
+          if ('providerRequestId' in event) {
+            explicitProviderRequestId = true;
+            providerRequestId = event.providerRequestId ?? null;
+          }
+        }
         if (header === null) {
           throw proxyError(502, 'server_error', 'invalid_upstream_response', null, 'The upstream model response was invalid.');
         }
@@ -196,6 +215,7 @@ export async function runChatStream(input: {
             uncachedInputTokens: event.uncachedInputTokens ?? null,
             cacheCreationInputTokens: event.cacheCreationInputTokens ?? null,
             cacheReadInputTokens: event.cacheReadInputTokens ?? null,
+            thoughtsTokens: event.thoughtsTokens ?? null,
           };
         }
         const rendered = renderChunk(event, header, input.request.includeUsage);
@@ -247,7 +267,8 @@ export async function runChatStream(input: {
       uncachedInputTokens: usage.uncachedInputTokens,
       cacheCreationInputTokens: usage.cacheCreationInputTokens,
       cacheReadInputTokens: usage.cacheReadInputTokens,
-      providerRequestId: safeProviderRequestId(header?.id),
+      providerRequestId: explicitProviderRequestId ? providerRequestId : safeProviderRequestId(header?.id),
+      thoughtsTokens: usage.thoughtsTokens,
       stopReason,
       streamStatus: terminal,
       firstTextDeltaMs,
@@ -301,6 +322,7 @@ async function recordStream(
     uncachedInputTokens: number | null;
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
+    thoughtsTokens: number | null;
     providerRequestId: string | null;
     stopReason: string | null;
     streamStatus: TerminalStreamStatus;
@@ -324,6 +346,7 @@ async function recordStream(
         uncachedInputTokens: result.uncachedInputTokens,
         cacheCreationInputTokens: result.cacheCreationInputTokens,
         cacheReadInputTokens: result.cacheReadInputTokens,
+        thoughtsTokens: result.thoughtsTokens,
         streamStatus: result.streamStatus,
         firstTextDeltaMs: result.firstTextDeltaMs,
         chunkCount: result.chunkCount,

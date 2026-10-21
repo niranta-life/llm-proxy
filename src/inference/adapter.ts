@@ -30,6 +30,7 @@ export type UpstreamCompletion = {
   uncachedInputTokens: number | null;
   cacheCreationInputTokens: number | null;
   cacheReadInputTokens: number | null;
+  thoughtsTokens?: number | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

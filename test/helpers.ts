@@ -99,6 +99,7 @@ export async function createTestApp(
     credentialKey?: Buffer | null;
     maxActiveStreams?: number;
     maxStreamsPerTenant?: number;
+    vertexClientFactory?: import('../src/inference/vertex-client.js').VertexClientFactory;
   } = {},
 ) {
   const config = configFor(db);
@@ -115,6 +116,7 @@ export async function createTestApp(
     credentialKey: options.credentialKey ?? null,
     maxActiveStreams: options.maxActiveStreams ?? config.maxActiveStreams,
     maxStreamsPerTenant: options.maxStreamsPerTenant ?? config.maxStreamsPerTenant,
+    vertexClientFactory: options.vertexClientFactory,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

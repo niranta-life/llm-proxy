@@ -1,0 +1,44 @@
+Migration and rollback verification.
+
+Image llm-proxy:9472efb was built from git archive 9472efbcc3fdc2c5b69474ac935218360141b3b8.
+Image id: sha256:706ca52f9208079d2cdf819c741a46456b77b75048ad4e0baee902e6f62d4b5c
+docker image inspect llm-proxy:9472efb Id matches that digest.
+The started container image was sha256:706ca52f9208079d2cdf819c741a46456b77b75048ad4e0baee902e6f62d4b5c.
+The container config image was llm-proxy:9472efb.
+That image does not contain the new non-stream provider count.
+The image ran on the same database.
+Inference was off.
+No provider key was supplied.
+PROVIDER_CREDENTIAL_KEY was unset on that container.
+The first two readiness probes returned an empty reply while the process started.
+rollback_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+rollback_image_try 2 curl_rc=52 curl: (52) Empty reply from server
+rollback_image_try 3 200
+rollback_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+
+schema_migrations kept versions 001 through 011.
+schema_migrations kept 011_private_endpoint.sql.
+010_compatible_providers.sql remained applied.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The query did not select protected credential text.
+No migration file was added.
+git diff --exit-code for migrations 001 through 011 was empty.
+
+The rollback container was removed.
+The Compose app was started again on llm-proxy:slice-04e.
+docker image inspect llm-proxy:slice-04e Id is sha256:ddeb49389f86659f0611ef32061b9f889d9021cc49e8046fef36c5e2779b9a23.
+docker inspect llm-proxy-app-1 Image matched that digest after restore.
+The first restored probe returned an empty reply while the process started.
+restored_app_try 1 curl_rc=52 curl: (52) Empty reply from server
+restored_app_try 2 200
+restored_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+The database volume llm-proxy_pgdata was not removed.
+Colima was not stopped.
+ycrest and gemba containers stayed running.
+ROLLBACK_KEPT_ROWS_AND_MIGRATIONS_001_THROUGH_011
+DEPLOY_EXIT:0

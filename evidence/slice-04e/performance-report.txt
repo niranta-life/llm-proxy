@@ -1,0 +1,30 @@
+Performance report.
+
+Twelve chats ran at the same time.
+Two chats ran for each enabled provider.
+All 12 returned HTTP 200.
+Elapsed time was 322 ms.
+The slowest chat was 290 ms.
+OpenAI max was 257 ms.
+Anthropic max was 283 ms.
+Vertex max was 289 ms.
+xAI max was 284 ms.
+OpenRouter max was 278 ms.
+DGX max was 290 ms.
+Each provider stored 2 attempts on its own upstream model.
+
+An xAI connection failure returned 502 upstream_error in 115 ms.
+The next chat stayed on OpenAI.
+
+A cancelled OpenAI stream omitted [DONE].
+The stored stream status was client_aborted.
+
+Graceful shutdown drained the open streams.
+activeAfter was 0.
+The finished stream had one [DONE].
+The held stream had zero [DONE].
+One attempt was interrupted.
+A chat after shutdown returned 503 shutting_down.
+The upstream hit count did not grow after shutdown.
+
+Result: LOAD_PASSED

@@ -1,0 +1,52 @@
+Tenant isolation report.
+
+Two tenants used the shipped chat route.
+Each tenant had its own OpenAI, Anthropic, Vertex, xAI, OpenRouter, and DGX deployment.
+
+Alpha made 12 requests.
+All 12 succeeded.
+Alpha usage was 92 prompt tokens, 49 completion tokens, and 185 total tokens.
+Alpha streaming counted 6 requests and 6 completed streams.
+Alpha stream usage was 47 prompt tokens, 30 completion tokens, and 99 total tokens.
+Each alpha provider row counted 2 requests and 2 completed attempts.
+OpenAI tokens were 6, 4, and 10.
+Anthropic tokens were 28, 19, and 47.
+Vertex tokens were 12, 4, and 16.
+xAI tokens were 8, 6, and 14.
+OpenRouter tokens were 16, 2, and 18.
+DGX tokens were 22, 14, and 80.
+The alpha summary did not contain beta deployment names.
+
+Beta made 6 JSON requests.
+All 6 succeeded.
+The beta summary did not contain alpha deployment names.
+A later alpha summary stayed at 12 succeeded requests.
+
+The last beta call for each provider used the beta credential.
+The Vertex cache minted a client per tenant.
+A repeat call reused the cached client.
+Rotating the alpha OpenAI credential changed only the next alpha call.
+The beta OpenAI call kept the beta key.
+Rotating the alpha Anthropic credential changed only the next alpha call.
+Only the rotated connection increased credential_version and config_version.
+
+A disabled alpha Vertex connection returned 404.
+That call made no new Vertex call and minted no client.
+Re-enabling alpha minted a new alpha client.
+The next beta Vertex call did not mint a client.
+
+A disabled alpha xAI deployment returned 404 model_not_found.
+That call made zero xAI calls.
+The beta xAI route stayed on the beta key.
+model auto stayed on the OpenAI deployment for each tenant.
+Disabling xAI did not change the stored auto alias.
+
+set-deployment-health changed only the selected deployment health_status.
+That command did not change config_version.
+validate-deployment validated_mock changed only that deployment.
+That command increased config_version by 1.
+validated_live was rejected.
+The stored status stayed validated_mock.
+The error text was validation status is not available.
+
+Result: ISOLATION_PASSED

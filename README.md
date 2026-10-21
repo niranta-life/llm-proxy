@@ -545,6 +545,7 @@ The proxy encrypts the provider credential.
 A deployment uses the same capability list as an OpenAI deployment.
 Do not pass `--default-max-output-tokens` for xAI.
 Do not pass an OpenRouter routing flag for xAI.
+The proxy does not send `X-OpenRouter-Metadata` to xAI.
 The proxy does not send the request again after an error.
 The proxy does not switch the model after an error.
 The proxy does not switch the provider after a stream starts.
@@ -600,7 +601,9 @@ The match ignores letter case.
 The proxy keeps the provider name that OpenRouter reported.
 The proxy does not treat the model name as that provider.
 The proxy does not read a provider from a summary sentence.
-A response that does not name the provider does not succeed.
+The proxy can read that name on the final stream chunk.
+A complete stream then ends with `[DONE]`.
+A required provider that the response does not name does not succeed.
 A reported provider outside the stored list does not succeed.
 The proxy does not send the request again after an error.
 The proxy does not choose a second model.
@@ -624,6 +627,12 @@ docker compose run --rm app node dist/cli.js register-deployment \
 docker compose run --rm app node dist/cli.js set-deployment-enabled \
   --tenant-id <tenant-id> \
   --name router-chat \
+  --enabled true
+docker compose run --rm app node dist/cli.js set-tenant-streaming \
+  --tenant-id <tenant-id> --enabled true
+docker compose run --rm app node dist/cli.js set-deployment-streaming \
+  --tenant-id <tenant-id> \
+  --deployment router-chat \
   --enabled true
 ```
 
@@ -753,6 +762,8 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 A success body is an OpenAI chat completion.
 `object` is `chat.completion`.
 `model` is the upstream model.
+The body includes `provider` when the upstream response names one.
+A stream frame does not include `provider`.
 The assistant text is in `choices`.
 The body contains `usage` only when the provider sent integer token counts.
 When the provider does not send usage, the body has no `usage`.
@@ -1526,6 +1537,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - OpenRouter serving identity is the selected provider in `openrouter_metadata`.
 - That name matches a stored slug. The match ignores letter case.
 - The proxy keeps the provider name that OpenRouter reported.
+- A non-stream body includes `provider` when the upstream response names one.
+- A stream frame does not include `provider`.
+- The proxy can read an OpenRouter provider from the final stream chunk.
 - A required serving provider that the response does not name does not succeed.
 - The proxy accepts a text chat completion in 1 response when `stream` is not `true`.
 - The proxy does not accept a tool.

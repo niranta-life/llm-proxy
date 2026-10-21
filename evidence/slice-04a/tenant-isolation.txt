@@ -1,0 +1,78 @@
+Tenant isolation.
+
+Vitest on Node 24:
+test/registry.test.ts isolates tenant configuration, validation, and credential references.
+test/tenant-isolation.test.ts prevents tenant A from reading or changing tenant B rows.
+test/inference-isolation.test.ts keeps two tenants on different backends.
+The full suite result is in regression-after.txt.
+
+Live runtime role on the deployed database.
+Beta sees only its xAI connection and no Alpha rows.
+Alpha sees only its own providers and no Beta rows.
+A runtime select of protected_credential is permission denied.
+
+===== beta runtime =====
+BEGIN
+              set_config              
+--------------------------------------
+ a0959b9c-be3a-43ee-a6ac-42c67094f342
+(1 row)
+
+ provider | auth_mode | project_id | location 
+----------+-----------+------------+----------
+ xai      | api_key   |            | 
+(1 row)
+
+ deployments 
+-------------
+           0
+(1 row)
+
+ alpha_rows 
+------------
+          0
+(1 row)
+
+COMMIT
+
+===== alpha runtime =====
+BEGIN
+              set_config              
+--------------------------------------
+ a669ad63-c6f7-4dae-8c5d-56245df8def8
+(1 row)
+
+  provider  
+------------
+ dgx
+ openrouter
+ vertex
+(3 rows)
+
+      name       | validation_status | health_status | config_version 
+-----------------+-------------------+---------------+----------------
+ evidence-vertex | valid             | healthy       |              4
+(1 row)
+
+ beta_rows 
+-----------
+         0
+(1 row)
+
+COMMIT
+
+runtime select of protected_credential:
+ERROR:  permission denied for table provider_connections
+
+===== evidence ciphertext flags =====
+              tenant_id               |  provider  |    auth_mode    | endpoint_null | ciphertext | no_at 
+--------------------------------------+------------+-----------------+---------------+------------+-------
+ 1bde13e1-79c7-4d63-b0c1-430043fe466a | vertex     | service_account | t             | t          | t
+ a0959b9c-be3a-43ee-a6ac-42c67094f342 | xai        | api_key         | t             | t          | t
+ a669ad63-c6f7-4dae-8c5d-56245df8def8 | dgx        | api_key         | f             | t          | t
+ a669ad63-c6f7-4dae-8c5d-56245df8def8 | openrouter | api_key         | t             | t          | t
+ a669ad63-c6f7-4dae-8c5d-56245df8def8 | vertex     | service_account | t             | t          | t
+ fa856e6f-6281-405e-856b-724752f73f4c | anthropic  | api_key         | f             | t          | t
+ fa856e6f-6281-405e-856b-724752f73f4c | openai     | api_key         | t             | t          | t
+(7 rows)
+

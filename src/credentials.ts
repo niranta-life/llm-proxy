@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 export type ProviderCredentialStore = {
-  protect(secret: string): string;
+  protect(secret: string, mode?: 'api_key' | 'service_account'): string;
   open(protectedCredential: string): string;
 };
 
@@ -9,21 +9,27 @@ export function createCredentialStore(key: Buffer): ProviderCredentialStore {
   if (key.length !== 32) throw new Error('credential key must be 32 bytes');
 
   return {
-    protect(secret: string): string {
-      if (secret.length < 8 || secret.length > 256 || /\s/.test(secret)) {
+    protect(secret: string, mode: 'api_key' | 'service_account' = 'api_key'): string {
+      if (mode === 'service_account') {
+        if (secret.length < 8 || secret.length > 3000) throw new Error('provider credential is invalid');
+      } else if (secret.length < 8 || secret.length > 256 || /\s/.test(secret)) {
         throw new Error('provider credential is invalid');
       }
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', key, iv);
       const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
       const tag = cipher.getAuthTag();
-      return [
+      const encoded = [
         'aes-256-gcm',
         '1',
         iv.toString('base64url'),
         tag.toString('base64url'),
         ciphertext.toString('base64url'),
       ].join('$');
+      if (encoded.length < 40 || encoded.length > 4096 || /\s/.test(encoded)) {
+        throw new Error('provider credential is invalid');
+      }
+      return encoded;
     },
 
     open(protectedCredential: string): string {

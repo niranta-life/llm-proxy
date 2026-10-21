@@ -7,15 +7,19 @@ import {
   registerModelDeployment,
   registerOpenAiConnection,
   registerProviderDeployment,
+  registerRegistryConnection,
   replaceAnthropicCredential,
   replaceOpenAiCredential,
+  setDeploymentHealth,
   setDeploymentStreaming,
+  setDeploymentValidation,
   setModelAlias,
   setModelDeploymentEnabled,
   setOpenAiConnectionEnabled,
   setProviderConnectionEnabled,
   setTenantStreamingEnabled,
 } from './db/inference-admin.js';
+import { prepareRegistryConnection } from './inference/registry.js';
 import { createPool } from './db/pools.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
@@ -59,6 +63,10 @@ type Flags = {
   'idle-timeout-ms'?: string;
   'total-timeout-ms'?: string;
   'backpressure-timeout-ms'?: string;
+  project?: string;
+  location?: string;
+  'auth-mode'?: string;
+  status?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -132,6 +140,10 @@ async function main(): Promise<void> {
         'idle-timeout-ms': { type: 'string' },
         'total-timeout-ms': { type: 'string' },
         'backpressure-timeout-ms': { type: 'string' },
+        project: { type: 'string' },
+        location: { type: 'string' },
+        'auth-mode': { type: 'string' },
+        status: { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -216,6 +228,53 @@ async function main(): Promise<void> {
       return;
     }
 
+    if (
+      command === 'register-vertex-connection' ||
+      command === 'register-xai-connection' ||
+      command === 'register-openrouter-connection' ||
+      command === 'register-dgx-connection'
+    ) {
+      const tenantId = requireTenant(values);
+      const apiKey = values['api-key'] ?? '';
+      const provider = command.slice('register-'.length, command.indexOf('-connection'));
+      if (tenantId === undefined || apiKey.length === 0) {
+        logger.error('tenant-id and api-key are required');
+        process.exitCode = 1;
+        return;
+      }
+      const prepared = prepareRegistryConnection({
+        provider,
+        authMode: values['auth-mode'],
+        endpoint: values.endpoint,
+        projectId: values.project,
+        location: values.location,
+        credential: apiKey,
+      });
+      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, prepared.authMode);
+      const created = await registerRegistryConnection(pool, {
+        tenantId,
+        provider: prepared.provider,
+        protectedCredential,
+        authMode: prepared.authMode,
+        endpoint: prepared.endpoint,
+        projectId: prepared.projectId,
+        location: prepared.location,
+      });
+      process.stdout.write(
+        `${JSON.stringify({
+          ...created,
+          tenantId,
+          provider: prepared.provider,
+          authMode: prepared.authMode,
+          enabled: true,
+          endpoint: prepared.endpoint,
+          projectId: prepared.projectId,
+          location: prepared.location,
+        })}\n`,
+      );
+      return;
+    }
+
     if (command === 'register-openai-connection' || command === 'set-openai-credential') {
       const tenantId = requireTenant(values);
       const apiKey = values['api-key'] ?? '';
@@ -263,22 +322,23 @@ async function main(): Promise<void> {
       const provider = values.provider ?? 'openai';
       const defaultMaxText = values['default-max-output-tokens'];
       const defaultMaxOutputTokens = defaultMaxText === undefined ? null : Number(defaultMaxText);
+      const deploymentProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
       if (
         tenantId === undefined ||
         name.length === 0 ||
         upstreamModel.length === 0 ||
         !Number.isInteger(timeoutMs) ||
         capabilities === undefined ||
-        (provider !== 'openai' && provider !== 'anthropic') ||
+        !deploymentProviders.has(provider) ||
         (values.enabled !== undefined && parseEnabled(values.enabled) === undefined) ||
         (defaultMaxOutputTokens !== null && !Number.isInteger(defaultMaxOutputTokens)) ||
-        (provider === 'openai' && defaultMaxText !== undefined)
+        (provider !== 'anthropic' && defaultMaxText !== undefined)
       ) {
         logger.error('deployment arguments are invalid');
         process.exitCode = 1;
         return;
       }
-      if (provider === 'anthropic') {
+      if (provider !== 'openai') {
         const created = await registerProviderDeployment(pool, {
           tenantId,
           provider,
@@ -315,6 +375,22 @@ async function main(): Promise<void> {
       }
       const configVersion = await setModelDeploymentEnabled(pool, tenantId, name, enabled);
       process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, configVersion })}\n`);
+      return;
+    }
+
+    if (command === 'validate-deployment' || command === 'set-deployment-health') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const status = values.status?.trim() ?? '';
+      if (tenantId === undefined || name.length === 0 || status.length === 0) {
+        logger.error('tenant-id, deployment, and status are required');
+        process.exitCode = 1;
+        return;
+      }
+      const updated = command === 'validate-deployment'
+        ? await setDeploymentValidation(pool, tenantId, name, status)
+        : await setDeploymentHealth(pool, tenantId, name, status);
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...updated })}\n`);
       return;
     }
 

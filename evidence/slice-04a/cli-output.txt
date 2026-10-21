@@ -1,0 +1,86 @@
+Operator CLI on the deployed database.
+Secrets and ciphertext are removed.
+Validation sets status valid and leaves health unknown.
+A later health update leaves the configuration version at 4.
+
+$ cli provision-tenant --name Evidence Alpha
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","keyId":"30ed4fb6-c86c-4d32-9d7e-e21887b9e8ac","secret":"[redacted]","name":"Evidence Alpha"}
+
+$ cli provision-tenant --name Evidence Beta
+exit 0
+{"tenantId":"a0959b9c-be3a-43ee-a6ac-42c67094f342","keyId":"b047c577-4d27-4b76-87f4-b09ce71e25d2","secret":"[redacted]","name":"Evidence Beta"}
+
+$ cli register-vertex-connection --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --api-key [redacted] --project evidence-vertex-proj --location us-central1
+exit 0
+{"connectionId":"4df7e80f-a03f-4878-83dd-5cd39d3d31f5","credentialVersion":1,"configVersion":1,"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"vertex","authMode":"service_account","enabled":true,"endpoint":null,"projectId":"evidence-vertex-proj","location":"us-central1"}
+
+$ cli register-vertex-connection --tenant-id a0959b9c-be3a-43ee-a6ac-42c67094f342 --api-key [redacted] --project evidence-beta-proj --location us-central1
+exit 1
+
+{"time":"2026-10-21T02:39:06.073Z","level":"error","msg":"command failed","message":"service account identity is not a credential"}
+
+$ cli register-vertex-connection --tenant-id a0959b9c-be3a-43ee-a6ac-42c67094f342 --api-key [redacted] --project evidence-beta-proj --location us-central1 --endpoint https://aiplatform.googleapis.com
+exit 1
+
+{"time":"2026-10-21T02:39:06.139Z","level":"error","msg":"command failed","message":"endpoint is not allowed"}
+
+$ cli concurrent openrouter
+exit 0
+{"connectionId":"8f45a2c8-4470-41c6-bd4e-44116791825a","credentialVersion":1,"configVersion":1,"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"openrouter","authMode":"api_key","enabled":true,"endpoint":null,"projectId":null,"location":null}
+
+$ cli concurrent xai
+exit 0
+{"connectionId":"a4136d21-c346-4b10-a4e1-909614a0e493","credentialVersion":1,"configVersion":1,"tenantId":"a0959b9c-be3a-43ee-a6ac-42c67094f342","provider":"xai","authMode":"api_key","enabled":true,"endpoint":null,"projectId":null,"location":null}
+
+$ cli register-dgx-connection --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --api-key [redacted] --endpoint https://dgx.evidence.internal:8443/v1/
+exit 0
+{"connectionId":"96def32d-316d-46fc-bac6-84387500a080","credentialVersion":1,"configVersion":1,"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"dgx","authMode":"api_key","enabled":true,"endpoint":"https://dgx.evidence.internal:8443/v1","projectId":null,"location":null}
+
+$ cli register-dgx-connection --tenant-id a0959b9c-be3a-43ee-a6ac-42c67094f342 --api-key [redacted] --endpoint https://api.openai.com/v1
+exit 1
+
+{"time":"2026-10-21T02:39:06.537Z","level":"error","msg":"command failed","message":"endpoint is invalid"}
+
+$ cli register-xai-connection --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --api-key [redacted] --auth-mode service_account
+exit 1
+
+{"time":"2026-10-21T02:39:06.626Z","level":"error","msg":"command failed","message":"auth mode is not supported"}
+
+$ cli register-deployment --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --provider vertex --name evidence-vertex --upstream-model gemini-evidence --timeout-ms 5000 --capabilities temperature --enabled true
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"vertex","name":"evidence-vertex","enabled":true,"deploymentId":"2e8c8402-b45a-4708-8861-cadea76a2075","configVersion":1}
+
+$ cli validate-deployment --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --deployment evidence-vertex --status valid
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","deployment":"evidence-vertex","configVersion":2,"validationStatus":"valid","healthStatus":"unknown"}
+
+$ cli set-connection-enabled --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --provider vertex --enabled false
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"vertex","enabled":false,"credentialVersion":2}
+
+$ cli set-connection-enabled --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --provider vertex --enabled true
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","provider":"vertex","enabled":true,"credentialVersion":3}
+
+$ cli set-deployment-enabled --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --name evidence-vertex --enabled false
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","name":"evidence-vertex","enabled":false,"configVersion":3}
+
+$ cli set-deployment-enabled --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --name evidence-vertex --enabled true
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","name":"evidence-vertex","enabled":true,"configVersion":4}
+
+$ cli set-deployment-health --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8 --deployment evidence-vertex --status healthy
+exit 0
+{"tenantId":"a669ad63-c6f7-4dae-8c5d-56245df8def8","deployment":"evidence-vertex","configVersion":4,"validationStatus":"valid","healthStatus":"healthy"}
+
+$ cli list-inference --tenant-id a669ad63-c6f7-4dae-8c5d-56245df8def8
+exit 0
+{"aliases":[],"connections":[{"id":"4df7e80f-a03f-4878-83dd-5cd39d3d31f5","enabled":true,"authMode":"service_account","endpoint":null,"location":"us-central1","provider":"vertex","createdAt":"2026-10-21T02:39:05.987227+00:00","projectId":"evidence-vertex-proj","workspaceId":null,"configVersion":3,"credentialVersion":3},{"id":"8f45a2c8-4470-41c6-bd4e-44116791825a","enabled":true,"authMode":"api_key","endpoint":null,"location":null,"provider":"openrouter","createdAt":"2026-10-21T02:39:06.232981+00:00","projectId":null,"workspaceId":null,"configVersion":1,"credentialVersion":1},{"id":"96def32d-316d-46fc-bac6-84387500a080","enabled":true,"authMode":"api_key","endpoint":"https://dgx.evidence.internal:8443/v1","location":null,"provider":"dgx","createdAt":"2026-10-21T02:39:06.45405+00:00","projectId":null,"workspaceId":null,"configVersion":1,"credentialVersion":1}],"deployments":[{"id":"2e8c8402-b45a-4708-8861-cadea76a2075","name":"evidence-vertex","enabled":true,"createdAt":"2026-10-21T02:39:06.741612+00:00","timeoutMs":5000,"capabilities":["temperature"],"connectionId":"4df7e80f-a03f-4878-83dd-5cd39d3d31f5","healthStatus":"healthy","configVersion":4,"upstreamModel":"gemini-evidence","streamingEnabled":false,"validationStatus":"valid","streamIdleTimeoutMs":null,"streamTotalTimeoutMs":null,"defaultMaxOutputTokens":null,"streamConnectTimeoutMs":null,"streamBackpressureTimeoutMs":null}],"streamingEnabled":false}
+
+$ cli list-inference --tenant-id a0959b9c-be3a-43ee-a6ac-42c67094f342
+exit 0
+{"aliases":[],"connections":[{"id":"a4136d21-c346-4b10-a4e1-909614a0e493","enabled":true,"authMode":"api_key","endpoint":null,"location":null,"provider":"xai","createdAt":"2026-10-21T02:39:06.368788+00:00","projectId":null,"workspaceId":null,"configVersion":1,"credentialVersion":1}],"deployments":[],"streamingEnabled":false}
+
+tenants a669ad63-c6f7-4dae-8c5d-56245df8def8 a0959b9c-be3a-43ee-a6ac-42c67094f342

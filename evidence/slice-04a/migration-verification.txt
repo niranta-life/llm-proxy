@@ -1,0 +1,66 @@
+Migration verification for 008_provider_registry.sql.
+
+Before the new image started, schema_migrations had versions 001 through 007.
+The new image reported 008 absent, then applied it and became ready.
+Rollback image 67979e9 applied no migration and left 008 in place.
+Migrations 001 through 007 are unchanged on disk.
+Hashes match the values pinned by test/registry.test.ts.
+
+before-migrations
+           version           
+-----------------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+ 005_openai_streaming.sql
+ 006_anthropic_streaming.sql
+ 007_stream_interrupted.sql
+(7 rows)
+
+
+ready-before-008 {"required":"008_provider_registry.sql","present":false}
+
+===== schema_migrations =====
+           version           
+-----------------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+ 005_openai_streaming.sql
+ 006_anthropic_streaming.sql
+ 007_stream_interrupted.sql
+ 008_provider_registry.sql
+(8 rows)
+
+
+{"time":"2026-10-21T02:32:04.436Z","level":"info","msg":"migrations complete","applied":["008_provider_registry.sql"]}
+===== hashes =====
+5fb271999098068ddce35308d3b1c182edad4f4d87d1d35c3a9117ee164361b9  migrations/001_schema.sql
+45638c9b9a377c2d335c771d943eb44a8f72bf85eb722b11e6d3e5fa70b24bf4  migrations/002_security.sql
+0dba7a3c8ca8bec3dd9958ca3b3f1f92e27a8ae0da11ad59e336e7402ee3aba9  migrations/003_inference.sql
+993a7c477615441538062460f3af81a372747ea74f15c1acaf4e8dcfb76a2585  migrations/004_anthropic.sql
+1568f883c9731873f051c1c6c9dc1f9e8cdac3ca00aecca7f768ad1c44709e01  migrations/005_openai_streaming.sql
+72dcec3056c13811ac10cfc12b9c72ff3ea888b66585ba76e05720de942fe27b  migrations/006_anthropic_streaming.sql
+de86494160977b01a2b5789131d1918c755a2a815cc0f6fa50d26ff274d129db  migrations/007_stream_interrupted.sql
+a2e29bdcce88fa42b539cae2adbe889e2ce15b6503c28e87692956b069bb30e8  migrations/008_provider_registry.sql
+===== drop scan =====
+008 has no DROP COLUMN or DROP TABLE
+
+migrations-001-through-007-diff
+empty
+===== schema_migrations during rollback =====
+           version           
+-----------------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+ 005_openai_streaming.sql
+ 006_anthropic_streaming.sql
+ 007_stream_interrupted.sql
+ 008_provider_registry.sql
+(8 rows)
+
+{"time":"2026-10-21T02:37:03.921Z","level":"info","msg":"migrations complete","applied":[]}

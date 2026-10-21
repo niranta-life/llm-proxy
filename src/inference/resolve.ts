@@ -1,4 +1,4 @@
-import type { ProviderName } from './contract.js';
+import type { RegistryProviderName } from './contract.js';
 
 export type DeploymentCandidate = {
   id: string;
@@ -11,7 +11,7 @@ export type DeploymentCandidate = {
   connectionVersion: number;
   enabled: boolean;
   connectionEnabled: boolean;
-  provider: ProviderName;
+  provider: RegistryProviderName;
   endpoint: string | null;
   workspaceId: string | null;
   defaultMaxOutputTokens: number | null;
@@ -37,7 +37,7 @@ export type ResolvedRoute = {
   configVersion: number;
   connectionId: string;
   connectionVersion: number;
-  provider: ProviderName;
+  provider: RegistryProviderName;
   endpoint: string | null;
   workspaceId: string | null;
   defaultMaxOutputTokens: number | null;

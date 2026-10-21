@@ -61,6 +61,9 @@ The proxy records the attempt, the duration, and the token counts from the provi
 The proxy returns an OpenAI chat completion.
 The proxy returns the model list for that tenant.
 The proxy returns metric totals for a time window.
+The proxy records an estimated cost for each attempt.
+The tenant can read that cost for the same time window.
+A missing price does not change the chat completion.
 
 The proxy can send the same request to Anthropic.
 The proxy changes that request into a request for the Anthropic Messages API.
@@ -1032,6 +1035,50 @@ The route returns records for that tenant.
 A stored amount keeps the price version that was in force for that attempt.
 A missing price does not change the chat completion.
 A cost recording error does not change the chat completion.
+You record a price with the CLI.
+The proxy does not embed a public price list.
+You supply each rate.
+The currency is USD.
+A rate is a decimal.
+A later price does not change an amount that is already stored.
+A verified price with complete usage is estimated.
+An unverified price is provisional.
+Partial usage is provisional.
+Missing usage is unknown.
+Anthropic bills the split token counts.
+Vertex bills the split token counts.
+Those providers do not also bill the summed prompt count.
+OpenAI bills the prompt count and the completion count when no cache count is stored.
+A DGX allocated rate stays apart from the external amount.
+
+```bash
+docker compose run --rm app node dist/cli.js register-price \
+  --provider openai \
+  --upstream-model gpt-4o-mini \
+  --effective-at 2026-01-01T00:00:00Z \
+  --source operator \
+  --status verified \
+  --input-rate 0.000001 \
+  --output-rate 0.000002
+```
+
+The command can also take `--location`, `--service-tier`, `--serving-provider`, `--cache-read-rate`, `--cache-write-rate`, `--thinking-rate`, `--request-fee`, and `--allocated-rate`.
+`--status` is `verified` or `unverified`.
+
+```bash
+docker compose run --rm app node dist/cli.js set-deployment-service-tier \
+  --tenant-id <tenant-id> --deployment primary --service-tier batch
+```
+
+`--service-tier none` clears the tier on that command.
+
+```bash
+docker compose run --rm app node dist/cli.js reconcile-attempt-cost \
+  --tenant-id <tenant-id> --attempt-id <attempt-id>
+```
+
+Reconcile keeps the stored amount.
+Reconcile keeps the stored price version.
 
 `GET /health/live` returns `{"status":"live"}`.
 `GET /health/ready` returns `{"status":"ready","database":"ready"}` when the proxy is ready.
@@ -1728,9 +1775,11 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - Public `usage` has the 3 OpenAI token fields.
 - The proxy sends 1 attempt for each request that it accepts.
 - The schema permits one more attempt row for the same request.
+- The proxy records an estimated cost for each attempt.
+- The proxy does not take a payment.
 - The proxy does not set a maximum number of requests.
-- The proxy does not calculate a charge.
-- The proxy has no price.
+- A price is a stored version.
+- The proxy does not embed a public price list.
 - The proxy has no quality score.
 - The repository has no Kubernetes manifest.
 - The repository has no pipeline for continuous integration.
@@ -1793,7 +1842,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - An HTTP route that changes a provider record.
 - Production control of a database role password.
 - Production control of the provider key.
-- A charge for use, a maximum number of requests, and the cost of each request.
+- A payment for use and a maximum number of requests.
 
 ## License
 

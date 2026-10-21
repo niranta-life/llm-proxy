@@ -1,0 +1,23 @@
+Live provider smoke.
+
+Flags were read from the process environment.
+.env.live was not sourced.
+No provider key was printed.
+No live flag was set.
+
+VERTEX_LIVE was unset.
+XAI_LIVE was unset.
+OPENROUTER_LIVE was unset.
+OPENAI_STREAM_SMOKE was unset.
+ANTHROPIC_SMOKE was unset.
+
+Hosted smoke was not run.
+scripts/openai-stream-smoke.mjs wrote that the OpenAI stream smoke test is off.
+That script exited 0.
+scripts/anthropic-smoke.mjs wrote that the Anthropic smoke test is off.
+That script exited 0.
+The Vertex live test skips unless VERTEX_LIVE is 1.
+The xAI live test skips unless XAI_LIVE is 1.
+The OpenRouter live test skips unless OPENROUTER_LIVE is 1.
+
+Result: LIVE_SMOKE_NOT_RUN

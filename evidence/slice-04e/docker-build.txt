@@ -1,0 +1,40 @@
+Docker build.
+
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Image: llm-proxy-app:latest
+Tag: llm-proxy:slice-04e
+Image id: sha256:ddeb49389f86659f0611ef32061b9f889d9021cc49e8046fef36c5e2779b9a23
+docker image inspect llm-proxy:slice-04e Id matches that digest.
+docker image inspect llm-proxy-app:latest Id matches that digest.
+docker inspect llm-proxy-app-1 Image matches that digest.
+
+The image was built from the worktree.
+The image file migrations/011_private_endpoint.sql is present.
+The image file migrations/001_schema.sql is present.
+The image file dist/inference/private.js is present.
+The image file dist/inference/store.js contains the non-stream provider count.
+The image does not contain .env.live.
+Result: NEW_FILES_OK
+
+The same image was started on the existing database.
+The first readiness probe returned an empty reply while the process started.
+new_image_try 1 curl_rc=52 curl: (52) Empty reply from server
+new_image_try 2 200
+new_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+
+The app was restarted.
+The first restart probe returned an empty reply while the process started.
+restart_app_try 1 curl_rc=52 curl: (52) Empty reply from server
+restart_app_try 2 200
+restart_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+The restarted container image was sha256:ddeb49389f86659f0611ef32061b9f889d9021cc49e8046fef36c5e2779b9a23.
+
+schema_migrations contained versions 001 through 011.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The database volume llm-proxy_pgdata was not removed.
+DEPLOY_EXIT:0

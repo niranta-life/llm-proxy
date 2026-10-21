@@ -1,0 +1,37 @@
+Passed and failed tests.
+
+Node was v24.22.0.
+Vitest was v3.2.7.
+The full suite command was ./node_modules/.bin/vitest run.
+No live flag was set for the suite.
+
+Test Files 32 passed | 2 skipped (34).
+Tests 170 passed | 3 skipped (173).
+Duration 270.08s.
+EXIT:0.
+
+Failed tests: none.
+
+The skipped tests were the existing live suites.
+test/compatible-live.test.ts skipped the xAI live call because XAI_LIVE was unset.
+test/compatible-live.test.ts skipped the OpenRouter live call because OPENROUTER_LIVE was unset.
+test/vertex-live.test.ts skipped the Vertex live call because VERTEX_LIVE was unset.
+
+The new provider tests passed and were not skipped.
+test/provider-matrix.test.ts passed 5 tests.
+test/provider-isolation.test.ts passed 1 test.
+test/provider-load.test.ts passed 4 tests.
+test/stream-production.test.ts passed with the wider provider counts.
+
+The metrics body for the production stream test counted the non-stream OpenAI chat.
+OpenAI provider requests were 5.
+OpenAI completed were 2.
+OpenAI prompt tokens were 6.
+OpenAI completion tokens were 4.
+OpenAI total tokens were 10.
+Anthropic provider requests were 1.
+Anthropic completed were 1.
+Anthropic total tokens were 30.
+The stream section stayed at 5 requests.
+
+Result: SUITE_PASSED

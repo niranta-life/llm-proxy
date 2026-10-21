@@ -1,0 +1,42 @@
+Provider compatibility matrix.
+
+The shipped proxy served POST /v1/chat/completions for six providers.
+Each provider used a local double.
+DGX used the local mock at dgx.lab.internal.
+No request went to a real DGX host.
+
+OpenAI JSON status 200.
+OpenAI stream ended with one data: [DONE].
+OpenAI upstream model was gpt-matrix-actual.
+Anthropic JSON status 200.
+Anthropic stream ended with one data: [DONE].
+Anthropic upstream model was claude-matrix-actual.
+Vertex JSON status 200.
+Vertex stream ended with one data: [DONE].
+Vertex upstream model was gemini-matrix-actual.
+xAI JSON status 200.
+xAI stream ended with one data: [DONE].
+xAI upstream model was grok-matrix-actual.
+OpenRouter JSON status 200.
+OpenRouter stream ended with one data: [DONE].
+OpenRouter upstream model was router-matrix-actual.
+DGX JSON status 200.
+DGX stream ended with one data: [DONE].
+DGX request model was private-model.
+
+model auto selected only the stored OpenAI deployment.
+A disabled deployment returned 404 model_not_found.
+That call made zero upstream calls.
+top_p was rejected as unsupported_parameter before fetch for all six providers.
+A missing usage object stayed unset.
+An OpenAI partial usage left total_tokens null.
+A timeout returned 504 timeout.
+A connection failure returned 502 upstream_error.
+HTTP 429 returned 429 rate_limit for OpenAI, Anthropic, xAI, OpenRouter, and DGX.
+Vertex HTTP 429 returned 502 upstream_error.
+HTTP 500 returned 502 upstream_error.
+Each error made one upstream call.
+A later OpenAI chat stayed on OpenAI.
+A cancelled stream stored client_aborted and omitted [DONE] for all six providers.
+
+Result: MATRIX_PASSED

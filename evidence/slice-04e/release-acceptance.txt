@@ -1,0 +1,40 @@
+Release acceptance.
+
+Each enabled provider serves an OpenAI-shaped text chat on POST /v1/chat/completions.
+The providers are OpenAI, Anthropic, Vertex, xAI, OpenRouter, and the private DGX mock.
+JSON and stream both passed.
+Capability checks reject an unsupported field before any upstream call.
+model auto uses only the stored alias for that tenant.
+An explicit deployment name selects only that deployment.
+A complete stream ends with one data: [DONE].
+Usage is stored only from integer upstream counts.
+A missing total stays unset.
+Client cancellation omits [DONE].
+Timeout, connection failure, HTTP 429, and HTTP 5xx use the existing provider errors.
+Vertex HTTP 429 stays 502 upstream_error.
+The proxy makes one upstream call and does not fall back.
+
+One tenant cannot use another tenant credential, endpoint, or cached client.
+Rotating a credential changes only that tenant.
+A disabled connection or deployment is not called.
+Health, validation, and configuration version change only for the updated deployment.
+validated_live is not written.
+Provider rows count stream and non-stream attempts for that tenant only.
+
+Enabling or disabling one provider leaves the other routes and the stored auto alias unchanged.
+No intelligent routing was added.
+No evals were added.
+
+The Node 24 suite passed.
+The only skips were the existing live tests whose flags were unset.
+Hosted smoke was not run.
+Live DGX was not run.
+The DGX deployment is not validated_live.
+
+Image llm-proxy:slice-04e became ready.
+A restart stayed ready.
+Image 9472efb stayed ready on the same database.
+Migrations 001 through 011 remained applied.
+Row counts stayed at 20 tenants, 28 deployments, and 23 connections.
+
+Result: ACCEPTED

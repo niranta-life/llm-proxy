@@ -1,0 +1,13 @@
+DGX deferred validation.
+
+Live DGX was not run.
+No request went to a real DGX host.
+The deployment is not validated_live.
+validated_live was rejected with validation status is not available.
+The stored validation status stayed validated_mock.
+The local mock served the DGX chat and the DGX stream.
+The mock host was dgx.lab.internal.
+The pinned address stayed inside the test double.
+DGX remains mock-validated until hardware exists.
+
+Result: DGX_LIVE_NOT_RUN

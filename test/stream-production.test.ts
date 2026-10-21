@@ -445,14 +445,14 @@ describe('streaming production controls', () => {
           expect.objectContaining({
             provider: 'openai',
             deployment: 'metrics-openai',
-            requests: 4,
-            completed: 1,
+            requests: 5,
+            completed: 2,
             cancelled: 1,
             errors: 1,
             truncated: 1,
-            promptTokens: 3,
-            completionTokens: 2,
-            totalTokens: 5,
+            promptTokens: 6,
+            completionTokens: 4,
+            totalTokens: 10,
           }),
           expect.objectContaining({
             provider: 'anthropic',
@@ -467,7 +467,14 @@ describe('streaming production controls', () => {
       );
       expect(body.byProvider).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ provider: 'openai', requests: 4, completed: 1 }),
+          expect.objectContaining({
+            provider: 'openai',
+            requests: 5,
+            completed: 2,
+            promptTokens: 6,
+            completionTokens: 4,
+            totalTokens: 10,
+          }),
           expect.objectContaining({ provider: 'anthropic', requests: 1, completed: 1, totalTokens: 30 }),
         ]),
       );

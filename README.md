@@ -998,8 +998,14 @@ A cancellation is `client_aborted`.
 A stream error is `provider_failed`, `timed_out`, `slow_consumer`, or `interrupted`.
 The body contains the P50 and the P95 of the time to the first text.
 The body contains the P50 and the P95 of the stream duration.
-The body contains those counts for each provider.
-The body contains those counts for each deployment.
+A provider row counts each stream attempt and each non-stream attempt for that provider.
+A deployment row counts each stream attempt and each non-stream attempt for that deployment.
+A succeeded non-stream attempt counts as completed.
+A failed non-stream attempt counts as an error.
+A cancelled non-stream attempt counts as cancelled.
+A provider token sum includes a non-stream response when the provider sent integer counts.
+The body does not invent a token count.
+The stream section still counts only a stream.
 The body contains the reported stream token sums.
 A window with no latency samples has a null P50 and a null P95.
 A window with no reported tokens has null token sums.

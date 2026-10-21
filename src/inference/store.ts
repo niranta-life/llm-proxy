@@ -488,9 +488,22 @@ export async function summarizeMetrics(client: PoolClient, from: Date, to: Date)
     `SELECT c.provider AS provider,
             d.name AS deployment,
             count(*)::int AS requests,
-            count(*) FILTER (WHERE a.stream_status = 'completed')::int AS completed,
-            count(*) FILTER (WHERE a.stream_status = 'client_aborted')::int AS cancelled,
-            count(*) FILTER (WHERE a.stream_status IN ${STREAM_ERROR_STATUSES})::int AS errors,
+            count(*) FILTER (
+              WHERE a.stream_status = 'completed'
+                 OR (a.stream_status IS NULL AND a.status = 'succeeded')
+            )::int AS completed,
+            count(*) FILTER (
+              WHERE a.stream_status = 'client_aborted'
+                 OR (a.stream_status IS NULL AND a.error_code = 'request_cancelled')
+            )::int AS cancelled,
+            count(*) FILTER (
+              WHERE a.stream_status IN ${STREAM_ERROR_STATUSES}
+                 OR (
+                   a.stream_status IS NULL
+                   AND a.status = 'failed'
+                   AND a.error_code IS DISTINCT FROM 'request_cancelled'
+                 )
+            )::int AS errors,
             count(*) FILTER (WHERE a.stream_status = 'stream_truncated')::int AS truncated,
             sum(a.prompt_tokens)::bigint AS prompt_tokens,
             sum(a.completion_tokens)::bigint AS completion_tokens,
@@ -500,7 +513,6 @@ export async function summarizeMetrics(client: PoolClient, from: Date, to: Date)
      JOIN model_deployments d ON d.id = a.deployment_id AND d.tenant_id = a.tenant_id
      JOIN provider_connections c ON c.id = d.connection_id AND c.tenant_id = d.tenant_id
      WHERE r.created_at >= $1 AND r.created_at < $2
-       AND a.stream_status IS NOT NULL
      GROUP BY c.provider, d.name
      ORDER BY c.provider, d.name`,
     [from, to],

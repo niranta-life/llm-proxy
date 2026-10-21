@@ -4,6 +4,8 @@ import type { ChatRequest } from './validate.js';
 
 export type ProviderName = 'openai' | 'anthropic';
 
+export type RegistryProviderName = ProviderName | 'vertex' | 'xai' | 'openrouter' | 'dgx';
+
 export type CanonicalTextRequest = ChatRequest;
 
 export type CanonicalTextCompletion = UpstreamCompletion['response'];

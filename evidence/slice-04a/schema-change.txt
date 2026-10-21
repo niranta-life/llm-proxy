@@ -1,0 +1,37 @@
+Provider registry schema after 008_provider_registry.sql.
+
+The migration adds columns, checks, one index, and functions.
+It replaces provider_connections_provider_check with the six-provider list.
+It does not add a table.
+It does not drop a column.
+
+===== columns =====
+      table_name      |     column_name      | data_type | is_nullable |   column_default    
+----------------------+----------------------+-----------+-------------+---------------------
+ model_deployments    | config_version       | integer   | NO          | 1
+ model_deployments    | health_status        | text      | NO          | 'unknown'::text
+ model_deployments    | validation_status    | text      | NO          | 'unvalidated'::text
+ provider_connections | auth_mode            | text      | NO          | 'api_key'::text
+ provider_connections | config_version       | integer   | NO          | 1
+ provider_connections | endpoint             | text      | YES         | 
+ provider_connections | location             | text      | YES         | 
+ provider_connections | project_id           | text      | YES         | 
+ provider_connections | protected_credential | text      | NO          | 
+(9 rows)
+
+===== constraints =====
+                  conname                  
+-------------------------------------------
+ model_deployments_health_status_check
+ model_deployments_validation_status_check
+ provider_connections_auth_mode_check
+ provider_connections_registry_shape_check
+(4 rows)
+
+
+===== index =====
+                indexname                |                                                          indexdef                                                           
+-----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------
+ model_deployments_tenant_validation_idx | CREATE INDEX model_deployments_tenant_validation_idx ON public.model_deployments USING btree (tenant_id, validation_status)
+(1 row)
+

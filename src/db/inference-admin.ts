@@ -7,8 +7,12 @@ export type InferenceListing = {
     provider: string;
     enabled: boolean;
     credentialVersion: number;
+    configVersion: number;
+    authMode: string;
     endpoint: string | null;
     workspaceId: string | null;
+    projectId: string | null;
+    location: string | null;
     createdAt: string;
   }>;
   deployments: Array<{
@@ -26,6 +30,8 @@ export type InferenceListing = {
     streamIdleTimeoutMs: number | null;
     streamTotalTimeoutMs: number | null;
     streamBackpressureTimeoutMs: number | null;
+    validationStatus: string;
+    healthStatus: string;
     createdAt: string;
   }>;
   aliases: Array<{
@@ -243,6 +249,78 @@ export async function setDeploymentStreaming(
   const version = result.rows[0]?.version;
   if (version === undefined) throw new Error('deployment streaming was not updated');
   return version;
+}
+
+export async function registerRegistryConnection(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    provider: string;
+    protectedCredential: string;
+    authMode: string;
+    endpoint: string | null;
+    projectId: string | null;
+    location: string | null;
+  },
+): Promise<{ connectionId: string; credentialVersion: number; configVersion: number }> {
+  const result = await pool.query<{ connection_id: string; credential_version: number; config_version: number }>(
+    `SELECT connection_id, credential_version, config_version
+     FROM register_registry_connection($1::uuid, $2, $3, $4, $5, $6, $7)`,
+    [
+      input.tenantId,
+      input.provider,
+      input.protectedCredential,
+      input.authMode,
+      input.endpoint,
+      input.projectId,
+      input.location,
+    ],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('connection was not created');
+  return {
+    connectionId: row.connection_id,
+    credentialVersion: row.credential_version,
+    configVersion: row.config_version,
+  };
+}
+
+export async function setDeploymentValidation(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+  status: string,
+): Promise<{ configVersion: number; validationStatus: string; healthStatus: string }> {
+  const result = await pool.query<{ config_version: number; validation_status: string; health_status: string }>(
+    'SELECT config_version, validation_status, health_status FROM set_deployment_validation($1::uuid, $2, $3)',
+    [tenantId, name, status],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not updated');
+  return {
+    configVersion: row.config_version,
+    validationStatus: row.validation_status,
+    healthStatus: row.health_status,
+  };
+}
+
+export async function setDeploymentHealth(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+  status: string,
+): Promise<{ configVersion: number; validationStatus: string; healthStatus: string }> {
+  const result = await pool.query<{ config_version: number; validation_status: string; health_status: string }>(
+    'SELECT config_version, validation_status, health_status FROM set_deployment_health($1::uuid, $2, $3)',
+    [tenantId, name, status],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not updated');
+  return {
+    configVersion: row.config_version,
+    validationStatus: row.validation_status,
+    healthStatus: row.health_status,
+  };
 }
 
 export async function listTenantInference(pool: Pool, tenantId: string): Promise<InferenceListing> {

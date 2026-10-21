@@ -1,0 +1,76 @@
+Rollback verification.
+
+Image llm-proxy:67979e9 ran on the same database with inference off.
+No provider key was supplied.
+Readiness returned HTTP 200.
+The image applied no migration.
+Versions 001 through 008 stayed present.
+The proof Vertex row and deployment stayed present.
+Migrations 001 through 007 had an empty diff.
+The current image was started again and returned HTTP 200.
+The existing OpenAI and Anthropic tenant stayed present.
+
+===== stop compose app =====
+===== start rollback image =====
+8139caca56af9cf2e2e53ed06806bb8ce19dd7ea205b2ca4aa09b62f0fcd5910
+rollback-ready-http 200
+rollback-ready-body {"status":"ready","database":"ready"}
+===== rollback container log =====
+{"time":"2026-10-21T02:37:03.921Z","level":"info","msg":"migrations complete","applied":[]}
+{"time":"2026-10-21T02:37:04.073Z","level":"info","msg":"listening","host":"0.0.0.0","port":8080}
+===== schema_migrations during rollback =====
+           version           
+-----------------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+ 005_openai_streaming.sql
+ 006_anthropic_streaming.sql
+ 007_stream_interrupted.sql
+ 008_provider_registry.sql
+(8 rows)
+
+===== proof rows during rollback =====
+ provider |    auth_mode    |    project_id     |  location   | endpoint_null | config_version | enabled | ciphertext | no_at 
+----------+-----------------+-------------------+-------------+---------------+----------------+---------+------------+-------
+ vertex   | service_account | proof-vertex-proj | us-central1 | t             |              3 | t       | t          | t
+(1 row)
+
+     name     | validation_status | health_status | config_version | enabled 
+--------------+-------------------+---------------+----------------+---------
+ proof-vertex | valid             | healthy       |              4 | t
+(1 row)
+
+===== migrations 001-007 diff =====
+empty
+===== restore compose app =====
+llm-proxy-67979e9
+restore-ready-http 200
+restore-ready-body {"status":"ready","database":"ready"}
+llm-proxy-app-1 llm-proxy-app Up 2 seconds (health: starting)
+llm-proxy-postgres-1 postgres:16 Up 9 hours (healthy)
+           version           
+-----------------------------
+ 001_schema.sql
+ 002_security.sql
+ 003_inference.sql
+ 004_anthropic.sql
+ 005_openai_streaming.sql
+ 006_anthropic_streaming.sql
+ 007_stream_interrupted.sql
+ 008_provider_registry.sql
+(8 rows)
+
+                indexname                
+-----------------------------------------
+ model_deployments_tenant_validation_idx
+(1 row)
+
+===== live check tenant still present =====
+ provider  | enabled 
+-----------+---------
+ anthropic | t
+ openai    | t
+(2 rows)
+

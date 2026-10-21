@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { proxyError } from './errors.js';
+import type { RegistryProviderName } from './contract.js';
 import type { AliasCandidate, DeploymentCandidate, ResolvedRoute } from './resolve.js';
 import type { TokenUsage } from './adapter.js';
 import type { StreamStatus } from './stream.js';
@@ -26,8 +27,17 @@ type DeploymentRow = {
   stream_backpressure_timeout_ms: number | null;
 };
 
-function providerName(value: string): 'openai' | 'anthropic' {
-  if (value === 'openai' || value === 'anthropic') return value;
+function providerName(value: string): RegistryProviderName {
+  if (
+    value === 'openai' ||
+    value === 'anthropic' ||
+    value === 'vertex' ||
+    value === 'xai' ||
+    value === 'openrouter' ||
+    value === 'dgx'
+  ) {
+    return value;
+  }
   throw new Error('provider is invalid');
 }
 

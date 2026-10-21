@@ -956,6 +956,53 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`008_provider_registry.sql` stores Vertex, xAI, OpenRouter, and private DGX configuration.
+The file does not drop a column.
+The file does not change an OpenAI row.
+The file does not change an Anthropic row.
+The file does not edit migrations `001` through `007`.
+
+The image `67979e9` stays ready on this database.
+A tenant that stores only OpenAI and Anthropic can still send a chat completion.
+A stored Vertex, xAI, OpenRouter, or DGX row is outside that image.
+Its latest migration file is `007_stream_interrupted.sql`.
+After `008_provider_registry.sql` is applied, `schema_migrations` keeps `007_stream_interrupted.sql`.
+The readiness route on image `67979e9` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:67979e9`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar 67979e9 | docker build -t llm-proxy:67979e9 -
+docker compose stop app
+docker rm -f llm-proxy-67979e9
+docker run -d --name llm-proxy-67979e9 --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=true \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:67979e9
+```
+
+That image stays ready.
+A tenant that stores only OpenAI and Anthropic can still send a chat completion.
+Do not delete a Vertex, xAI, OpenRouter, or DGX row to roll back.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-67979e9
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.

@@ -1,0 +1,34 @@
+Local Application Default Credentials.
+
+These commands are for a development machine.
+A chat request does not run gcloud.
+A developer credential file is not production auth.
+
+export VERTEX_PROJECT_ID="your-project-id"
+export VERTEX_LOCATION="us-central1"
+
+gcloud auth login
+gcloud config set project "$VERTEX_PROJECT_ID"
+
+gcloud auth application-default login
+
+gcloud auth application-default \
+  set-quota-project "$VERTEX_PROJECT_ID"
+
+gcloud services enable aiplatform.googleapis.com \
+  --project "$VERTEX_PROJECT_ID"
+
+The identity needs roles/aiplatform.user on that project.
+Impersonation also needs roles/iam.serviceAccountTokenCreator on the target service account.
+
+The SDK discovers the ADC file.
+The process does not set a key file name for ADC mode.
+Local Docker can mount that file read-only.
+
+export VERTEX_ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
+docker compose -f docker-compose.yml -f docker-compose.adc.yml up
+
+The overlay sets GOOGLE_APPLICATION_CREDENTIALS to /var/run/gcp/adc.json.
+The default Compose file does not mount a credential.
+The image does not copy the ADC file.
+Workload identity and approved impersonation are the production modes.

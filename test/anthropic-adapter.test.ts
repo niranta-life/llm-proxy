@@ -171,6 +171,7 @@ describe('Anthropic response normalization', () => {
         uncachedInputTokens: 1,
         cacheCreationInputTokens: null,
         cacheReadInputTokens: null,
+        thoughtsTokens: null,
       });
       const body = JSON.stringify(proxy.body());
       expect(body).not.toContain('lookup');

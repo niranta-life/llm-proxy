@@ -25,6 +25,12 @@ type DeploymentRow = {
   stream_idle_timeout_ms: number | null;
   stream_total_timeout_ms: number | null;
   stream_backpressure_timeout_ms: number | null;
+  project_id: string | null;
+  location: string | null;
+  auth_mode: string;
+  service_account_identity: string | null;
+  api_version: string;
+  connection_config_version: number;
 };
 
 function providerName(value: string): RegistryProviderName {
@@ -55,6 +61,8 @@ export async function loadCatalog(client: PoolClient): Promise<{
     `SELECT d.id, d.name, d.upstream_model, d.timeout_ms, d.capabilities, d.config_version,
             d.connection_id, c.credential_version AS connection_version, d.enabled,
             c.enabled AS connection_enabled, c.provider, c.endpoint, c.workspace_id,
+            c.project_id, c.location, c.auth_mode, c.service_account_identity, c.api_version,
+            c.config_version AS connection_config_version,
             d.default_max_output_tokens, d.streaming_enabled,
             d.stream_connect_timeout_ms, d.stream_idle_timeout_ms,
             d.stream_total_timeout_ms, d.stream_backpressure_timeout_ms
@@ -86,6 +94,12 @@ export async function loadCatalog(client: PoolClient): Promise<{
       streamIdleTimeoutMs: row.stream_idle_timeout_ms,
       streamTotalTimeoutMs: row.stream_total_timeout_ms,
       streamBackpressureTimeoutMs: row.stream_backpressure_timeout_ms,
+      projectId: row.project_id,
+      location: row.location,
+      authMode: row.auth_mode,
+      serviceAccountIdentity: row.service_account_identity,
+      apiVersion: row.api_version,
+      connectionConfigVersion: row.connection_config_version,
     })),
     aliases: aliases.rows.map((row) => ({ alias: row.alias, deploymentId: row.deployment_id })),
     streamingEnabled: tenant.rows[0]?.streaming_enabled ?? false,
@@ -96,7 +110,7 @@ export async function insertPending(
   client: PoolClient,
   tenantId: string,
   route: ResolvedRoute,
-): Promise<{ requestId: string; attemptId: string; protectedCredential: string }> {
+): Promise<{ requestId: string; attemptId: string; protectedCredential: string | null }> {
   const request = await client.query<{ id: string }>(
     `INSERT INTO proxy_requests (
        tenant_id, deployment_id, deployment_config_version, connection_id, connection_version, requested_model, status
@@ -122,15 +136,23 @@ export async function insertPending(
   );
   const attemptId = attempt.rows[0]?.id;
   if (attemptId === undefined) throw new Error('attempt was not created');
-  const credential = await client.query<{ protected_credential: string | null }>(
-    'SELECT load_provider_credential($1::uuid, $2::uuid) AS protected_credential',
+  const credential = await client.query<{
+    auth_mode: string;
+    enabled: boolean;
+    protected_credential: string | null;
+  }>(
+    `SELECT c.auth_mode, c.enabled,
+            load_provider_credential($1::uuid, $2::uuid) AS protected_credential
+     FROM provider_connections c
+     WHERE c.id = $2 AND c.tenant_id = $1`,
     [tenantId, route.connectionId],
   );
-  const protectedCredential = credential.rows[0]?.protected_credential;
-  if (protectedCredential === undefined || protectedCredential === null) {
+  const row = credential.rows[0];
+  const secretless = row?.auth_mode === 'adc' || row?.auth_mode === 'workload_identity' || row?.auth_mode === 'impersonation';
+  if (row === undefined || !row.enabled || (row.protected_credential === null && !secretless)) {
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
-  return { requestId, attemptId, protectedCredential };
+  return { requestId, attemptId, protectedCredential: row.protected_credential };
 }
 
 export async function finishAttempt(
@@ -148,6 +170,7 @@ export async function finishAttempt(
     uncachedInputTokens: number | null;
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
+    thoughtsTokens: number | null;
     streamStatus?: StreamStatus | null;
     firstTextDeltaMs?: number | null;
     chunkCount?: number | null;
@@ -162,7 +185,8 @@ export async function finishAttempt(
          uncached_input_tokens = $11, cache_creation_input_tokens = $12,
          cache_read_input_tokens = $13,
          stream_status = $14, first_text_delta_ms = $15,
-         chunk_count = $16, bytes_written = $17
+         chunk_count = $16, bytes_written = $17,
+         thoughts_tokens = $18
      WHERE id = $1 AND tenant_id = $2`,
     [
       input.attemptId,
@@ -182,6 +206,7 @@ export async function finishAttempt(
       input.firstTextDeltaMs ?? null,
       input.chunkCount ?? null,
       input.bytesWritten ?? null,
+      input.thoughtsTokens,
     ],
   );
   if ((attempt.rowCount ?? 0) !== 1) throw new Error('attempt was not updated');

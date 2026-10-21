@@ -1,0 +1,21 @@
+Rollback verification.
+
+Image llm-proxy:8020fb2 ran on the same database.
+Inference was off.
+No provider key was supplied.
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+schema_migrations kept versions 001 through 009.
+The Vertex rows stayed present.
+The query did not select protected_credential text.
+
+ provider |    auth_mode    |      project_id      |  location   | api_version | identity_null | has_ciphertext | endpoint_null 
+ vertex   | service_account | evidence-vertex-proj | us-central1 | v1          | t             | t              | t
+ vertex   | service_account | proof-vertex-proj    | us-central1 | v1          | t             | t              | t
+
+git diff --exit-code for migrations 001 through 008 was empty.
+The Compose app was started again on llm-proxy:slice-04b.
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+The database volume was not removed.
+The rollback container was removed.

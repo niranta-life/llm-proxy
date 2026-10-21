@@ -1,0 +1,8 @@
+Live provider smoke.
+
+The live Vertex smoke was not run.
+VERTEX_LIVE was unset.
+test/vertex-live.test.ts was skipped.
+The full suite recorded 1 skipped test.
+This slice does not claim a real Vertex call.
+A live run requires VERTEX_LIVE=1, VERTEX_PROJECT_ID, VERTEX_LOCATION, and real ADC credentials.

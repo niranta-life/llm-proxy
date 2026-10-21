@@ -17,7 +17,7 @@ export type StreamStatus = (typeof STREAM_STATUSES)[number];
 export type TerminalStreamStatus = Exclude<StreamStatus, 'connecting' | 'streaming'>;
 
 export type CanonicalEvent =
-  | { type: 'start'; id: string; model: string; created: number }
+  | { type: 'start'; id: string; model: string; created: number; providerRequestId?: string | null }
   | { type: 'text_delta'; text: string }
   | {
       type: 'usage';
@@ -27,6 +27,7 @@ export type CanonicalEvent =
       uncachedInputTokens?: number | null;
       cacheCreationInputTokens?: number | null;
       cacheReadInputTokens?: number | null;
+      thoughtsTokens?: number | null;
     }
   | { type: 'finish'; finishReason: string; nativeReason?: string };
 

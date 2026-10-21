@@ -36,7 +36,8 @@ const UNICODE = 'caf\u00e9-split';
 const ATTEMPT_GRANT = `GRANT UPDATE (
   status, error_code, duration_ms, prompt_tokens, completion_tokens, total_tokens,
   provider_request_id, stop_reason, uncached_input_tokens, cache_creation_input_tokens,
-  cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written
+  cache_read_input_tokens, stream_status, first_text_delta_ms, chunk_count, bytes_written,
+  thoughts_tokens
 ) ON model_attempts TO llm_runtime`;
 
 type Scene = (request: IncomingMessage, response: ServerResponse, hit: MockHit) => void;

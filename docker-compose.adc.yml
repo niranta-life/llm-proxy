@@ -1,0 +1,9 @@
+# Local development only.
+# Do not use a developer ADC file as production auth.
+# The image does not copy this file.
+services:
+  app:
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /var/run/gcp/adc.json
+    volumes:
+      - ${VERTEX_ADC_FILE:?set VERTEX_ADC_FILE to the ADC json path}:/var/run/gcp/adc.json:ro

@@ -1,0 +1,23 @@
+Project and location selection.
+
+The Vertex client sets vertexai to true.
+The client uses the stored project and the stored location.
+The client sets the API version from the connection.
+The stable API version is v1.
+The client sets the location host itself.
+GOOGLE_VERTEX_BASE_URL cannot redirect that host.
+global uses https://aiplatform.googleapis.com/.
+us and eu use the regional endpoint host.
+Another location uses https://LOCATION-aiplatform.googleapis.com/.
+
+Passed tests:
+- vertex client selection > selects the location host and stable API without reading the active gcloud project
+- vertex client selection > calls the configured project and location when Google environment variables point elsewhere
+- vertex client selection > checks access on the configured project and location
+- vertex chat > converts a text chat for the tenant project and records usage
+
+The chat test set GOOGLE_CLOUD_PROJECT and GOOGLE_VERTEX_BASE_URL to decoy values.
+The recorded call still used alpha-vertex-proj and us-central1.
+Those environment values were restored after the call.
+The access check requests /v1/projects/probe-vertex-proj/locations/global/models.
+That request does not use the publisher model catalog.

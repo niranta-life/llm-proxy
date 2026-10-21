@@ -1,0 +1,17 @@
+Docker build.
+
+The image was built from the clean final tree.
+Command: docker compose build app
+Image: llm-proxy-app:latest
+Tag: llm-proxy:slice-04b
+Image id: sha256:a7d4a52c78aab2a78dde75082cd4e0a2ac683d9c2fd5b3c82e2440978e35602e
+The built file dist/inference/vertex-client.js contains queryBase: false.
+The image check found no ADC file.
+Result: ADC_ABSENT
+
+The same image was started on the existing database.
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+schema_migrations contained versions 001 through 009.
+The image does not copy a credential file.
+The default Compose file does not mount a credential.

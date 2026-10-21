@@ -17,6 +17,7 @@ export type FailedAttemptFacts = {
   uncachedInputTokens: number | null;
   cacheCreationInputTokens: number | null;
   cacheReadInputTokens: number | null;
+  thoughtsTokens: number | null;
 };
 
 export function emptyAttemptFacts(): FailedAttemptFacts {
@@ -28,6 +29,7 @@ export function emptyAttemptFacts(): FailedAttemptFacts {
     uncachedInputTokens: null,
     cacheCreationInputTokens: null,
     cacheReadInputTokens: null,
+    thoughtsTokens: null,
   };
 }
 

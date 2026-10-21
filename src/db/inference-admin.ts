@@ -13,6 +13,8 @@ export type InferenceListing = {
     workspaceId: string | null;
     projectId: string | null;
     location: string | null;
+    serviceAccountIdentity: string | null;
+    apiVersion: string;
     createdAt: string;
   }>;
   deployments: Array<{
@@ -256,16 +258,18 @@ export async function registerRegistryConnection(
   input: {
     tenantId: string;
     provider: string;
-    protectedCredential: string;
+    protectedCredential: string | null;
     authMode: string;
     endpoint: string | null;
     projectId: string | null;
     location: string | null;
+    serviceAccountIdentity?: string | null;
+    apiVersion?: 'v1' | 'v1beta1';
   },
 ): Promise<{ connectionId: string; credentialVersion: number; configVersion: number }> {
   const result = await pool.query<{ connection_id: string; credential_version: number; config_version: number }>(
     `SELECT connection_id, credential_version, config_version
-     FROM register_registry_connection($1::uuid, $2, $3, $4, $5, $6, $7)`,
+     FROM register_registry_connection($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       input.tenantId,
       input.provider,
@@ -274,6 +278,8 @@ export async function registerRegistryConnection(
       input.endpoint,
       input.projectId,
       input.location,
+      input.serviceAccountIdentity ?? null,
+      input.apiVersion ?? 'v1',
     ],
   );
   const row = result.rows[0];
@@ -320,6 +326,48 @@ export async function setDeploymentHealth(
     configVersion: row.config_version,
     validationStatus: row.validation_status,
     healthStatus: row.health_status,
+  };
+}
+
+export type VertexOperatorConnection = {
+  connectionId: string;
+  projectId: string;
+  location: string;
+  authMode: string;
+  serviceAccountIdentity: string | null;
+  apiVersion: string;
+  configVersion: number;
+  credentialVersion: number;
+  protectedCredential: string | null;
+  enabled: boolean;
+};
+
+export async function loadVertexOperatorConnection(pool: Pool, tenantId: string): Promise<VertexOperatorConnection | null> {
+  const result = await pool.query<{
+    connection_id: string;
+    project_id: string;
+    location: string;
+    auth_mode: string;
+    service_account_identity: string | null;
+    api_version: string;
+    config_version: number;
+    credential_version: number;
+    protected_credential: string | null;
+    enabled: boolean;
+  }>('SELECT * FROM load_vertex_operator_connection($1::uuid)', [tenantId]);
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  return {
+    connectionId: row.connection_id,
+    projectId: row.project_id,
+    location: row.location,
+    authMode: row.auth_mode,
+    serviceAccountIdentity: row.service_account_identity,
+    apiVersion: row.api_version,
+    configVersion: row.config_version,
+    credentialVersion: row.credential_version,
+    protectedCredential: row.protected_credential,
+    enabled: row.enabled,
   };
 }
 

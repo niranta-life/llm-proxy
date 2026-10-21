@@ -5,6 +5,7 @@ import {
   invalidRequest,
   proxyError,
   safeProviderRequestId,
+  transportFor,
   type FailedAttemptFacts,
 } from './errors.js';
 import type { CanonicalEvent } from './stream.js';
@@ -398,23 +399,24 @@ function statusOf(error: unknown): number | null {
   return null;
 }
 
-export function normalizeVertexError(error: unknown, callerAborted: boolean): Error {
+export function normalizeVertexError(error: unknown, callerAborted: boolean, retryAfter: string | null = null): Error {
   if (callerAborted) {
     return proxyError(408, 'server_error', 'request_cancelled', null, 'The request was cancelled.', 'request_cancelled');
   }
   if (error instanceof Error && error.name === 'ProxyError') return error;
   const status = statusOf(error);
+  const transport = transportFor(error, status, retryAfter);
   if (status === 401) {
-    return proxyError(401, 'authentication_error', 'expired_credentials', null, 'The upstream provider rejected the credential.', 'expired_credentials');
+    return proxyError(401, 'authentication_error', 'expired_credentials', null, 'The upstream provider rejected the credential.', 'expired_credentials', undefined, transport);
   }
   if (status === 403) {
-    return proxyError(403, 'permission_error', 'permission_denied', null, 'The upstream provider denied the request.', 'permission_denied');
+    return proxyError(403, 'permission_error', 'permission_denied', null, 'The upstream provider denied the request.', 'permission_denied', undefined, transport);
   }
   if (status === 404) {
-    return proxyError(404, 'invalid_request_error', 'model_not_available', 'model', 'The model is not available.', 'model_not_available');
+    return proxyError(404, 'invalid_request_error', 'model_not_available', 'model', 'The model is not available.', 'model_not_available', undefined, transport);
   }
   if (status === 400) {
-    return proxyError(400, 'invalid_request_error', 'invalid_project', null, 'The Google Cloud project or location is not valid.', 'invalid_project');
+    return proxyError(400, 'invalid_request_error', 'invalid_project', null, 'The Google Cloud project or location is not valid.', 'invalid_project', undefined, transport);
   }
-  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
+  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.', null, undefined, transport);
 }

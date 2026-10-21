@@ -1,0 +1,38 @@
+Rollback proof.
+
+Retry is off when a deployment has no execution policy.
+An operator turns retry on for one deployment with set-execution-policy and --retries true.
+The same command with --retries false inserts a new policy and points that deployment at it.
+The old policy row stays.
+No policy row is deleted.
+No column is dropped.
+No table is dropped.
+
+The proof is the shipped chat route against a mock provider and real PostgreSQL.
+The passing full run started at 12:11:36.
+EXIT:0.
+
+With retry on, a rate limit followed by success made 2 upstream hits.
+The caller status was 200.
+
+The next command set --retries false on that same deployment.
+The next chat was a continued rate limit.
+The caller status was 429.
+The mock recorded 1 hit.
+The database stored 1 attempt.
+The failure class was rate_limit.
+The elapsed time was 81 ms.
+The duration was 1 ms.
+The expense was known.
+The amount was null.
+
+RETRY_CASE {"case":"rollback-off","status":429,"hits":1,"elapsedMs":81,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+RETRY_ROLLBACK {"enabledHits":2,"disabledHits":1,"disabledAttempts":1,"failureClass":"rate_limit"}
+
+Turning retry off stopped the next extra attempt.
+The test did not boot a container for this proof.
+This file does not claim a readiness HTTP status.
+Image 2b644cc remains the published parent.
+Its latest migration file is 012_cost_accounting.sql.
+013_execution_policy.sql is additive.
+schema_migrations keeps 012_cost_accounting.sql after 013 is applied.

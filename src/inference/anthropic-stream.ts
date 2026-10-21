@@ -1,6 +1,7 @@
 import { anthropicOrigin, mapAnthropicFinishReason, toAnthropicMessageBody } from './anthropic.js';
 import type { ProviderCall } from './contract.js';
-import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
+import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy, transportFor } from './errors.js';
 import {
   createSseDecoder,
   StreamShutdownError,
@@ -332,20 +333,21 @@ export function itemsFromAnthropicData(
   return eventsFromAnthropicEvent(parsed, cursor, permittedModel);
 }
 
-function statusFailure(status: number, aborted: boolean): ReturnType<typeof proxyError> {
+function statusFailure(status: number, aborted: boolean, retryAfter: string | null): ReturnType<typeof proxyError> {
+  const transport = transportFor(null, status, retryAfter);
   if (aborted) {
     return proxyError(408, 'server_error', 'request_cancelled', null, 'The request was cancelled.', 'request_cancelled');
   }
   if (status === 401 || status === 403) {
-    return proxyError(401, 'authentication_error', 'upstream_auth_error', null, 'The upstream provider rejected the credential.', 'authentication_error');
+    return proxyError(401, 'authentication_error', 'upstream_auth_error', null, 'The upstream provider rejected the credential.', 'authentication_error', undefined, transport);
   }
   if (status === 429) {
-    return proxyError(429, 'rate_limit_error', 'rate_limit', null, 'The upstream model request failed.', 'rate_limit_error');
+    return proxyError(429, 'rate_limit_error', 'rate_limit', null, 'The upstream model request failed.', 'rate_limit_error', undefined, transport);
   }
   if (status === 529) {
-    return proxyError(529, 'server_error', 'overloaded', null, 'The upstream provider is overloaded.', 'overloaded_error');
+    return proxyError(529, 'server_error', 'overloaded', null, 'The upstream provider is overloaded.', 'overloaded_error', undefined, transport);
   }
-  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
+  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.', null, undefined, transport);
 }
 
 export async function* streamAnthropicChat(input: {
@@ -360,6 +362,7 @@ export async function* streamAnthropicChat(input: {
   idleTimeoutMs: number;
   totalTimeoutMs: number;
   deadline: AbortController;
+  fetchImpl?: typeof fetch;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
@@ -409,7 +412,7 @@ export async function* streamAnthropicChat(input: {
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
-    const response = await fetch(url, {
+    const response = await (input.fetchImpl ?? fetch)(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -418,7 +421,8 @@ export async function* streamAnthropicChat(input: {
     clearTimeout(connectTimer);
     if (!response.ok || response.body === null) {
       await response.arrayBuffer().catch(() => undefined);
-      throw statusFailure(response.status || 502, input.signal.aborted);
+      const retryAfter = response.headers.get('retry-after');
+      throw statusFailure(response.status || 502, isCallerAbort(input.signal), retryAfter === null || retryAfter.trim() === '' ? null : retryAfter.trim());
     }
     armIdle();
     reader = response.body.getReader();
@@ -459,7 +463,9 @@ export async function* streamAnthropicChat(input: {
       }
     }
   } catch (error) {
-    if (input.signal.aborted) throw statusFailure(408, true);
+    if (isCallerAbort(input.signal)) throw statusFailure(408, true, null);
+    const kind = deadlineKindOf(input.signal);
+    if (kind !== null) throw timeoutProxy(kind);
     if (input.deadline.signal.reason instanceof StreamShutdownError) throw input.deadline.signal.reason;
     if (timedOut !== null) throw new StreamTimeoutError(timedOut);
     if (error instanceof StreamTimeoutError) throw error;
@@ -502,5 +508,6 @@ export function streamAnthropic(call: ProviderCall & { timeouts: StreamTimeouts;
     idleTimeoutMs: call.timeouts.idle,
     totalTimeoutMs: call.timeouts.total,
     deadline: call.deadline,
+    fetchImpl: call.fetchImpl,
   });
 }

@@ -7,7 +7,8 @@ import {
   servingProviderAllowed,
   type OpenRouterPolicy,
 } from './compatible.js';
-import { normalizeUpstreamError, proxyError } from './errors.js';
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
+import { normalizeUpstreamError, proxyError, timeoutProxy } from './errors.js';
 import {
   createSseDecoder,
   eventsFromOpenAiChunk,
@@ -161,9 +162,12 @@ export async function* streamOpenAiChat(input: {
     clearTimeout(connectTimer);
     if (!response.ok || response.body === null) {
       await response.arrayBuffer().catch(() => undefined);
+      const retryHeaders = new Headers();
+      const retryAfter = response.headers.get('retry-after');
+      if (retryAfter !== null && retryAfter.trim() !== '') retryHeaders.set('retry-after', retryAfter);
       throw normalizeUpstreamError(
-        APIError.generate(response.status || 502, undefined, '', undefined),
-        input.signal.aborted,
+        APIError.generate(response.status || 502, undefined, '', retryHeaders as never),
+        isCallerAbort(input.signal),
       );
     }
     armIdle();
@@ -209,7 +213,9 @@ export async function* streamOpenAiChat(input: {
       }
     }
   } catch (error) {
-    if (input.signal.aborted) throw normalizeUpstreamError(error, true);
+    if (isCallerAbort(input.signal)) throw normalizeUpstreamError(error, true);
+    const kind = deadlineKindOf(input.signal);
+    if (kind !== null) throw timeoutProxy(kind);
     if (input.deadline.signal.reason instanceof StreamShutdownError) throw input.deadline.signal.reason;
     if (timedOut !== null) throw new StreamTimeoutError(timedOut);
     if (error instanceof StreamTimeoutError) throw error;

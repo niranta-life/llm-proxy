@@ -3,13 +3,17 @@ import { streamAnthropic } from './anthropic-stream.js';
 import type { ProviderAdapter, ProviderCall } from './contract.js';
 import type { UpstreamStreamItem } from './openai-stream.js';
 import type { StreamTimeouts } from './stream.js';
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
 import {
   ProxyError,
   emptyAttemptFacts,
   invalidRequest,
   proxyError,
+  readRetryAfter,
   safeNativeReason,
   safeProviderRequestId,
+  timeoutProxy,
+  transportFor,
   type FailedAttemptFacts,
 } from './errors.js';
 import type { TokenUsage, UpstreamCompletion } from './adapter.js';
@@ -278,7 +282,7 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
   }
   if (error instanceof ProxyError) return error;
   if (error instanceof APIConnectionTimeoutError || error instanceof APIUserAbortError) {
-    return proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.', 'timeout');
+    return timeoutProxy(null);
   }
   if (error instanceof APIError) {
     const native = anthropicErrorType(error);
@@ -286,6 +290,7 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
       ...emptyAttemptFacts(),
       providerRequestId: safeProviderRequestId(error.requestID),
     };
+    const transport = transportFor(error, typeof error.status === 'number' ? error.status : null, readRetryAfter(error.headers));
     if (error.status === 401 || error.status === 403) {
       return proxyError(
         401,
@@ -295,6 +300,7 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
         'The upstream provider rejected the credential.',
         native ?? 'authentication_error',
         facts,
+        transport,
       );
     }
     if (error.status === 429) {
@@ -306,6 +312,7 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
         'The upstream model request failed.',
         native ?? 'rate_limit_error',
         facts,
+        transport,
       );
     }
     if (error.status === 529) {
@@ -317,6 +324,7 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
         'The upstream provider is overloaded.',
         native ?? 'overloaded_error',
         facts,
+        transport,
       );
     }
     return proxyError(
@@ -327,9 +335,19 @@ export function normalizeAnthropicError(error: unknown, callerAborted: boolean):
       'The upstream model request failed.',
       native,
       facts,
+      transport,
     );
   }
-  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
+  return proxyError(
+    502,
+    'server_error',
+    'upstream_error',
+    null,
+    'The upstream model request failed.',
+    null,
+    emptyAttemptFacts(),
+    transportFor(error, null, null),
+  );
 }
 
 const silentLog = {
@@ -352,15 +370,20 @@ export async function executeAnthropic(call: ProviderCall): Promise<UpstreamComp
     timeout: call.route.timeoutMs,
     logLevel: 'off',
     logger: silentLog,
+    fetch: call.fetchImpl,
     defaultHeaders: call.route.workspaceId
       ? { 'anthropic-workspace-id': call.route.workspaceId }
       : undefined,
   });
   const controller = new AbortController();
-  const abort = (): void => controller.abort();
-  if (call.signal.aborted) controller.abort();
+  const abort = (): void => {
+    if (!controller.signal.aborted) controller.abort(call.signal.reason);
+  };
+  if (call.signal.aborted) abort();
   else call.signal.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(), call.route.timeoutMs);
+  const timer = setTimeout(() => {
+    if (!controller.signal.aborted) controller.abort();
+  }, call.route.timeoutMs);
   try {
     const response = await client.messages.create(body, {
       maxRetries: 0,
@@ -369,11 +392,10 @@ export async function executeAnthropic(call: ProviderCall): Promise<UpstreamComp
     });
     return normalizeAnthropicMessage(response, Math.floor(Date.now() / 1000));
   } catch (error) {
-    if (call.signal.aborted) throw normalizeAnthropicError(error, true);
+    if (isCallerAbort(call.signal)) throw normalizeAnthropicError(error, true);
     if (error instanceof ProxyError) throw error;
-    if (controller.signal.aborted) {
-      throw proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.', 'timeout');
-    }
+    const kind = deadlineKindOf(call.signal);
+    if (kind !== null || controller.signal.aborted) throw timeoutProxy(kind ?? 'attempt');
     throw normalizeAnthropicError(error, false);
   } finally {
     clearTimeout(timer);

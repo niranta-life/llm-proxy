@@ -14,6 +14,12 @@ import {
 } from './cost.js';
 import { invalidRequest } from './errors.js';
 
+function storedCertainty(value: string | null, amount: string | null): 'none' | 'uncertain' | 'known' | null {
+  if (amount !== null) return 'known';
+  if (value === 'none' || value === 'uncertain' || value === 'known') return value;
+  return null;
+}
+
 const PROVIDERS = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
 const DEPLOYMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const STATUSES: CostStatus[] = ['estimated', 'provisional', 'reconciled', 'unknown'];
@@ -64,6 +70,7 @@ type AttemptCostRow = {
   cache_creation_input_tokens: number | null;
   cache_read_input_tokens: number | null;
   thoughts_tokens: number | null;
+  expense_certainty: string | null;
 };
 
 type PriceRow = {
@@ -247,7 +254,8 @@ export async function recordAttemptCost(
   const attempt = await client.query<AttemptCostRow>(
     `SELECT c.provider, a.upstream_model AS model, c.location, d.service_tier, a.serving_provider, a.created_at,
             a.prompt_tokens, a.completion_tokens, a.total_tokens,
-            a.uncached_input_tokens, a.cache_creation_input_tokens, a.cache_read_input_tokens, a.thoughts_tokens
+            a.uncached_input_tokens, a.cache_creation_input_tokens, a.cache_read_input_tokens, a.thoughts_tokens,
+            a.expense_certainty
      FROM model_attempts a
      JOIN model_deployments d ON d.tenant_id = a.tenant_id AND d.id = a.deployment_id
      JOIN provider_connections c ON c.tenant_id = d.tenant_id AND c.id = d.connection_id
@@ -279,12 +287,13 @@ export async function recordAttemptCost(
   const calculated = calculateCost({ provider, usage: usageFromRow(row), price: selected });
   const existing = await readExisting(client, tenantId, attemptId);
   const stored = costToStore(existing, calculated);
+  const certainty = storedCertainty(row.expense_certainty, stored.amount);
   if (existing === null) {
     await client.query(
       `INSERT INTO attempt_costs (
          tenant_id, attempt_id, price_version_id, cost_status, amount,
-         allocated_status, allocated_amount, currency
-       ) VALUES ($1, $2, $3, $4, $5::numeric, $6, $7::numeric, $8)`,
+         allocated_status, allocated_amount, currency, expense_certainty
+       ) VALUES ($1, $2, $3, $4, $5::numeric, $6, $7::numeric, $8, $9)`,
       [
         tenantId,
         attemptId,
@@ -294,6 +303,7 @@ export async function recordAttemptCost(
         stored.allocatedStatus,
         stored.allocatedAmount,
         stored.currency,
+        certainty,
       ],
     );
   }

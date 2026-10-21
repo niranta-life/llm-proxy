@@ -1,6 +1,7 @@
 import { ApiError } from '@google/genai';
 import type { ProviderAdapter, ProviderCall } from './contract.js';
-import { ProxyError, proxyError } from './errors.js';
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
+import { ProxyError, proxyError, timeoutProxy } from './errors.js';
 import type { UpstreamStreamItem } from './openai-stream.js';
 import { StreamShutdownError, StreamTimeoutError, type StreamTimeouts } from './stream.js';
 import {
@@ -55,16 +56,22 @@ function vertexSpec(call: ProviderCall): VertexClientSpec {
   };
 }
 
-function finishVertexError(spec: VertexClientSpec, error: unknown, callerAborted: boolean, timedOut: boolean): Error {
+function finishVertexError(
+  spec: VertexClientSpec,
+  error: unknown,
+  callerAborted: boolean,
+  timedOut: boolean,
+  deadlineKind: 'connection' | 'attempt' | 'total' | null,
+  retryAfter: string | null,
+): Error {
   let normalized: Error;
-  if (callerAborted) normalized = normalizeVertexError(error, true);
+  if (callerAborted) normalized = normalizeVertexError(error, true, retryAfter);
   else if (error instanceof ProxyError) normalized = error;
   else {
     const status = providerStatus(error);
-    if (status === 400 || status === 401 || status === 403 || status === 404) normalized = normalizeVertexError(error, false);
-    else if (timedOut) {
-      normalized = proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.', 'timeout');
-    } else normalized = normalizeVertexError(error, false);
+    if (status === 400 || status === 401 || status === 403 || status === 404) normalized = normalizeVertexError(error, false, retryAfter);
+    else if (timedOut) normalized = timeoutProxy(deadlineKind ?? 'attempt');
+    else normalized = normalizeVertexError(error, false, retryAfter);
   }
   if (normalized instanceof ProxyError && normalized.code === 'expired_credentials') evictVertexClient(spec);
   return normalized;
@@ -75,24 +82,43 @@ async function executeVertex(call: ProviderCall) {
   const spec = vertexSpec(call);
   const factory = call.vertexClientFactory ?? defaultVertexClientFactory;
   const controller = new AbortController();
-  const abort = (): void => controller.abort();
-  if (call.signal.aborted) controller.abort();
+  const abort = (): void => {
+    if (!controller.signal.aborted) controller.abort(call.signal.reason);
+  };
+  if (call.signal.aborted) abort();
   else call.signal.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(), call.route.timeoutMs);
+  const timer = setTimeout(() => {
+    if (!controller.signal.aborted) controller.abort();
+  }, call.route.timeoutMs);
   try {
     const client = await factory(spec);
     if (controller.signal.aborted) throw controller.signal.reason instanceof Error ? controller.signal.reason : new Error('aborted');
+    if (call.attemptTrace) call.attemptTrace.fetchEntered = true;
     const response = await raceAbort(
       client.generateContent({
         model: prepared.model,
         contents: prepared.contents,
-        config: { ...prepared.config, abortSignal: controller.signal },
+        config: {
+          ...prepared.config,
+          abortSignal: controller.signal,
+          ...(call.fetchImpl ? { httpOptions: { fetch: call.fetchImpl } } : {}),
+        },
       }),
       controller.signal,
     );
+    if (call.attemptTrace) call.attemptTrace.headersReceived = true;
+    call.onHeaders?.();
     return normalizeVertexResponse(response, Math.floor(Date.now() / 1000), call.route.upstreamModel);
   } catch (error) {
-    throw finishVertexError(spec, error, call.signal.aborted, controller.signal.aborted);
+    const kind = deadlineKindOf(call.signal);
+    throw finishVertexError(
+      spec,
+      error,
+      isCallerAbort(call.signal),
+      kind !== null || controller.signal.aborted,
+      kind,
+      call.attemptTrace?.retryAfter ?? null,
+    );
   } finally {
     clearTimeout(timer);
     call.signal.removeEventListener('abort', abort);
@@ -115,10 +141,19 @@ export const vertexAdapter: ProviderAdapter & {
     try {
       client = await factory(spec);
     } catch (error) {
-      throw finishVertexError(spec, error, call.signal.aborted, false);
+      throw finishVertexError(
+        spec,
+        error,
+        isCallerAbort(call.signal),
+        deadlineKindOf(call.signal) !== null,
+        deadlineKindOf(call.signal),
+        call.attemptTrace?.retryAfter ?? null,
+      );
     }
+    if (call.attemptTrace) call.attemptTrace.fetchEntered = true;
+    let noted = false;
     try {
-      yield* streamVertexChat({
+      for await (const item of streamVertexChat({
         client,
         request: prepared,
         signal: call.signal,
@@ -126,10 +161,20 @@ export const vertexAdapter: ProviderAdapter & {
         idleTimeoutMs: call.timeouts.idle,
         totalTimeoutMs: call.timeouts.total,
         deadline: call.deadline,
-      });
+        fetchImpl: call.fetchImpl,
+        retryAfter: () => call.attemptTrace?.retryAfter ?? null,
+      })) {
+        if (!noted) {
+          noted = true;
+          if (call.attemptTrace) call.attemptTrace.headersReceived = true;
+          call.onHeaders?.();
+        }
+        yield item;
+      }
     } catch (error) {
       if (error instanceof StreamTimeoutError || error instanceof StreamShutdownError) throw error;
-      throw finishVertexError(spec, error, call.signal.aborted, false);
+      const kind = deadlineKindOf(call.signal);
+      throw finishVertexError(spec, error, isCallerAbort(call.signal), kind !== null, kind, call.attemptTrace?.retryAfter ?? null);
     }
   },
 };

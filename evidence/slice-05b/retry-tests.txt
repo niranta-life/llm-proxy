@@ -1,0 +1,125 @@
+Retry tests from the passing full run.
+
+The run started at 12:11:36.
+The command was ./node_modules/.bin/vitest run.
+EXIT:0.
+Each line is the stored attempt row for that chat.
+Hits are upstream calls recorded by the mock.
+A deployment with no stored policy makes 1 attempt.
+An enabled policy makes at most 2 attempts.
+model=auto is the chat model on the success path.
+
+RETRY_CASE {"case":"retry-off","status":429,"hits":1,"elapsedMs":184,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":18,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"429-then-ok","status":200,"hits":2,"elapsedMs":91,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":2,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+
+RETRY_CASE {"case":"429-cap","status":429,"hits":2,"elapsedMs":91,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":5,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"503","status":502,"hits":2,"elapsedMs":76,"attempts":[{"ordinal":1,"status":"failed","failureClass":"unavailable","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"unavailable","durationMs":0,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"retry-after-valid","status":200,"hits":2,"elapsedMs":1096,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":2,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+RETRY_ELAPSED {"case":"retry-after-valid","gapMs":1024}
+
+RETRY_CASE {"case":"retry-after-invalid","status":200,"hits":2,"elapsedMs":96,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+RETRY_ELAPSED {"case":"retry-after-invalid","gapMs":27}
+
+RETRY_CASE {"case":"retry-after-exceeds","status":429,"hits":1,"elapsedMs":63,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"http-400","status":502,"hits":1,"elapsedMs":65,"attempts":[{"ordinal":1,"status":"failed","failureClass":"client_error","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"http-401","status":502,"hits":1,"elapsedMs":59,"attempts":[{"ordinal":1,"status":"failed","failureClass":"unauthorized","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"connection-on","status":502,"hits":0,"elapsedMs":353,"attempts":[{"ordinal":1,"status":"failed","failureClass":"connection_failure","durationMs":11,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"connection_failure","durationMs":1,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"connection-off","status":502,"hits":0,"elapsedMs":0,"attempts":[{"ordinal":1,"status":"failed","failureClass":"connection_failure","durationMs":2,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"timeout-before","status":504,"hits":1,"elapsedMs":342,"attempts":[{"ordinal":1,"status":"failed","failureClass":"timeout_before_dispatch","durationMs":205,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"timeout-after","status":504,"hits":1,"elapsedMs":274,"attempts":[{"ordinal":1,"status":"failed","failureClass":"timeout_after_dispatch","durationMs":201,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"total-deadline","status":504,"hits":1,"elapsedMs":282,"attempts":[{"ordinal":1,"status":"failed","failureClass":"total_deadline","durationMs":201,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"cancel-backoff","status":408,"hits":1,"elapsedMs":229,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":2,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"stream-partial","status":200,"hits":1,"elapsedMs":86,"attempts":[{"ordinal":1,"status":"failed","failureClass":"stream_started","durationMs":7,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+RETRY_CASE {"case":"concurrent","status":200,"hits":4,"elapsedMs":77,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":1,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":0,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":0,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":0,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+
+A valid Retry-After of 1 second waited 1024 ms between attempts.
+An invalid Retry-After waited 27 ms.
+That wait stayed inside the 40 ms backoff cap plus scheduling.
+A valid Retry-After of 10 seconds did not fit a 2000 ms total deadline.
+That chat made 1 attempt and returned HTTP 429.
+The elapsed time was 63 ms.
+HTTP 400 made 1 attempt.
+HTTP 401 made 1 attempt.
+The continued rate limit made 2 attempts and then stopped.
+The continued HTTP 503 made 2 attempts and then stopped.
+The caller saw HTTP 502 for that HTTP 503.
+Cancellation during backoff made 1 attempt.
+The stream that had already sent output made 1 attempt.
+Two concurrent chats made 4 hits.
+Each chat stored ordinals 1 and 2.
+No chat stored an ordinal above 2.
+
+Vertex used the shipped Google client and a local HTTP server.
+model=auto selected that deployment.
+The generateContent path contained deadline-vertex-proj.
+The client made one upstream call per attempt.
+
+VERTEX_DEADLINE {"case":"headers-inside-connection","status":200,"hits":1,"elapsedMs":1396,"headerMs":34,"bodyAfterHeaderMs":1103,"path":"/v1/projects/deadline-vertex-proj/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent","attempts":[{"ordinal":1,"status":"succeeded","failureClass":null,"dispatched":true,"expense":"known","durationMs":1165,"amount":null}]}
+
+Headers arrived in 34 ms.
+The connection deadline was 800 ms.
+The body continued for 1103 ms after those headers.
+The attempt deadline was 4000 ms.
+The caller status was 200.
+The database stored 1 attempt.
+dispatched was true.
+The expense was known.
+The amount was null.
+
+VERTEX_DEADLINE {"case":"headers-after-connection","status":504,"hits":1,"elapsedMs":452,"headerAt":null,"dispatched":false,"failureClass":"timeout_before_dispatch","expense":"none","amount":null,"durationMs":308}
+
+Headers did not arrive.
+The connection deadline was 300 ms.
+The caller status was 504.
+The elapsed time was 452 ms.
+The duration was 308 ms.
+The class was timeout_before_dispatch.
+dispatched was false.
+The expense was none.
+The amount was null.
+The database stored 1 attempt.
+
+VERTEX_RETRY_AFTER {"case":"429","status":200,"hits":2,"statuses":[429,200],"gapMs":1070,"elapsedMs":1182,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","dispatched":true,"expense":"known","amount":null,"durationMs":3},{"ordinal":2,"status":"succeeded","failureClass":null,"dispatched":true,"expense":"known","amount":null,"durationMs":6}]}
+
+A Vertex HTTP 429 carried Retry-After 1.
+Backoff was 0.
+The gap was 1070 ms.
+The elapsed time was 1182 ms.
+The first class was rate_limit.
+The second attempt succeeded.
+The caller status was 200.
+Each attempt was one upstream hit.
+
+VERTEX_RETRY_AFTER {"case":"503","status":200,"hits":2,"statuses":[503,200],"gapMs":1032,"elapsedMs":1106,"failureClass":"unavailable","amount":null}
+
+A Vertex HTTP 503 carried Retry-After 1.
+The gap was 1032 ms.
+The elapsed time was 1106 ms.
+The first class was unavailable.
+The amount was null.
+The caller status was 200.
+The upstream was hit twice.
+
+VERTEX_RETRY_AFTER {"case":"retry-after-too-long","status":502,"hits":1,"elapsedMs":73,"failureClass":"rate_limit","dispatched":true,"expense":"known","amount":null}
+
+A Vertex Retry-After of 10 seconds did not fit a 2000 ms deadline.
+The caller status was 502.
+The elapsed time was 73 ms.
+The database stored 1 attempt.
+The class was rate_limit.
+dispatched was true.
+The expense was known.
+The amount was null.

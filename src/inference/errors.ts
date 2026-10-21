@@ -1,4 +1,5 @@
 import { APIConnectionTimeoutError, APIError, APIUserAbortError } from 'openai';
+import { networkFailureKind } from './execution-policy.js';
 
 export type OpenAiErrorBody = {
   error: {
@@ -33,6 +34,53 @@ export function emptyAttemptFacts(): FailedAttemptFacts {
   };
 }
 
+export type DeadlineKindName = 'connection' | 'attempt' | 'total';
+
+export type ErrorTransport = {
+  upstreamStatus: number | null;
+  retryAfter: string | null;
+  deadlineKind: DeadlineKindName | null;
+  connectionFailure: boolean;
+  ambiguousNetwork: boolean;
+};
+
+export function emptyTransport(): ErrorTransport {
+  return {
+    upstreamStatus: null,
+    retryAfter: null,
+    deadlineKind: null,
+    connectionFailure: false,
+    ambiguousNetwork: false,
+  };
+}
+
+export function readRetryAfter(headers: unknown): string | null {
+  if (headers === null || headers === undefined || typeof headers !== 'object') return null;
+  if ('get' in headers && typeof headers.get === 'function') {
+    const value = headers.get.call(headers, 'retry-after');
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  }
+  const record = headers as Record<string, unknown>;
+  const raw = record['retry-after'] ?? record['Retry-After'];
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+export function transportFor(error: unknown, upstreamStatus: number | null, retryAfter: string | null): ErrorTransport {
+  const kind = networkFailureKind(error);
+  return {
+    upstreamStatus,
+    retryAfter,
+    deadlineKind: null,
+    connectionFailure: kind === 'connection',
+    ambiguousNetwork: kind === 'ambiguous',
+  };
+}
+
 export class ProxyError extends Error {
   readonly status: number;
   readonly errorType: string;
@@ -41,6 +89,7 @@ export class ProxyError extends Error {
 
   readonly nativeReason: string | null;
   readonly attempt: FailedAttemptFacts;
+  readonly transport: ErrorTransport;
 
   constructor(
     status: number,
@@ -50,6 +99,7 @@ export class ProxyError extends Error {
     message: string,
     nativeReason: string | null = null,
     attempt: FailedAttemptFacts = emptyAttemptFacts(),
+    transport: ErrorTransport = emptyTransport(),
   ) {
     super(message);
     this.name = 'ProxyError';
@@ -59,6 +109,7 @@ export class ProxyError extends Error {
     this.param = param;
     this.nativeReason = nativeReason;
     this.attempt = attempt;
+    this.transport = transport;
   }
 
   body(): OpenAiErrorBody {
@@ -81,8 +132,25 @@ export function proxyError(
   message: string,
   nativeReason: string | null = null,
   attempt?: FailedAttemptFacts,
+  transport?: ErrorTransport,
 ): ProxyError {
-  return new ProxyError(status, errorType, code, param, message, nativeReason, attempt ?? emptyAttemptFacts());
+  return new ProxyError(
+    status,
+    errorType,
+    code,
+    param,
+    message,
+    nativeReason,
+    attempt ?? emptyAttemptFacts(),
+    transport ?? emptyTransport(),
+  );
+}
+
+export function timeoutProxy(kind: DeadlineKindName | null): ProxyError {
+  return proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.', 'timeout', emptyAttemptFacts(), {
+    ...emptyTransport(),
+    deadlineKind: kind,
+  });
 }
 
 export function safeNativeReason(value: unknown): string | null {
@@ -104,13 +172,26 @@ export function normalizeUpstreamError(error: unknown, callerAborted: boolean): 
     return proxyError(408, 'server_error', 'request_cancelled', null, 'The request was cancelled.', 'request_cancelled');
   }
   if (error instanceof APIConnectionTimeoutError || error instanceof APIUserAbortError) {
-    return proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.', 'timeout');
+    return timeoutProxy(null);
   }
-  if (error instanceof APIError && error.status === 429) {
-    return proxyError(429, 'rate_limit_error', 'rate_limit', null, 'The upstream model request failed.');
+  if (error instanceof APIError) {
+    const transport = transportFor(error, typeof error.status === 'number' ? error.status : null, readRetryAfter(error.headers));
+    if (error.status === 429) {
+      return proxyError(429, 'rate_limit_error', 'rate_limit', null, 'The upstream model request failed.', null, emptyAttemptFacts(), transport);
+    }
+    return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.', null, emptyAttemptFacts(), transport);
   }
   if (error instanceof ProxyError) return error;
-  return proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
+  return proxyError(
+    502,
+    'server_error',
+    'upstream_error',
+    null,
+    'The upstream model request failed.',
+    null,
+    emptyAttemptFacts(),
+    transportFor(error, null, null),
+  );
 }
 
 export function safeErrorCode(code: string | null): string {

@@ -1,0 +1,135 @@
+Stored attempts and cost rows from the passing full run.
+
+The run started at 12:11:36.
+The command was ./node_modules/.bin/vitest run.
+EXIT:0.
+Each attempt is its own row.
+The cost amount is text.
+A missing amount is null.
+No row stored the amount 0.
+The operator route is GET /internal/v1/metrics/attempts.
+
+RETRY_HISTORY {"listed":2,"sample":[{"ordinal":1,"failureClass":"rate_limit","durationMs":1,"amount":null},{"ordinal":2,"failureClass":null,"durationMs":2,"amount":null}]}
+
+model=auto received HTTP 429 and then HTTP 200.
+The caller status was 200.
+The elapsed time was 91 ms.
+Attempt 1 failed as rate_limit.
+The duration was 1 ms.
+The expense was known.
+The cost status was unknown.
+The amount was null.
+Attempt 2 succeeded.
+The duration was 2 ms.
+The expense was known.
+The amount was null.
+The history list contained those 2 attempts.
+
+A continued rate limit stored 2 failed attempts.
+Both classes were rate_limit.
+The caller status was 429.
+The elapsed time was 91 ms.
+
+HTTP 503 stored 2 attempts.
+Both classes were unavailable.
+The expense was known.
+The amount was null.
+The caller status was 502.
+The elapsed time was 76 ms.
+
+A connection failure before dispatch stored 2 attempts when retry was on.
+The class was connection_failure.
+The expense was none.
+The amount was null.
+dispatched was false.
+The same failure with retry off stored 1 attempt.
+The expense was none.
+The amount was null.
+
+A timeout before dispatch stored 1 attempt.
+The class was timeout_before_dispatch.
+The duration was 205 ms.
+The elapsed time was 342 ms.
+The expense was none.
+The amount was null.
+dispatched was false.
+
+A timeout after dispatch stored 1 attempt.
+The class was timeout_after_dispatch.
+The duration was 201 ms.
+The elapsed time was 274 ms.
+The expense was uncertain.
+The cost status was unknown.
+The amount was null.
+dispatched was true.
+
+An exhausted total deadline stored 1 attempt.
+The class was total_deadline.
+The duration was 201 ms.
+The elapsed time was 282 ms.
+The expense was uncertain.
+The amount was null.
+dispatched was true.
+
+A stream that sent output and then failed stored 1 attempt.
+The class was stream_started.
+The duration was 7 ms.
+The elapsed time was 86 ms.
+The expense was uncertain.
+The amount was null.
+The caller status was 200.
+The request status was failed.
+
+Two concurrent requests stored separate ordinal pairs.
+Each pair was ordinal 1 then ordinal 2.
+The hit count was 4.
+The elapsed time was 77 ms.
+
+HTTP 400 stored 1 attempt as client_error.
+HTTP 401 stored 1 attempt as unauthorized.
+The expense on both was known.
+The amount on both was null.
+
+A Vertex chat whose headers arrived inside the connection deadline stored 1 attempt.
+The status was succeeded.
+dispatched was true.
+The expense was known.
+The amount was null.
+The duration was 1165 ms.
+The elapsed time was 1396 ms.
+Headers took 34 ms.
+The body continued 1103 ms after the headers.
+
+A Vertex chat whose headers missed the connection deadline stored 1 attempt.
+The class was timeout_before_dispatch.
+dispatched was false.
+The expense was none.
+The amount was null.
+The duration was 308 ms.
+The elapsed time was 452 ms.
+The caller status was 504.
+
+A Vertex HTTP 429 with Retry-After 1 stored 2 attempts.
+The first class was rate_limit.
+The expense was known.
+The amount was null.
+The duration was 3 ms.
+The second attempt succeeded.
+The duration was 6 ms.
+The amount was null.
+The gap was 1070 ms.
+The elapsed time was 1182 ms.
+
+A Vertex HTTP 503 with Retry-After 1 stored a first class of unavailable.
+The amount was null.
+The gap was 1032 ms.
+The elapsed time was 1106 ms.
+The caller status was 200.
+
+A Vertex Retry-After of 10 seconds stored 1 attempt.
+The class was rate_limit.
+dispatched was true.
+The expense was known.
+The amount was null.
+The elapsed time was 73 ms.
+The caller status was 502.

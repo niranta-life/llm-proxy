@@ -6,11 +6,28 @@ import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter } from './adapter.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
-import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId } from './errors.js';
+import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
 import { recordAttemptCostSafely } from './cost-store.js';
-import { finishAttempt, insertPending, markStream } from './store.js';
+import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
+import {
+  deadlineKindOf,
+  decideRetry,
+  defaultPolicy,
+  emptyAttemptTrace,
+  fetchForProvider,
+  isCallerAbort,
+  networkFailureKind,
+  policyAttempts,
+  startAttemptDeadlines,
+  startTotalDeadline,
+  waitForRetry,
+  wasDispatched,
+  type AttemptTrace,
+  type FailureInput,
+  type PolicyInput,
+} from './execution-policy.js';
 import {
   attemptStatusFor,
   initialStreamMachine,
@@ -131,13 +148,55 @@ export async function runChatStream(input: {
       throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
     }
 
-    const started = process.hrtime.bigint();
+    const requestStarted = process.hrtime.bigint();
+    const { policy, deadlinesActive } = policyFor(input.route);
+    const total = startTotalDeadline(deadlinesActive, policy.totalDeadlineMs);
     const deadline = new AbortController();
     abortShutdown = (): void => {
       shutdownState.fired = true;
       if (!deadline.signal.aborted) deadline.abort(new StreamShutdownError());
     };
     if (shutdownState.fired && !deadline.signal.aborted) deadline.abort(new StreamShutdownError());
+    let ordinal = 1;
+    try {
+    while (ordinal <= policyAttempts(policy)) {
+    if (deadlinesActive && elapsedMs(requestStarted) >= policy.totalDeadlineMs) {
+      await recordStream(input, {
+        requestId,
+        attemptId,
+        status: 'failed',
+        errorCode: 'timeout',
+        durationMs: 0,
+        usage: emptyTokenUsage(),
+        uncachedInputTokens: null,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+        providerRequestId: null,
+        stopReason: 'timeout',
+        streamStatus: 'timed_out',
+        firstTextDeltaMs: null,
+        chunkCount: 0,
+        bytesWritten: 0,
+        failureClass: 'total_deadline',
+        dispatched: false,
+        expenseCertainty: 'none',
+        closeRequest: true,
+      });
+      throw timeoutProxy('total');
+    }
+    const elapsed = elapsedMs(requestStarted);
+    const remaining = deadlinesActive ? Math.max(1, policy.totalDeadlineMs - elapsed) : input.route.timeoutMs;
+    const attemptMs = deadlinesActive ? Math.max(1, Math.min(policy.attemptDeadlineMs, remaining)) : input.route.timeoutMs;
+    const trace = emptyAttemptTrace();
+    const window = startAttemptDeadlines({
+      enabled: deadlinesActive,
+      caller: input.signal,
+      total: total.signal,
+      connectionMs: policy.connectionDeadlineMs,
+      attemptMs,
+    });
+    const started = process.hrtime.bigint();
     let machine = initialStreamMachine();
     let header: { id: string; model: string; created: number } | null = null;
     let bytesWritten = 0;
@@ -168,12 +227,14 @@ export async function runChatStream(input: {
         baseURL: transport.baseURL,
         request: input.request,
         route: input.route,
-        signal: input.signal,
+        signal: window.signal,
         timeouts,
         deadline,
         tenantId: input.tenantId,
         vertexClientFactory: input.vertexClientFactory,
-        fetchImpl: transport.fetchImpl,
+        fetchImpl: fetchForProvider(input.route.provider, transport.fetchImpl, trace, () => window.noteHeaders()),
+        attemptTrace: trace,
+        onHeaders: () => window.noteHeaders(),
       };
       const iterable =
         input.route.provider === 'anthropic'
@@ -262,6 +323,8 @@ export async function runChatStream(input: {
         machine = reduceStream(machine, { type: 'provider_failure' });
         if (error instanceof ProxyError) providerCode = error.code;
       }
+    } finally {
+      window.cancel();
     }
 
     if (machine.status === 'completed' && opened) {
@@ -284,6 +347,27 @@ export async function runChatStream(input: {
     }
     const terminal = machine.status as TerminalStreamStatus;
     const recordedCode = streamErrorCode(terminal, providerCode);
+    const failed = attemptStatusFor(terminal) === 'failed';
+    const facts = streamFailureFacts({
+      caller: input.signal,
+      attemptSignal: window.signal,
+      opened,
+      trace,
+      failure,
+      terminal,
+    });
+    const decision = failed
+      ? decideRetry({
+          policy,
+          deadlinesActive,
+          ordinal,
+          elapsedMs: elapsedMs(requestStarted),
+          nowMs: Date.now(),
+          random: Math.random,
+          failure: facts,
+        })
+      : null;
+    const retry = decision !== null && decision.retry && !opened && ordinal < policyAttempts(policy);
     await recordStream(input, {
       requestId,
       attemptId,
@@ -303,6 +387,10 @@ export async function runChatStream(input: {
       bytesWritten,
       servingModel: header?.model ?? null,
       servingProvider,
+      failureClass: decision?.failureClass ?? null,
+      dispatched: failed ? facts.dispatched : true,
+      expenseCertainty: decision?.expenseCertainty ?? 'known',
+      closeRequest: !retry,
     });
 
     if (opened) {
@@ -313,12 +401,103 @@ export async function runChatStream(input: {
       }
       return;
     }
-    throw httpError(terminal, failure);
+    if (!retry) throw httpError(terminal, failure);
+    const signals = total.signal === null ? [input.signal] : [input.signal, total.signal];
+    const slept = await waitForRetry(decision?.waitMs ?? 0, signals);
+    if (slept !== 'ok') {
+      await closeStreamRequest(input, requestId);
+      if (isCallerAbort(input.signal)) {
+        throw proxyError(408, 'server_error', 'request_cancelled', null, 'The request was cancelled.', 'request_cancelled');
+      }
+      throw timeoutProxy(deadlineKindOf(total.signal ?? undefined) ?? 'total');
+    }
+    ordinal += 1;
+    if (ordinal > policyAttempts(policy)) throw httpError(terminal, failure);
+    try {
+      attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
+        insertAttempt(client, input.tenantId, requestId, input.route, ordinal),
+      );
+      await withTenant(input.runtimePool, input.tenantId, (client) =>
+        markStream(client, { tenantId: input.tenantId, attemptId, streamStatus: 'connecting' }),
+      );
+    } catch (error) {
+      await closeStreamRequest(input, requestId);
+      if (error instanceof ProxyError) throw error;
+      input.logger.error('request persistence failed', { message: errorMessage(error) });
+      throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+    }
+    }
+    throw proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
+    } finally {
+      total.cancel();
+    }
   } finally {
     apiKey = '';
     untrack();
     input.gate.release(input.tenantId);
     await transport.release();
+  }
+}
+
+function policyFor(route: ResolvedRoute): { policy: PolicyInput; deadlinesActive: boolean } {
+  const stored = route.executionPolicy ?? null;
+  if (stored === null) return { policy: defaultPolicy(route.timeoutMs), deadlinesActive: false };
+  return { policy: stored, deadlinesActive: true };
+}
+
+function emptyTokenUsage(): { promptTokens: null; completionTokens: null; totalTokens: null } {
+  return { promptTokens: null, completionTokens: null, totalTokens: null };
+}
+
+function streamFailureFacts(input: {
+  caller: AbortSignal;
+  attemptSignal: AbortSignal;
+  opened: boolean;
+  trace: AttemptTrace;
+  failure: unknown;
+  terminal: TerminalStreamStatus;
+}): FailureInput {
+  const proxy = input.failure instanceof ProxyError ? input.failure : null;
+  const network = networkFailureKind(input.failure);
+  const deadlineKind = deadlineKindOf(input.attemptSignal) ?? proxy?.transport.deadlineKind ?? null;
+  const timedOut =
+    input.terminal === 'timed_out' || proxy?.code === 'timeout' || deadlineKind !== null || input.failure instanceof StreamTimeoutError;
+  const httpStatus = proxy?.transport.upstreamStatus ?? null;
+  const connectionFailure = proxy?.transport.connectionFailure === true || network === 'connection';
+  const ambiguousNetwork = proxy?.transport.ambiguousNetwork === true || network === 'ambiguous';
+  return {
+    callerAborted: input.terminal === 'client_aborted' || isCallerAbort(input.caller),
+    outputStarted: input.opened,
+    dispatched: wasDispatched({
+      fetchEntered: input.trace.fetchEntered,
+      headersReceived: input.trace.headersReceived,
+      httpStatus,
+      connectionFailure,
+      ambiguousNetwork,
+      timedOut,
+      deadlineKind,
+    }),
+    timedOut,
+    deadlineKind,
+    httpStatus,
+    retryAfter: proxy?.transport.retryAfter ?? null,
+    connectionFailure,
+    ambiguousNetwork,
+  };
+}
+
+async function closeStreamRequest(
+  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  requestId: string,
+): Promise<void> {
+  try {
+    await withTenant(input.runtimePool, input.tenantId, (client) => finishRequest(client, input.tenantId, requestId, 'failed'));
+  } catch (error) {
+    input.logger.error('attempt result was not recorded', {
+      severity: 'critical',
+      requestId,
+      message: errorMessage(error),
+    });
   }
 }
 
@@ -361,6 +540,10 @@ async function recordStream(
     bytesWritten: number;
     servingModel?: string | null;
     servingProvider?: string | null;
+    failureClass?: string | null;
+    dispatched?: boolean;
+    expenseCertainty?: 'none' | 'uncertain' | 'known' | null;
+    closeRequest?: boolean;
   },
 ): Promise<void> {
   try {
@@ -385,6 +568,10 @@ async function recordStream(
         bytesWritten: result.bytesWritten,
         servingModel: result.servingModel ?? null,
         servingProvider: result.servingProvider ?? null,
+        failureClass: result.failureClass ?? null,
+        dispatched: result.dispatched ?? false,
+        expenseCertainty: result.expenseCertainty ?? null,
+        closeRequest: result.closeRequest,
       });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });

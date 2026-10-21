@@ -8,7 +8,7 @@ import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
-import { listVisibleModels, summarizeMetrics } from '../inference/store.js';
+import { listAttemptHistory, listVisibleModels, summarizeMetrics } from '../inference/store.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
 import type { Logger } from '../logger.js';
@@ -263,6 +263,30 @@ export function buildApp(deps: AppDeps): ProxyApp {
     } catch (error) {
       if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
       deps.logger.error('cost read failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
+
+  app.get<{
+    Querystring: { from?: string; to?: string; provider?: string; deployment?: string; model?: string };
+  }>('/internal/v1/metrics/attempts', async (request, reply) => {
+    const tenantId = await rejectUnauthenticated(request, reply);
+    if (tenantId === null) return;
+    try {
+      const window = parseMetricsWindow(request.query.from, request.query.to);
+      const filters = parseCostFilters(request.query);
+      const attempts = await withTenant(deps.runtimePool, tenantId, (client) =>
+        listAttemptHistory(client, window.from, window.to, filters),
+      );
+      return {
+        window: { from: window.from.toISOString(), to: window.to.toISOString() },
+        attempts,
+      };
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('attempt history read failed', { message: errorMessage(error) });
       return reply
         .code(500)
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());

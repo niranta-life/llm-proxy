@@ -41,6 +41,7 @@ export type VertexGenerateRequest = {
     stopSequences?: string[];
     abortSignal?: AbortSignal;
     automaticContinuation: false;
+    httpOptions?: { fetch?: typeof fetch };
   };
 };
 

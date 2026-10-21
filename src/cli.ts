@@ -29,6 +29,7 @@ import { prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
+import { setDeploymentExecutionPolicy } from './db/execution-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
@@ -108,6 +109,12 @@ type Flags = {
   'request-fee'?: string;
   'allocated-rate'?: string;
   'attempt-id'?: string;
+  retries?: string;
+  'connection-deadline-ms'?: string;
+  'attempt-deadline-ms'?: string;
+  'total-deadline-ms'?: string;
+  'initial-backoff-ms'?: string;
+  'max-backoff-ms'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -119,6 +126,13 @@ function parseEnabled(value: string | undefined): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function parsePolicyMs(value: string | undefined, minimum: number): number | undefined {
+  if (value === undefined || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > 600000) return undefined;
+  return parsed;
 }
 
 function parseTimeout(value: string | undefined): number | null | undefined {
@@ -347,6 +361,12 @@ async function main(): Promise<void> {
         'request-fee': { type: 'string' },
         'allocated-rate': { type: 'string' },
         'attempt-id': { type: 'string' },
+        retries: { type: 'string' },
+        'connection-deadline-ms': { type: 'string' },
+        'attempt-deadline-ms': { type: 'string' },
+        'total-deadline-ms': { type: 'string' },
+        'initial-backoff-ms': { type: 'string' },
+        'max-backoff-ms': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -381,6 +401,12 @@ async function main(): Promise<void> {
       && command !== 'set-deployment-service-tier'
     )
     || (values['attempt-id'] !== undefined && command !== 'reconcile-attempt-cost')
+    || (values.retries !== undefined && command !== 'set-execution-policy')
+    || (values['connection-deadline-ms'] !== undefined && command !== 'set-execution-policy')
+    || (values['attempt-deadline-ms'] !== undefined && command !== 'set-execution-policy')
+    || (values['total-deadline-ms'] !== undefined && command !== 'set-execution-policy')
+    || (values['initial-backoff-ms'] !== undefined && command !== 'set-execution-policy')
+    || (values['max-backoff-ms'] !== undefined && command !== 'set-execution-policy')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');
@@ -922,6 +948,46 @@ async function main(): Promise<void> {
       }
       const reconciled = await reconcileAttemptCost(pool, tenantId, attemptId);
       process.stdout.write(`${JSON.stringify(reconciled)}\n`);
+      return;
+    }
+
+    if (command === 'set-execution-policy') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const retriesEnabled = parseEnabled(values.retries);
+      const connectionDeadlineMs = parsePolicyMs(values['connection-deadline-ms'], 100);
+      const attemptDeadlineMs = parsePolicyMs(values['attempt-deadline-ms'], 100);
+      const totalDeadlineMs = parsePolicyMs(values['total-deadline-ms'], 100);
+      const initialBackoffMs = parsePolicyMs(values['initial-backoff-ms'], 0);
+      const maxBackoffMs = parsePolicyMs(values['max-backoff-ms'], 0);
+      if (
+        tenantId === undefined
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+        || name === 'auto'
+        || retriesEnabled === undefined
+        || connectionDeadlineMs === undefined
+        || attemptDeadlineMs === undefined
+        || totalDeadlineMs === undefined
+        || initialBackoffMs === undefined
+        || maxBackoffMs === undefined
+        || initialBackoffMs > maxBackoffMs
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const policyId = await setDeploymentExecutionPolicy(
+        pool,
+        tenantId,
+        name,
+        retriesEnabled,
+        connectionDeadlineMs,
+        attemptDeadlineMs,
+        totalDeadlineMs,
+        initialBackoffMs,
+        maxBackoffMs,
+      );
+      process.stdout.write(`${JSON.stringify({ policyId, retriesEnabled })}\n`);
       return;
     }
 

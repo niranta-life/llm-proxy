@@ -1,4 +1,5 @@
 import type { RegistryProviderName } from './contract.js';
+import type { StoredExecutionPolicy } from './execution-policy.js';
 
 export type DeploymentCandidate = {
   id: string;
@@ -31,6 +32,7 @@ export type DeploymentCandidate = {
   allowFallbacks: boolean | null;
   requireServingProvider: boolean;
   maxConcurrency: number | null;
+  executionPolicy?: StoredExecutionPolicy | null;
 };
 
 export type AliasCandidate = {
@@ -68,6 +70,7 @@ export type ResolvedRoute = {
   allowFallbacks: boolean | null;
   requireServingProvider: boolean;
   maxConcurrency: number | null;
+  executionPolicy?: StoredExecutionPolicy | null;
 };
 
 export function resolveModel(
@@ -110,5 +113,6 @@ export function resolveModel(
     allowFallbacks: deployment.allowFallbacks ?? null,
     requireServingProvider: deployment.requireServingProvider ?? false,
     maxConcurrency: deployment.maxConcurrency ?? null,
+    executionPolicy: deployment.executionPolicy ?? null,
   };
 }

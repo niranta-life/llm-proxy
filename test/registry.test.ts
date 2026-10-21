@@ -82,6 +82,7 @@ describe('provider registry', () => {
       '010_compatible_providers.sql',
       '011_private_endpoint.sql',
       '012_cost_accounting.sql',
+      '013_execution_policy.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -95,6 +96,8 @@ describe('provider registry', () => {
     expect(privateEndpoint).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const costAccounting = readFileSync(join(projectRoot, 'migrations', '012_cost_accounting.sql'), 'utf8');
     expect(costAccounting).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    const executionPolicy = readFileSync(join(projectRoot, 'migrations', '013_execution_policy.sql'), 'utf8');
+    expect(executionPolicy).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

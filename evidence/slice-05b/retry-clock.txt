@@ -1,0 +1,66 @@
+Fake-clock decisions from the passing full run.
+
+The run started at 12:11:36.
+The command was ./node_modules/.bin/vitest run.
+EXIT:0.
+The decisions come from the shipped decideRetry function.
+The wait uses the shipped waitForRetry function.
+A fake timer advanced the backoff.
+
+RETRY_CLOCK {"case":"jitter-cap","waitMs":49,"retry":true}
+
+The remaining total time was 100 ms.
+The connection deadline was 50 ms.
+The attempt deadline was 80 ms.
+random() was 0.99.
+The wait was 49 ms.
+The wait stayed inside every deadline.
+
+A random() value of 1 produced a wait of 99 ms on a 100 ms cap.
+The wait did not reach the cap.
+
+RETRY_CLOCK {"case":"invalid-retry-after","waitMs":20}
+
+The header was "soon".
+The initial backoff was 40 ms.
+The max backoff was 40 ms.
+random() was 0.5.
+The wait was 20 ms.
+The invalid header did not add time beyond that backoff.
+
+RETRY_CLOCK {"case":"retry-after","deltaSeconds":2000,"httpDate":2000,"equalRemainingStops":false}
+
+A delta-seconds header of 2 waited 2000 ms.
+An HTTP date 2 seconds ahead waited 2000 ms.
+A valid header equal to the total deadline did not retry.
+equalRemainingStops was false.
+The failure class stayed rate_limit.
+
+RETRY_CLOCK {"case":"stops","classes":["cancelled","stream_started","client_error","unauthorized","timeout_before_dispatch","timeout_after_dispatch","ambiguous_network"],"total":"total_deadline","limit":"attempt_limit","disabled":"retries_disabled"}
+
+Each of those classes returned retry false and a wait of 0.
+A caller cancellation classified as cancelled.
+Output that had started classified as stream_started.
+HTTP 400 classified as client_error.
+HTTP 401 classified as unauthorized.
+A timeout before dispatch classified as timeout_before_dispatch.
+A timeout after dispatch classified as timeout_after_dispatch.
+An ambiguous network failure after dispatch classified as ambiguous_network.
+An elapsed time equal to the total deadline classified as total_deadline.
+Ordinal 2 with a limit of 2 classified as attempt_limit.
+A disabled policy with deadlines inactive stayed rate_limit.
+That case did not classify as total_deadline.
+The stop reason was retries_disabled.
+
+A connection failure before dispatch retried.
+The expense was none.
+A timeout after dispatch did not retry.
+The expense was uncertain.
+
+The backoff abort test resolved aborted when the caller signal aborted.
+A 1000 ms wait with no signal resolved ok after the fake clock advanced 1000 ms.
+
+The shipped OpenAI client and the shipped Anthropic client keep maxRetries at 0.
+The test keeps provider SDK retries off in the shipped clients passed.
+The Vertex client did not set retryOptions.
+A Vertex 429 and a Vertex 503 each produced one upstream hit per attempt.

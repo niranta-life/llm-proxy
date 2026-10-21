@@ -1,4 +1,5 @@
 import type { UpstreamCompletion } from './adapter.js';
+import type { AttemptTrace } from './execution-policy.js';
 import type { ResolvedRoute } from './resolve.js';
 import type { ChatRequest } from './validate.js';
 import type { VertexClientFactory } from './vertex-client.js';
@@ -20,6 +21,8 @@ export type ProviderCall = {
   tenantId: string;
   vertexClientFactory?: VertexClientFactory;
   fetchImpl?: typeof fetch;
+  attemptTrace?: AttemptTrace;
+  onHeaders?: () => void;
 };
 
 export type ProviderAdapter = {

@@ -1,0 +1,70 @@
+Full regression results.
+
+Node was v24.22.0.
+Vitest was v3.2.7.
+The command was ./node_modules/.bin/vitest run from llm-proxy.
+VERTEX_LIVE was unset.
+XAI_LIVE was unset.
+OPENROUTER_LIVE was unset.
+tsc --noEmit exited 0 before these runs.
+
+Five full runs failed before the passing run.
+The run at 11:39:38 failed 1 test.
+Test Files 1 failed | 36 passed | 2 skipped (39).
+Tests 1 failed | 220 passed | 3 skipped (224).
+Duration 310.57s.
+EXIT:1.
+The failed assertion was test/stream-production.test.ts:763.
+The assertion was expect(slowStopped || slowWrites < 24).toBe(true).
+
+The run at 11:45:06 failed that same assertion.
+Test Files 1 failed | 36 passed | 2 skipped (39).
+Tests 1 failed | 220 passed | 3 skipped (224).
+Duration 314.20s.
+EXIT:1.
+
+The run at 11:50:57 failed that same assertion.
+Test Files 1 failed | 36 passed | 2 skipped (39).
+Tests 1 failed | 220 passed | 3 skipped (224).
+Duration 308.60s.
+EXIT:1.
+
+The run at 11:59:08 failed 2 tests.
+Test Files 2 failed | 35 passed | 2 skipped (39).
+Tests 2 failed | 219 passed | 3 skipped (224).
+Duration 319.77s.
+EXIT:1.
+One failure was the same stream-production assertion.
+The other was test/vertex-chat.test.ts waiting for client_aborted.
+The stored stream status was timed_out.
+That test passed in the other full runs.
+
+The run at 12:05:10 failed only the stream-production assertion.
+Test Files 1 failed | 36 passed | 2 skipped (39).
+Tests 1 failed | 220 passed | 3 skipped (224).
+Duration 324.24s.
+EXIT:1.
+
+That stream-production check is the existing slow consumer slot check.
+The assertion was not changed.
+An isolated run of that test passed.
+The retry tests passed in every full run.
+The Vertex deadline tests passed in every full run.
+
+The passing full run started at 12:11:36.
+Test Files 37 passed | 2 skipped (39).
+Tests 221 passed | 3 skipped (224).
+Duration 300.24s.
+EXIT:0.
+
+The skipped tests were the existing live suites.
+test/compatible-live.test.ts skipped the xAI live call because XAI_LIVE was unset.
+test/compatible-live.test.ts skipped the OpenRouter live call because OPENROUTER_LIVE was unset.
+test/vertex-live.test.ts skipped the Vertex live call because VERTEX_LIVE was unset.
+
+The new tests passed and were not skipped.
+test/execution-policy.test.ts passed 9 tests.
+test/retry-policy.test.ts passed 13 tests.
+test/vertex-deadline.test.ts passed 5 tests.
+The clock tests use a fake timer.
+The chat tests use mock providers or a local Vertex HTTP server and real PostgreSQL.

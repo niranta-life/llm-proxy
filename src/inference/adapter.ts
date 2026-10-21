@@ -8,7 +8,8 @@ import {
   routePolicy,
 } from './compatible.js';
 import type { ProviderAdapter, ProviderCall } from './contract.js';
-import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId } from './errors.js';
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
+import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import { streamOpenAiChat, type UpstreamStreamItem } from './openai-stream.js';
 import type { StreamTimeouts } from './stream.js';
 import type { ChatMessage } from './validate.js';
@@ -154,10 +155,14 @@ export async function completeChat(input: {
     ...(input.defaultHeaders ? { defaultHeaders: input.defaultHeaders } : {}),
   });
   const controller = new AbortController();
-  const abort = (): void => controller.abort();
-  if (input.signal.aborted) controller.abort();
+  const abort = (): void => {
+    if (!controller.signal.aborted) controller.abort(input.signal.reason);
+  };
+  if (input.signal.aborted) abort();
   else input.signal.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(), input.timeoutMs);
+  const timer = setTimeout(() => {
+    if (!controller.signal.aborted) controller.abort();
+  }, input.timeoutMs);
   try {
     const response = await client.chat.completions.create(
       toOpenAiChatBody({
@@ -174,12 +179,11 @@ export async function completeChat(input: {
       servingProvider: readReportedProvider(response, input.parseRouterMetadata === true),
     };
   } catch (error) {
-    if (input.signal.aborted) throw normalizeUpstreamError(error, true);
+    if (isCallerAbort(input.signal)) throw normalizeUpstreamError(error, true);
     if (error instanceof ProxyError) throw error;
     if (error instanceof Error && error.cause instanceof ProxyError) throw error.cause;
-    if (controller.signal.aborted) {
-      throw proxyError(504, 'server_error', 'timeout', null, 'The upstream model request timed out.');
-    }
+    const kind = deadlineKindOf(input.signal);
+    if (kind !== null || controller.signal.aborted) throw timeoutProxy(kind ?? 'attempt');
     throw normalizeUpstreamError(error, false);
   } finally {
     clearTimeout(timer);
@@ -203,7 +207,7 @@ export const openAiAdapter: ProviderAdapter & {
       timeoutMs: call.route.timeoutMs,
       signal: call.signal,
       optional: compatibleRequestFields(call.route.provider, policy, call.request.optional),
-      fetchImpl: compatible ? call.fetchImpl : undefined,
+      fetchImpl: call.fetchImpl,
       ...(call.route.provider === 'openrouter'
         ? {
             defaultHeaders: { [OPENROUTER_METADATA_HEADER]: OPENROUTER_METADATA_VALUE },
@@ -237,7 +241,7 @@ export const openAiAdapter: ProviderAdapter & {
       idleTimeoutMs: call.timeouts.idle,
       totalTimeoutMs: call.timeouts.total,
       deadline: call.deadline,
-      fetchImpl: compatible ? call.fetchImpl : undefined,
+      fetchImpl: call.fetchImpl,
       identity: call.route.provider === 'openrouter' ? policy : undefined,
     });
   },

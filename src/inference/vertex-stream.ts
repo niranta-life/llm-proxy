@@ -1,3 +1,5 @@
+import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
+import { timeoutProxy } from './errors.js';
 import { normalizeVertexError } from './vertex-convert.js';
 import type { VertexGenerateClient, VertexGenerateRequest } from './vertex-client.js';
 import type { UpstreamStreamItem } from './openai-stream.js';
@@ -44,6 +46,8 @@ export async function* streamVertexChat(input: {
   idleTimeoutMs: number;
   totalTimeoutMs: number;
   deadline: AbortController;
+  fetchImpl?: typeof fetch;
+  retryAfter?: () => string | null;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
@@ -80,7 +84,11 @@ export async function* streamVertexChat(input: {
   const request: VertexGenerateRequest = {
     model: input.request.model,
     contents: input.request.contents,
-    config: { ...input.request.config, abortSignal: controller.signal },
+    config: {
+      ...input.request.config,
+      abortSignal: controller.signal,
+      ...(input.fetchImpl ? { httpOptions: { fetch: input.fetchImpl } } : {}),
+    },
   };
 
   let iterator: AsyncIterator<unknown> | null = null;
@@ -107,11 +115,14 @@ export async function* streamVertexChat(input: {
     if (cursor.finished) yield { type: 'done' };
     else yield { type: 'closed' };
   } catch (error) {
-    if (input.signal.aborted) throw normalizeVertexError(error, true);
+    const retryAfter = input.retryAfter?.() ?? null;
+    if (isCallerAbort(input.signal)) throw normalizeVertexError(error, true, retryAfter);
+    const kind = deadlineKindOf(input.signal);
+    if (kind !== null) throw timeoutProxy(kind);
     if (input.deadline.signal.reason instanceof StreamShutdownError) throw input.deadline.signal.reason;
     if (timedOut !== null) throw new StreamTimeoutError(timedOut);
     if (error instanceof StreamTimeoutError) throw error;
-    throw normalizeVertexError(error, false);
+    throw normalizeVertexError(error, false, retryAfter);
   } finally {
     clearTimeout(connectTimer);
     clearTimeout(totalTimer);

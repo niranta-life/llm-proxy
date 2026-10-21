@@ -56,8 +56,10 @@ You can revoke a tenant key.
 
 The proxy accepts 1 text chat completion for 1 tenant.
 The proxy returns that completion in 1 response.
-The proxy sends the request 1 time to the OpenAI model for that tenant.
+The proxy sends the request 1 time to the OpenAI model for that tenant when retry is off.
 The proxy records the attempt, the duration, and the token counts from the provider.
+A failure after the request was sent can be an uncertain expense.
+A missing usage count is not stored as zero.
 The proxy returns an OpenAI chat completion.
 The proxy returns the model list for that tenant.
 The proxy returns metric totals for a time window.
@@ -78,7 +80,8 @@ The proxy can stream a text chat for an enabled Vertex deployment.
 The same caller can use each of those deployments.
 The caller changes only the model.
 Streaming stays off until that tenant and that deployment both have streaming enabled.
-One accepted stream makes one upstream attempt.
+One accepted stream makes one upstream attempt when retry is off.
+A stream that has sent output does not start another attempt.
 
 The metric totals for a time window include the stream request count.
 Those totals include the completed, cancelled, failed, and truncated stream counts.
@@ -553,7 +556,8 @@ A deployment uses the same capability list as an OpenAI deployment.
 Do not pass `--default-max-output-tokens` for xAI.
 Do not pass an OpenRouter routing flag for xAI.
 The proxy does not send `X-OpenRouter-Metadata` to xAI.
-The proxy does not send the request again after an error.
+The proxy sends the request again only when that deployment has retry enabled.
+That second attempt uses the same provider and the same deployment.
 The proxy does not switch the model after an error.
 The proxy does not switch the provider after a stream starts.
 
@@ -612,7 +616,8 @@ The proxy can read that name on the final stream chunk.
 A complete stream then ends with `[DONE]`.
 A required provider that the response does not name does not succeed.
 A reported provider outside the stored list does not succeed.
-The proxy does not send the request again after an error.
+The proxy sends the request again only when that deployment has retry enabled.
+That second attempt uses the same provider and the same deployment.
 The proxy does not choose a second model.
 Those 4 flags are invalid on a provider other than OpenRouter.
 
@@ -851,10 +856,10 @@ The proxy maps each Anthropic stop reason to these values:
 - `max_tokens` and `model_context_window_exceeded` become `length`.
 - `refusal` becomes `content_filter`.
 
-The proxy sends 1 request to the selected provider.
+The proxy sends 1 request to the selected provider when retry is off.
 `maxRetries` is `0`.
-A stream uses 1 provider request.
-The proxy does not send that stream request again.
+A stream uses 1 provider request when retry is off.
+The proxy does not send that stream request again after output starts.
 The proxy uses the timeout on the deployment.
 OpenAI uses `OPENAI_BASE_URL`.
 Anthropic uses the endpoint on the connection.
@@ -1035,6 +1040,18 @@ The route returns records for that tenant.
 A stored amount keeps the price version that was in force for that attempt.
 A missing price does not change the chat completion.
 A cost recording error does not change the chat completion.
+A failure after the request was sent can be an uncertain expense.
+A missing usage count is not stored as zero.
+
+`GET /internal/v1/metrics/attempts` uses the same tenant headers.
+The query must contain `from` and `to`.
+The query can contain `provider`, `deployment`, and `model`.
+The body lists each attempt in that window.
+Each item contains the attempt, the request, the ordinal, the failure class, the duration, and the expense certainty.
+The item contains `dispatched`.
+A cost amount in that list is text.
+A missing amount is null.
+Each attempt is one row.
 You record a price with the CLI.
 The proxy does not embed a public price list.
 You supply each rate.
@@ -1605,6 +1622,66 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`013_execution_policy.sql` stores a retry policy and attempt history columns.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `012`.
+
+The image `2b644cc` stays ready on this database.
+Its latest migration file is `012_cost_accounting.sql`.
+After `013_execution_policy.sql` is applied, `schema_migrations` keeps `012_cost_accounting.sql`.
+The readiness route on that image checks for `012_cost_accounting.sql`.
+A later file does not remove that row.
+
+Retry stays off until you set `--retries true` on one deployment.
+An enabled policy makes at most 2 upstream attempts.
+That second attempt uses the same provider and the same deployment.
+The proxy does not switch the model after an error.
+A rate limit and an unavailable response can use the second attempt.
+A connection failure before the request is sent can use the second attempt.
+Another HTTP status does not use the second attempt.
+A client cancellation does not use the second attempt.
+A stream that has sent output does not use the second attempt.
+A timeout before the request is sent does not use the second attempt.
+A timeout after the request is sent does not use the second attempt.
+An exhausted total deadline does not use the second attempt.
+An ambiguous network failure after the request is sent does not use the second attempt.
+A response header ends the connection deadline.
+The response body can still finish inside the attempt deadline.
+A valid Retry-After is used only when the wait fits the remaining deadlines.
+An invalid Retry-After does not add wait beyond the bounded backoff.
+A dispatched failure without usage is an uncertain expense.
+The amount for that expense stays null.
+A missing usage count is not stored as zero.
+The proxy keeps Retry-After from the HTTP response.
+Each provider client sets `maxRetries` to `0`.
+A deployment with no stored policy uses the deployment timeout.
+That deployment does not arm a separate deadline.
+A stored policy arms the connection deadline, the attempt deadline, and the total deadline.
+Retry can stay off while those deadlines stay on.
+For a response that is not a stream, the stored attempt deadline is the provider timeout.
+A stream keeps the deployment timeout.
+A stream keeps the stream timers.
+A deadline is an integer from 100 through 600000.
+A backoff is an integer from 0 through 600000.
+The initial backoff cannot be above the maximum backoff.
+The unit is milliseconds.
+You disable retry with `set-execution-policy` and `--retries false`.
+The next request sends 1 attempt.
+Do not delete a policy row to roll back.
+
+```bash
+docker compose run --rm app node dist/cli.js set-execution-policy \
+  --tenant-id <tenant-id> \
+  --deployment <name> \
+  --retries false \
+  --connection-deadline-ms 30000 \
+  --attempt-deadline-ms 30000 \
+  --total-deadline-ms 30000 \
+  --initial-backoff-ms 0 \
+  --max-backoff-ms 0
+```
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1756,7 +1833,8 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The proxy does not accept an image.
 - The proxy does not accept audio.
 - The proxy does not send the request to a second provider.
-- The proxy does not send the request again after an error.
+- The proxy sends 1 attempt when retry is off.
+- An enabled retry can send 1 more attempt to the same deployment.
 - The proxy does not select a deployment by a quality score.
 - Anthropic accepts 1 system message, and that message must be first.
 - Anthropic accepts a user message and an assistant message as text.
@@ -1773,8 +1851,26 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The proxy records a cache count on the attempt only when Anthropic sends that count.
 - The proxy does not invent a cache count.
 - Public `usage` has the 3 OpenAI token fields.
-- The proxy sends 1 attempt for each request that it accepts.
-- The schema permits one more attempt row for the same request.
+- The proxy sends 1 attempt for each accepted request when retry is off.
+- An enabled retry permits 2 attempts for that request.
+- That second attempt uses the same provider and the same deployment.
+- A rate limit and an unavailable response can use the second attempt.
+- A connection failure before the request is sent can use the second attempt.
+- Another HTTP status does not use the second attempt.
+- A client cancellation does not use the second attempt.
+- A stream that has sent output does not use the second attempt.
+- A timeout before the request is sent does not use the second attempt.
+- A timeout after the request is sent does not use the second attempt.
+- An exhausted total deadline does not use the second attempt.
+- An ambiguous network failure after the request is sent does not use the second attempt.
+- A response header ends the connection deadline.
+- The response body can still finish inside the attempt deadline.
+- A valid Retry-After is used only when the wait fits the remaining deadlines.
+- An invalid Retry-After does not add wait beyond the bounded backoff.
+- A dispatched failure without usage is an uncertain expense.
+- The amount for that expense stays null.
+- A missing usage count is not stored as zero.
+- The schema permits 2 attempt rows for the same request.
 - The proxy records an estimated cost for each attempt.
 - The proxy does not take a payment.
 - The proxy does not set a maximum number of requests.
@@ -1835,7 +1931,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - Input that is not text.
 - A tool call.
 - A second provider after an error.
-- A second send after an error.
+- An automatic retry for every error.
 - Selection of a deployment by a quality score.
 - OAuth, a login, saved caller state, and a user account.
 - An HTTP route that revokes a tenant key.

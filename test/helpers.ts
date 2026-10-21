@@ -102,6 +102,7 @@ export async function createTestApp(
     vertexClientFactory?: import('../src/inference/vertex-client.js').VertexClientFactory;
     compatibleFetch?: typeof fetch;
     privateResolve?: (host: string) => Promise<readonly string[]>;
+    now?: () => number;
   } = {},
 ) {
   const config = configFor(db);
@@ -121,6 +122,7 @@ export async function createTestApp(
     vertexClientFactory: options.vertexClientFactory,
     compatibleFetch: options.compatibleFetch,
     privateResolve: options.privateResolve,
+    now: options.now,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

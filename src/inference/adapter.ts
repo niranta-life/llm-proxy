@@ -243,6 +243,8 @@ export const openAiAdapter: ProviderAdapter & {
       deadline: call.deadline,
       fetchImpl: call.fetchImpl,
       identity: call.route.provider === 'openrouter' ? policy : undefined,
+      onDispatched: call.onDispatched,
+      stringBody: compatible,
     });
   },
 };

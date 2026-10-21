@@ -1,0 +1,17 @@
+Replica coordination.
+
+Two processes shared one database and one mock provider.
+The breaker allowed one probe.
+One chat reached the upstream.
+The other chat failed fast.
+The breaker then closed.
+
+BREAKER_CASE {"case":"replica-probes","hits":["/v1/chat/completions"],"results":[{"status":200,"code":null},{"status":503,"code":"circuit_open"}],"state":"closed","reason":"probe_succeeded"}
+
+A new process on the same database still failed fast while the breaker was open.
+The mock hit count did not grow.
+BREAKER_CASE {"case":"restart","restarted":{"status":503,"code":"circuit_open"},"hits":3,"before":3,"state":"open","changedAt":"2026-01-15T00:00:00.000Z"}
+
+The same dedicated run started at 13:08:22.
+Tests 22 passed.
+EXIT:0.

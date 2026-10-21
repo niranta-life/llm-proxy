@@ -29,6 +29,7 @@ import { prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
+import { resetDeploymentBreaker, setDeploymentBreaker } from './db/breaker.js';
 import { setDeploymentExecutionPolicy } from './db/execution-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
@@ -115,6 +116,11 @@ type Flags = {
   'total-deadline-ms'?: string;
   'initial-backoff-ms'?: string;
   'max-backoff-ms'?: string;
+  'window-ms'?: string;
+  'min-samples'?: string;
+  'failure-threshold'?: string;
+  'cooldown-ms'?: string;
+  'max-probes'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -126,6 +132,13 @@ function parseEnabled(value: string | undefined): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function parseBounded(value: string | undefined, minimum: number, maximum: number): number | undefined {
+  if (value === undefined || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) return undefined;
+  return parsed;
 }
 
 function parsePolicyMs(value: string | undefined, minimum: number): number | undefined {
@@ -367,6 +380,11 @@ async function main(): Promise<void> {
         'total-deadline-ms': { type: 'string' },
         'initial-backoff-ms': { type: 'string' },
         'max-backoff-ms': { type: 'string' },
+        'window-ms': { type: 'string' },
+        'min-samples': { type: 'string' },
+        'failure-threshold': { type: 'string' },
+        'cooldown-ms': { type: 'string' },
+        'max-probes': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -407,6 +425,11 @@ async function main(): Promise<void> {
     || (values['total-deadline-ms'] !== undefined && command !== 'set-execution-policy')
     || (values['initial-backoff-ms'] !== undefined && command !== 'set-execution-policy')
     || (values['max-backoff-ms'] !== undefined && command !== 'set-execution-policy')
+    || (values['window-ms'] !== undefined && command !== 'set-deployment-breaker')
+    || (values['min-samples'] !== undefined && command !== 'set-deployment-breaker')
+    || (values['failure-threshold'] !== undefined && command !== 'set-deployment-breaker')
+    || (values['cooldown-ms'] !== undefined && command !== 'set-deployment-breaker')
+    || (values['max-probes'] !== undefined && command !== 'set-deployment-breaker')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');
@@ -948,6 +971,62 @@ async function main(): Promise<void> {
       }
       const reconciled = await reconcileAttemptCost(pool, tenantId, attemptId);
       process.stdout.write(`${JSON.stringify(reconciled)}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-breaker') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const enabled = parseEnabled(values.enabled);
+      const windowMs = parseBounded(values['window-ms'], 100, 3_600_000);
+      const minSamples = parseBounded(values['min-samples'], 1, 10_000);
+      const failureThreshold = parseBounded(values['failure-threshold'], 1, 10_000);
+      const cooldownMs = parseBounded(values['cooldown-ms'], 0, 3_600_000);
+      const maxProbes = parseBounded(values['max-probes'], 1, 8);
+      const settingsInvalid = enabled === true && (
+        windowMs === undefined
+        || minSamples === undefined
+        || failureThreshold === undefined
+        || cooldownMs === undefined
+        || maxProbes === undefined
+        || failureThreshold > minSamples
+      );
+      if (
+        tenantId === undefined
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+        || name === 'auto'
+        || enabled === undefined
+        || settingsInvalid
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const deploymentId = await setDeploymentBreaker(
+        pool,
+        tenantId,
+        name,
+        enabled,
+        enabled ? windowMs ?? null : null,
+        enabled ? minSamples ?? null : null,
+        enabled ? failureThreshold ?? null : null,
+        enabled ? cooldownMs ?? null : null,
+        enabled ? maxProbes ?? null : null,
+      );
+      process.stdout.write(`${JSON.stringify({ deploymentId, enabled })}\n`);
+      return;
+    }
+
+    if (command === 'reset-deployment-breaker') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto') {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const deploymentId = await resetDeploymentBreaker(pool, tenantId, name);
+      process.stdout.write(`${JSON.stringify({ deploymentId, state: 'closed' })}\n`);
       return;
     }
 

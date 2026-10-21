@@ -13,6 +13,7 @@ import {
   createSseDecoder,
   eventsFromOpenAiChunk,
   initialChunkCursor,
+  jsonRequestStream,
   StreamShutdownError,
   StreamTimeoutError,
   type CanonicalEvent,
@@ -42,10 +43,17 @@ export async function* streamOpenAiChat(input: {
   deadline: AbortController;
   fetchImpl?: typeof fetch;
   identity?: OpenRouterPolicy;
+  onDispatched?: () => Promise<void>;
+  stringBody?: boolean;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
-    if (!controller.signal.aborted) controller.abort();
+    if (controller.signal.aborted) return;
+    try {
+      controller.abort();
+    } catch {
+      // A fetch listener can throw the abort reason from abort().
+    }
   };
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abort, { once: true });
@@ -148,17 +156,35 @@ export async function* streamOpenAiChat(input: {
   }
 
   try {
-    const response = await doFetch(url, {
+    const payload = JSON.stringify(body);
+    const headers = {
+      authorization: `Bearer ${input.apiKey}`,
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+      ...(input.identity !== undefined ? { [OPENROUTER_METADATA_HEADER]: OPENROUTER_METADATA_VALUE } : {}),
+    };
+    let queued: () => void = () => undefined;
+    const queuedBody = new Promise<void>((resolve) => {
+      queued = resolve;
+    });
+    const responsePromise = doFetch(url, {
       method: 'POST',
-      headers: {
-        authorization: `Bearer ${input.apiKey}`,
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
-        ...(input.identity !== undefined ? { [OPENROUTER_METADATA_HEADER]: OPENROUTER_METADATA_VALUE } : {}),
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: input.stringBody === true ? payload : jsonRequestStream(payload, queued),
+      ...(input.stringBody === true ? {} : { duplex: 'half' as const }),
       signal: controller.signal,
     });
+    void responsePromise.catch(() => undefined);
+    if (input.stringBody === true) {
+      await input.onDispatched?.();
+    } else {
+      const early = await Promise.race([
+        queuedBody.then(() => 'queued' as const),
+        responsePromise.then(() => 'headers' as const),
+      ]);
+      if (early === 'queued' || early === 'headers') await input.onDispatched?.();
+    }
+    const response = await responsePromise;
     clearTimeout(connectTimer);
     if (!response.ok || response.body === null) {
       await response.arrayBuffer().catch(() => undefined);

@@ -48,10 +48,16 @@ export async function* streamVertexChat(input: {
   deadline: AbortController;
   fetchImpl?: typeof fetch;
   retryAfter?: () => string | null;
+  onDispatched?: () => Promise<void>;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
-    if (!controller.signal.aborted) controller.abort();
+    if (controller.signal.aborted) return;
+    try {
+      controller.abort();
+    } catch {
+      // A fetch mock can throw the abort reason from the abort listener.
+    }
   };
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abort, { once: true });
@@ -94,6 +100,7 @@ export async function* streamVertexChat(input: {
   let iterator: AsyncIterator<unknown> | null = null;
   try {
     if (controller.signal.aborted) throw abortReason(controller.signal);
+    await input.onDispatched?.();
     const produced = input.client.generateContentStream(request);
     const iterable = isAsyncIterable(produced)
       ? produced

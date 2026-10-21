@@ -4,6 +4,7 @@ import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
 import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy, transportFor } from './errors.js';
 import {
   createSseDecoder,
+  jsonRequestStream,
   StreamShutdownError,
   StreamTimeoutError,
   type CanonicalEvent,
@@ -363,10 +364,16 @@ export async function* streamAnthropicChat(input: {
   totalTimeoutMs: number;
   deadline: AbortController;
   fetchImpl?: typeof fetch;
+  onDispatched?: () => Promise<void>;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
-    if (!controller.signal.aborted) controller.abort();
+    if (controller.signal.aborted) return;
+    try {
+      controller.abort();
+    } catch {
+      // A fetch listener can throw the abort reason from abort().
+    }
   };
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abort, { once: true });
@@ -412,12 +419,25 @@ export async function* streamAnthropicChat(input: {
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
-    const response = await (input.fetchImpl ?? fetch)(url, {
+    const doFetch = input.fetchImpl ?? fetch;
+    let queued: () => void = () => undefined;
+    const queuedBody = new Promise<void>((resolve) => {
+      queued = resolve;
+    });
+    const responsePromise = doFetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: jsonRequestStream(JSON.stringify(body), queued),
+      duplex: 'half',
       signal: controller.signal,
     });
+    void responsePromise.catch(() => undefined);
+    const early = await Promise.race([
+      queuedBody.then(() => 'queued' as const),
+      responsePromise.then(() => 'headers' as const),
+    ]);
+    if (early === 'queued' || early === 'headers') await input.onDispatched?.();
+    const response = await responsePromise;
     clearTimeout(connectTimer);
     if (!response.ok || response.body === null) {
       await response.arrayBuffer().catch(() => undefined);
@@ -509,5 +529,6 @@ export function streamAnthropic(call: ProviderCall & { timeouts: StreamTimeouts;
     totalTimeoutMs: call.timeouts.total,
     deadline: call.deadline,
     fetchImpl: call.fetchImpl,
+    onDispatched: call.onDispatched,
   });
 }

@@ -23,6 +23,7 @@ export type ProviderCall = {
   fetchImpl?: typeof fetch;
   attemptTrace?: AttemptTrace;
   onHeaders?: () => void;
+  onDispatched?: () => Promise<void>;
 };
 
 export type ProviderAdapter = {

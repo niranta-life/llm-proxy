@@ -1,0 +1,43 @@
+Request traces.
+
+An open breaker returns 503 with code circuit_open.
+The mock records no new hit.
+This is true for the deployment name, for the alias auto, and for a stream.
+
+BREAKER_CASE {"case":"opened","state":"open","reason":"failure_threshold","changedAt":"2026-01-15T00:00:00.000Z","failures":3,"samples":3,"blocked":{"status":503,"code":"circuit_open","hits":0},"autoBlocked":{"status":503,"code":"circuit_open","hits":0},"stream":{"status":503,"code":"circuit_open","hits":0},"alias":"db782b9b-2080-44e6-9433-960b36389108","health":"healthy","enabled":true,"configVersion":2}
+
+The operator health label stayed healthy.
+The deployment stayed enabled.
+The alias stayed on the same deployment.
+The config version stayed 2.
+
+A chat during cooldown also recorded no hit.
+BREAKER_CASE {"case":"probe-close","blocked":{"status":503,"code":"circuit_open","hits":0},"probe":{"status":200,"code":null,"hits":1},"closed":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"probe_succeeded","changedAt":"2026-01-15T00:00:10.000Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"next":{"status":200,"code":null,"hits":1}}
+
+After the failed probe, the next chat recorded no hit.
+BREAKER_CASE {"case":"probe-reopen","probe":{"status":502,"code":"upstream_error","hits":1},"reopened":{"deployment":"breaker-chat","enabled":true,"state":"open","reason":"probe_failed","changedAt":"2026-01-15T00:00:10.000Z","samples":4,"failures":4,"rateLimits":0,"probesInflight":0},"next":{"status":503,"code":"circuit_open","hits":0}}
+
+One tenant did not change another tenant.
+BREAKER_CASE {"case":"tenant-isolation","other":{"status":200,"code":null,"hits":1},"otherView":{"deployment":"other-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":null,"samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"mine":"open","alias":"db782b9b-2080-44e6-9433-960b36389108"}
+
+A disabled deployment still does not serve.
+BREAKER_CASE {"case":"deployment-disabled","status":404,"code":"model_not_found","enabled":false}
+
+A deployment with no breaker stays disabled.
+Repeated provider errors still reach that deployment.
+BREAKER_CASE {"case":"disabled-default","view":{"deployment":"breaker-plain","enabled":false,"state":"closed","reason":"disabled","changedAt":null,"samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"hits":4}
+
+No caller route resets the breaker.
+BREAKER_CASE {"case":"no-public-reset","status":404,"internal":404,"state":"open"}
+
+The inspection route shows state, reason, time, health counts, and the separate rate-limit count.
+BREAKER_CASE {"case":"inspect","deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-21T20:09:02.090Z","samples":1,"failures":1,"rateLimits":1,"probesInflight":0}
+
+A streamed chat to a closed port does not reach the mock.
+The refused connection is a provider failure.
+The open breaker then rejects the next stream before the mock.
+BREAKER_CASE {"case":"stream-refused-probe","probe":{"status":502,"code":"invalid_upstream_response"},"attempt":{"failure_class":"connection_failure","error_code":"upstream_error"},"reopened":{"deployment":"breaker-chat","enabled":true,"state":"open","reason":"probe_failed","changedAt":"2026-01-15T00:00:10.000Z","samples":4,"failures":4,"rateLimits":0,"probesInflight":0},"blocked":{"status":503,"code":"circuit_open","hits":0}}
+
+A streamed caller abort does not add a health failure.
+The following chat records one mock hit.
+BREAKER_CASE {"case":"stream-cancel-probe","errorCode":"request_cancelled","released":{"deployment":"breaker-chat","enabled":true,"state":"half_open","reason":"cooldown_elapsed","changedAt":"2026-01-15T00:00:10.000Z","samples":3,"failures":3,"rateLimits":0,"probesInflight":0},"next":{"status":200,"code":null,"hits":1},"closed":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"probe_succeeded","changedAt":"2026-01-15T00:00:10.000Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0}}

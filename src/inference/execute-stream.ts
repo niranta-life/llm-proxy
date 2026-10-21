@@ -1,11 +1,13 @@
 import type { Pool } from 'pg';
 import type { ProviderCredentialStore } from '../credentials.js';
+import { guardUpstream, noteUpstream } from '../db/breaker.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
 import { openAiAdapter } from './adapter.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
+import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
@@ -86,6 +88,7 @@ export async function runChatStream(input: {
   vertexClientFactory?: VertexClientFactory;
   fetchImpl?: typeof fetch;
   resolveHost?: (host: string) => Promise<readonly string[]>;
+  nowMs?: () => number;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -139,9 +142,6 @@ export async function runChatStream(input: {
       requestId = created.requestId;
       attemptId = created.attemptId;
       apiKey = created.apiKey;
-      await withTenant(input.runtimePool, input.tenantId, (client) =>
-        markStream(client, { tenantId: input.tenantId, attemptId, streamStatus: 'connecting' }),
-      );
     } catch (error) {
       if (error instanceof ProxyError) throw error;
       input.logger.error('request persistence failed', { message: errorMessage(error) });
@@ -217,11 +217,20 @@ export async function runChatStream(input: {
     let providerRequestId: string | null = null;
     let servingProvider: string | null = null;
     let failure: unknown = null;
+    let trackedBreaker = false;
+    let breakerProbe = false;
+    let breakerObservedAt = new Date((input.nowMs ?? Date.now)());
 
     try {
       if (deadline.signal.reason instanceof StreamShutdownError) {
         machine = reduceStream(machine, { type: 'shutdown' });
       } else {
+      const observedAt = new Date((input.nowMs ?? Date.now)());
+      const gate = await guardUpstream(input.runtimePool, input.tenantId, input.route.deploymentId, observedAt);
+      if (!gate.allow) throw circuitOpenError();
+      breakerObservedAt = observedAt;
+      trackedBreaker = gate.track;
+      breakerProbe = gate.probe;
       const call = {
         apiKey,
         baseURL: transport.baseURL,
@@ -235,6 +244,17 @@ export async function runChatStream(input: {
         fetchImpl: fetchForProvider(input.route.provider, transport.fetchImpl, trace, () => window.noteHeaders()),
         attemptTrace: trace,
         onHeaders: () => window.noteHeaders(),
+        onDispatched: async () => {
+          try {
+            await withTenant(input.runtimePool, input.tenantId, (client) =>
+              markStream(client, { tenantId: input.tenantId, attemptId, streamStatus: 'connecting' }),
+            );
+          } catch (error) {
+            if (error instanceof ProxyError) throw error;
+            input.logger.error('request persistence failed', { message: errorMessage(error) });
+            throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+          }
+        },
       };
       const iterable =
         input.route.provider === 'anthropic'
@@ -314,7 +334,10 @@ export async function runChatStream(input: {
       }
     } catch (error) {
       failure = error;
-      if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
+      if (error instanceof ProxyError && error.code === 'circuit_open') {
+        machine = { ...machine, status: 'provider_failed' };
+        providerCode = 'circuit_open';
+      } else if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
       else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
         machine = reduceStream(machine, { type: 'shutdown' });
       } else if (error instanceof SlowConsumerError) machine = reduceStream(machine, { type: 'backpressure_timeout' });
@@ -345,6 +368,31 @@ export async function runChatStream(input: {
     if (!isTerminalStatus(machine.status)) {
       machine = reduceStream(machine, { type: 'upstream_closed' });
     }
+    if (failure instanceof ProxyError && failure.code === 'circuit_open') {
+      await recordStream(input, {
+        requestId,
+        attemptId,
+        status: 'failed',
+        errorCode: 'circuit_open',
+        durationMs: elapsedMs(started),
+        usage,
+        uncachedInputTokens: null,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+        providerRequestId: null,
+        stopReason: null,
+        streamStatus: 'provider_failed',
+        firstTextDeltaMs: null,
+        chunkCount: 0,
+        bytesWritten: 0,
+        failureClass: null,
+        dispatched: false,
+        expenseCertainty: 'none',
+        closeRequest: true,
+      });
+      throw failure;
+    }
     const terminal = machine.status as TerminalStreamStatus;
     const recordedCode = streamErrorCode(terminal, providerCode);
     const failed = attemptStatusFor(terminal) === 'failed';
@@ -367,7 +415,15 @@ export async function runChatStream(input: {
           failure: facts,
         })
       : null;
-    const retry = decision !== null && decision.retry && !opened && ordinal < policyAttempts(policy);
+    const suppressRetry = trackedBreaker
+      ? await noteStreamBreaker(
+          input,
+          breakerObservedAt,
+          breakerProbe,
+          streamBreakerKind(failed, failure, facts.callerAborted, decision?.failureClass ?? null),
+        )
+      : false;
+    const retry = decision !== null && decision.retry && !suppressRetry && !opened && ordinal < policyAttempts(policy);
     await recordStream(input, {
       requestId,
       attemptId,
@@ -416,9 +472,6 @@ export async function runChatStream(input: {
     try {
       attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
         insertAttempt(client, input.tenantId, requestId, input.route, ordinal),
-      );
-      await withTenant(input.runtimePool, input.tenantId, (client) =>
-        markStream(client, { tenantId: input.tenantId, attemptId, streamStatus: 'connecting' }),
       );
     } catch (error) {
       await closeStreamRequest(input, requestId);
@@ -484,6 +537,40 @@ function streamFailureFacts(input: {
     connectionFailure,
     ambiguousNetwork,
   };
+}
+
+function streamBreakerKind(
+  failed: boolean,
+  failure: unknown,
+  callerAborted: boolean,
+  failureClass: string | null,
+): BreakerOutcome {
+  if (!failed) return 'success';
+  // A local persistence error is not provider health. The probe slot must be released.
+  if (failure instanceof ProxyError && failure.code === 'service_unavailable') return 'ignore';
+  return classifyBreakerOutcome({ succeeded: false, callerAborted, failureClass });
+}
+
+async function noteStreamBreaker(
+  input: { runtimePool: Pool; logger: Logger; tenantId: string; route: ResolvedRoute },
+  now: Date,
+  probe: boolean,
+  kind: BreakerOutcome,
+): Promise<boolean> {
+  try {
+    const noted = await noteUpstream(input.runtimePool, input.tenantId, input.route.deploymentId, now, probe, kind);
+    return noted.suppressRetry;
+  } catch (error) {
+    input.logger.error('breaker observation was not recorded', { message: errorMessage(error) });
+    if (probe) {
+      try {
+        await noteUpstream(input.runtimePool, input.tenantId, input.route.deploymentId, now, true, 'ignore');
+      } catch (releaseError) {
+        input.logger.error('breaker probe was not released', { message: errorMessage(releaseError) });
+      }
+    }
+    return false;
+  }
 }
 
 async function closeStreamRequest(

@@ -1567,19 +1567,19 @@ The file does not drop a column.
 The file does not drop a table.
 The file does not edit migrations `001` through `011`.
 
-The image `832d8ac` stays ready on this database.
+The image `ad4e41b` stays ready on this database.
 Its latest migration file is `011_private_endpoint.sql`.
 After `012_cost_accounting.sql` is applied, `schema_migrations` keeps `011_private_endpoint.sql`.
-The readiness route on image `832d8ac` can return HTTP 200.
-Build the image when your computer has no tag `llm-proxy:832d8ac`.
+The readiness route on image `ad4e41b` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:ad4e41b`.
 Stop the proxy that is in operation.
 Start that image on the same database network.
 
 ```bash
-git archive --format=tar 832d8ac | docker build -t llm-proxy:832d8ac -
+git archive --format=tar ad4e41b | docker build -t llm-proxy:ad4e41b -
 docker compose stop app
-docker rm -f llm-proxy-832d8ac
-docker run -d --name llm-proxy-832d8ac --network llm-proxy_default \
+docker rm -f llm-proxy-ad4e41b
+docker run -d --name llm-proxy-ad4e41b --network llm-proxy_default \
   -p 8080:8080 \
   -e HOST=0.0.0.0 -e PORT=8080 \
   -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
@@ -1590,7 +1590,7 @@ docker run -d --name llm-proxy-832d8ac --network llm-proxy_default \
   -e INFERENCE_ENABLED=false \
   -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
   -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
-  llm-proxy:832d8ac
+  llm-proxy:ad4e41b
 ```
 
 That image stays ready.
@@ -1598,7 +1598,7 @@ Do not delete a price row to roll back.
 Start the Compose proxy again with these commands:
 
 ```bash
-docker rm -f llm-proxy-832d8ac
+docker rm -f llm-proxy-ad4e41b
 docker compose start app
 ```
 

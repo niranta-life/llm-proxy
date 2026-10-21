@@ -75,13 +75,20 @@ describe('provider registry', () => {
 
   it('keeps migrations 001 through 007 and adds the registry columns', async () => {
     const names = readdirSync(join(projectRoot, 'migrations')).filter((name) => name.endsWith('.sql')).sort();
-    expect(names).toEqual([...Object.keys(MIGRATION_SHA256), '008_provider_registry.sql', '009_vertex_provider.sql']);
+    expect(names).toEqual([
+      ...Object.keys(MIGRATION_SHA256),
+      '008_provider_registry.sql',
+      '009_vertex_provider.sql',
+      '010_compatible_providers.sql',
+    ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
       expect(createHash('sha256').update(body).digest('hex')).toBe(hash);
     }
     const added = readFileSync(join(projectRoot, 'migrations', '008_provider_registry.sql'), 'utf8');
     expect(added).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    const compatible = readFileSync(join(projectRoot, 'migrations', '010_compatible_providers.sql'), 'utf8');
+    expect(compatible).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

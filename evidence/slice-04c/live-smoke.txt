@@ -1,0 +1,13 @@
+Live smoke.
+
+XAI_LIVE was unset.
+OPENROUTER_LIVE was unset.
+VERTEX_LIVE was unset.
+The xAI live test was not run.
+The OpenRouter live test was not run.
+The suite did not call api.x.ai.
+The suite did not call openrouter.ai.
+No provider key was read from .env.live.
+
+The skipped tests are in test/compatible-live.test.ts.
+evidence/slice-04c/regression-after.txt records both tests as skipped.

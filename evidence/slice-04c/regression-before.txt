@@ -1,0 +1,166 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+stdout | test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security
+{"metricsSummary":{"window":{"from":"2026-10-21T05:29:23.910Z","to":"2026-10-21T05:33:23.910Z"},"requests":{"total":6,"succeeded":3,"failed":3,"pending":0},"usage":{"promptTokens":21,"completionTokens":19,"totalTokens":40,"responsesMissingUsage":0},"latency":{"samples":6,"sumMs":117,"maxMs":44},"streaming":{"requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"firstTextDeltaMs":{"samples":2,"p50":13,"p95":43},"durationMs":{"samples":5,"p50":19,"p95":44},"usage":{"promptTokens":18,"completionTokens":17,"totalTokens":35}},"byProvider":[{"provider":"anthropic","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","requests":4,"completed":1,"cancelled":1,"errors":1,"truncated":1,"promptTokens":3,"completionTokens":2,"totalTokens":5}],"byDeployment":[{"provider":"anthropic","deployment":"metrics-claude","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","deployment":"metrics-openai","requests":4,"completed":1,"cancelled":1,"errors":1,"truncated":1,"promptTokens":3,"completionTokens":2,"totalTokens":5}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security 5071ms
+ ✓ test/stream-production.test.ts > streaming production controls > isolates tenant caps per process and releases a slow consumer slot 4786ms
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":1,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":2,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+ ✓ test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown 12356ms
+stdout | test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream
+{"restartExit":0,"interrupted":"interrupted","restarted":"completed","drainLogged":true,"poolsClosed":true}
+
+ ✓ test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream 3929ms
+stdout | test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot
+{"streamLoad":{"runs":[{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":114.21891699999833,"p95":153.81187499999942},"durationMs":{"p50":121.93316699999923,"p95":160.45895799999926},"forwardingOverheadMs":{"p50":9.39995799999815,"p95":31.87012500000128},"memoryRssBytes":{"1":102694912,"4":140279808,"8":160972800,"after":161513472}},{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":86.67162500000268,"p95":195.6459160000013},"durationMs":{"p50":97.01362499999959,"p95":220.39141599999857},"forwardingOverheadMs":{"p50":9.780416999994486,"p95":15.500458000002254},"memoryRssBytes":{"1":102694912,"4":140279808,"8":160972800,"after":161513472}}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot 6743ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 4426ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 2420ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 1414ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 1872ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 2369ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 2576ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 2037ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 2390ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 2554ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 3505ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 2750ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > streams a chat completion the official SDK can read 234ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > frames one done marker and keeps stream=false as JSON 336ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > rejects streaming until both the tenant and the deployment allow it 1052ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > cancels the upstream stream when the client disconnects 141ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > aborts a stalled downstream consumer 1449ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends a stalled downstream write on the total and idle deadlines 3428ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > returns a normal HTTP error when the provider fails before the first event 75ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps the HTTP status and omits done when the provider fails after partial output 80ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not complete a stream that never sends done 94ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > completes when the provider omits usage 78ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > reassembles unicode split across upstream bytes 94ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps parallel tenants on their own credentials 131ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not call upstream when persistence fails before the stream 102ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not retry when telemetry fails after bytes were sent 117ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends the stream on connect, idle, and total timeouts 4747ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > shows connecting and rejects one more stream at the active limit 5985ms
+ ✓ test/vertex-chat.test.ts > vertex chat > converts a text chat for the tenant project and records usage 202ms
+ ✓ test/vertex-chat.test.ts > vertex chat > keeps two tenants on their own project, model, and identity 86ms
+ ✓ test/vertex-chat.test.ts > vertex chat > serves OpenAI and Anthropic and refuses a disabled deployment and xAI 325ms
+ ✓ test/vertex-chat.test.ts > vertex chat > keeps provider failures on that tenant and refreshes an expired credential 540ms
+ ✓ test/vertex-chat.test.ts > vertex chat > rejects unsupported fields and records thinking tokens without showing them 441ms
+ ✓ test/vertex-chat.test.ts > vertex chat > streams text in order and records usage without a false done marker after failure 161ms
+ ✓ test/vertex-chat.test.ts > vertex chat > cancels, times out, and applies backpressure without writing done 1458ms
+ ✓ test/vertex-chat.test.ts > vertex chat > stops a live stream on the total timer while chunks reset idle 1361ms
+ ✓ test/vertex-chat.test.ts > vertex chat > registers secret-less auth and stops a probe before a network call 1635ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 1331ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 1002ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 1092ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 968ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 1425ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 995ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 951ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 935ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 1057ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 1749ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 1271ms
+stdout | test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller
+{"openaiContentPresent":true,"openaiOrderHeld":true,"openaiFinish":"stop","anthropicContentPresent":true,"anthropicFinish":"stop","secondMatchesFirst":true,"anthropicModel":"claude-permitted","openaiModel":"gpt-stream-actual"}
+
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller 554ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps cumulative usage and cache categories on the attempt 157ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > maps length and refusal and omits ping and thinking text 670ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > fails tool use, fallback, a foreign model, malformed input, a missing stop, and an in-stream error 644ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps a tenant off another tenant configuration and credential 380ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > makes no upstream call when either streaming flag is off 1373ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > records client cancellation and a slow downstream consumer 1439ms
+ ✓ test/registry.test.ts > provider registry > keeps migrations 001 through 007 and adds the registry columns 63ms
+ ✓ test/registry.test.ts > provider registry > serves OpenAI, Anthropic, and an enabled Vertex deployment on one tenant 2202ms
+ ✓ test/registry.test.ts > provider registry > registers each new provider and rejects invalid configuration before a write 4400ms
+ ✓ test/registry.test.ts > provider registry > separates validation status from health and increments configuration version 2530ms
+ ✓ test/registry.test.ts > provider registry > isolates tenant configuration, validation, and credential references 1631ms
+ ✓ test/readiness-failure.test.ts > readiness failure > reports the database ready only while postgres is up, and SIGTERM closes the pools 14029ms
+ ✓ test/inference-isolation.test.ts > inference tenant isolation > keeps two tenants on different backends, aliases, metrics, and logs 2370ms
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 2507ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 879ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 69ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 253ms
+ ✓ test/anthropic-contract.test.ts > OpenAI SDK contract for both providers > calls OpenAI and Anthropic by changing only model 1507ms
+ ✓ test/inference-config.test.ts > configuration lookup > registers, enables, and lists a tenant configuration without credential material 1472ms
+ ✓ test/inference-config.test.ts > configuration lookup > requires a credential key when inference is enabled and does not echo it 1ms
+ ✓ test/key-rotation.test.ts > key rotation and revocation > keeps another active key working after one key is revoked 1525ms
+ ✓ test/pool-leakage.test.ts > connection-pool context leakage > clears tenant context before a connection returns to the pool 977ms
+ ✓ test/authentication.test.ts > authentication > accepts a matching active tenant and secret 175ms
+ ✓ test/authentication.test.ts > authentication > rejects missing, malformed, unknown, and mismatched credentials with no tenant data 95ms
+ ✓ test/authentication.test.ts > authentication > stores only a protected verifier for the secret 96ms
+ ✓ test/authentication.test.ts > authentication > does not accept a model request or caller provider configuration 48ms
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 56ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 513ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > keeps one completion id, the assistant role, and ordered text deltas 3ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > maps finish reasons and omits usage that was not requested or not reported 1ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > rejects tools, a non-assistant role, and a bad finish reason 1ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > reassembles a UTF-8 character split across decoder writes 1ms
+ ✓ test/stream-unit.test.ts > stream state transitions > moves through connecting and streaming and completes only after finish and done 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > does not complete when the provider terminal event or done marker is missing 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > records each terminal status and each timeout 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > writes ordered frames and one done marker after a finish event 1ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > aborts a stalled consumer and removes the abort listener 31ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > settles a stalled write on a stream deadline before the backpressure timer 42ms
+ ✓ test/stream-unit.test.ts > stream admission > keeps a tenant cap beside the process cap and drains open streams 217ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects incomplete configuration without echoing secrets 3ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects an invalid log level 4ms
+ ✓ test/config-failure.test.ts > configuration failure > exits before listening when a required setting is missing 334ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > converts a text stream in block order 7ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > omits empty text, ping text, thinking text, and signature text 2ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > keeps the latest cumulative usage and the reported cache categories 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > maps max_tokens and refusal onto the OpenAI finish reasons 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects tool use, fallback, a foreign model, malformed input, and an in-stream error 2ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > does not complete when message_stop is missing 0ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects output-changing deltas and positive server tool counts 1ms
+ ✓ test/vertex-client.test.ts > vertex client selection > selects the location host and stable API without reading the active gcloud project 1ms
+ ✓ test/vertex-client.test.ts > vertex client selection > calls the configured project and location when Google environment variables point elsewhere 3ms
+ ✓ test/vertex-client.test.ts > vertex client selection > checks access on the configured project and location 1ms
+ ✓ test/vertex-client.test.ts > vertex client selection > refreshes a cached client by tenant, connection, and config version 0ms
+ ✓ test/vertex-client.test.ts > vertex client selection > validates a credential, project access, and a small inference without returning hidden text 1ms
+ ✓ test/vertex-convert.test.ts > vertex request conversion > maps text messages, a leading system instruction, and supported sampling fields 1ms
+ ✓ test/vertex-convert.test.ts > vertex request conversion > rejects unsupported fields, a non-leading system message, and disagreeing token limits 1ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > keeps the serving model, visible text, safety finish, and separate token counts 1ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > does not invent a total when thinking tokens are present and the provider omits one 0ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > returns an empty safety outcome for a blocked prompt and rejects non-text parts 0ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > converts stream chunks in order and keeps usage off the visible text 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > keeps caller fields and converts a leading system message 2ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > uses the configured default when the caller sends no output limit 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects a later system message, prefill, and disagreeing limits 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects unsupported parameters without removing them from the request 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > preserves OpenAI caller fields in the OpenAI body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > maps the four finish reasons 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > returns refusal text and hides thinking content 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > rejects a tool-use block and keeps the reported attempt facts off the public body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > keeps end_turn facts when the message contains a tool block 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > does not invent token counts the rejected message omitted 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > stores cache categories separately and does not invent missing counts 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > maps authentication, rate limit, overload, and server errors without the provider body 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > stores the native 5xx type and request id and does not invent either 1ms
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 2ms
+ ✓ test/validate-request.test.ts > request validation > keeps stream=true and rejects it until that deployment allows streaming 2ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 0ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 1ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+ ↓ test/vertex-live.test.ts > vertex live provider > runs one small non-streaming call and one small streaming call
+
+ Test Files  24 passed | 1 skipped (25)
+      Tests  136 passed | 1 skipped (137)
+   Start at  22:31:01
+   Duration  186.08s (transform 1.20s, setup 81ms, collect 7.98s, tests 155.58s, environment 4ms, prepare 1.88s)
+
+NPM_TEST_EXIT:0

@@ -1,0 +1,47 @@
+Docker build.
+
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Image: llm-proxy-app:latest
+Tag: llm-proxy:slice-04c
+Image id: sha256:7b345b67b58288943575ad6d9a73d13653d27a71587d0ae96895e4df8bdabf88
+docker image inspect llm-proxy:slice-04c Id matches that digest.
+docker image inspect llm-proxy-app:latest Id matches that digest.
+
+The image file dist/inference/compatible.js contains https://api.x.ai/v1.
+The image file contains https://openrouter.ai/api/v1.
+The image contains X-OpenRouter-Metadata.
+The image does not contain held.length > 256.
+The image contains migrations/010_compatible_providers.sql.
+The image does not contain .env.live.
+Result: URLS_PRESENT
+Result: MIGRATION_010_PRESENT
+Result: LIVE_FILE_ABSENT
+
+The same image was started on the existing database.
+Inference stayed off.
+The first readiness probe returned an empty reply while the process started.
+new_image_try 2 200
+new_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+schema_migrations contained versions 001 through 010.
+schema_migrations contains 010_compatible_providers.sql.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The database volume was not removed.
+The running app image id matches llm-proxy:slice-04c.
+docker inspect llm-proxy-app-1 Image is sha256:7b345b67b58288943575ad6d9a73d13653d27a71587d0ae96895e4df8bdabf88.
+
+Recheck after the serving-provider fix.
+Image llm-proxy:a0d8156 returned readiness HTTP 200 on the same database.
+The running rollback container image was sha256:76cce8940b1f4fc97c8ed62591b1f167e017d168f136e2bf94a08f7e33c503e5.
+That digest matches docker image inspect llm-proxy:a0d8156.
+rollback_image_try 2 200
+rollback_image_body {"status":"ready","database":"ready"}
+010_compatible_providers.sql remained applied.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+ROLLBACK_KEPT_ROWS_AND_MIGRATION_010
+DEPLOY_EXIT:0

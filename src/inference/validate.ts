@@ -125,7 +125,11 @@ export function assertStreamAllowed(
 ): void {
   if (!request.stream) return;
   if (
-    (route.provider === 'openai' || route.provider === 'anthropic' || route.provider === 'vertex') &&
+    (route.provider === 'openai' ||
+      route.provider === 'anthropic' ||
+      route.provider === 'vertex' ||
+      route.provider === 'xai' ||
+      route.provider === 'openrouter') &&
     tenantStreamingEnabled &&
     route.streamingEnabled
   ) {

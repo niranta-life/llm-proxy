@@ -1,0 +1,46 @@
+Rollback verification.
+
+Image llm-proxy:a0d8156 was built from git archive a0d81562a16c2f45f1ec44950bef411aeb0f110c.
+Image id: sha256:76cce8940b1f4fc97c8ed62591b1f167e017d168f136e2bf94a08f7e33c503e5
+docker image inspect llm-proxy:a0d8156 Id matches that digest.
+The started container image was sha256:76cce8940b1f4fc97c8ed62591b1f167e017d168f136e2bf94a08f7e33c503e5.
+The container config image was llm-proxy:a0d8156.
+That same container image was still that digest when readiness returned HTTP 200.
+The image ran on the same database.
+Inference was off.
+No provider key was supplied.
+PROVIDER_CREDENTIAL_KEY was unset on that container.
+The first readiness probe returned an empty reply while the process started.
+rollback_image_try 2 200
+rollback_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+schema_migrations kept versions 001 through 010.
+schema_migrations kept 010_compatible_providers.sql.
+009_vertex_provider.sql remained applied.
+Tenants stayed 20.
+Deployments stayed 28.
+Connections stayed 23.
+The query did not select protected_credential text.
+
+git diff --exit-code for migrations 001 through 009 was empty.
+Migration 010 has no DROP COLUMN and no DROP TABLE.
+The Compose app was started again on llm-proxy:slice-04c.
+docker image inspect llm-proxy:slice-04c Id is sha256:7b345b67b58288943575ad6d9a73d13653d27a71587d0ae96895e4df8bdabf88.
+docker inspect llm-proxy-app-1 Image matched that digest after restore.
+The first restored probe returned an empty reply while the process started.
+restored_app_try 2 200
+restored_app_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200.
+Body: {"status":"ready","database":"ready"}
+The database volume llm-proxy_pgdata was not removed.
+The rollback container was removed.
+Colima was not stopped.
+
+Recheck of image llm-proxy:a0d8156 on the same database.
+new_image_try 2 200
+new_image_body {"status":"ready","database":"ready"}
+Readiness returned HTTP 200 for the new image.
+Image llm-proxy:a0d8156 returned readiness HTTP 200.
+ROLLBACK_KEPT_ROWS_AND_MIGRATION_010
+DEPLOY_EXIT:0

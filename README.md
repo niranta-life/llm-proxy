@@ -106,9 +106,18 @@ The proxy can store a Vertex connection for a tenant.
 The proxy can send a text chat to an enabled Vertex deployment.
 The proxy can stream that chat when the tenant and the deployment both enable streaming.
 The proxy can store an xAI connection for a tenant.
+The proxy can send a text chat to an enabled xAI deployment.
+The proxy can stream that chat when the tenant and the deployment both enable streaming.
+The xAI base URL is `https://api.x.ai/v1`.
 The proxy can store an OpenRouter connection for a tenant.
+The proxy can send a text chat to an enabled OpenRouter deployment.
+The proxy can stream that chat when the tenant and the deployment both enable streaming.
+The OpenRouter base URL is `https://openrouter.ai/api/v1`.
+A new xAI deployment stays disabled until you enable it.
+A new OpenRouter deployment stays disabled until you enable it.
+Enable one of those providers at a time.
 The proxy can store 1 private DGX endpoint for a tenant.
-A chat completion for xAI, OpenRouter, or DGX is not sent.
+A chat completion for DGX is not sent.
 
 You can start the local Compose project with Colima.
 You can stop that project with Colima.
@@ -307,7 +316,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled --tenant-id 
 
 Streaming stays off until you enable it for that tenant.
 Streaming stays off until you enable it for that deployment.
-The deployment can be OpenAI, Anthropic, or Vertex.
+The deployment can be OpenAI, Anthropic, Vertex, xAI, or OpenRouter.
 When you omit a timeout flag, the proxy uses the deployment timeout.
 That timeout applies to the connection.
 That timeout applies when the provider sends no text.
@@ -521,39 +530,29 @@ A failed list does not report the project as valid.
 That command can run while the deployment is disabled.
 A disabled deployment still does not serve `POST /v1/chat/completions`.
 
-## Record a provider that does not serve chat
+## Send a chat to xAI
 
-The proxy stores xAI, OpenRouter, and 1 private DGX endpoint.
-Each tenant has 1 connection for each provider.
-A chat completion does not use those providers.
+The proxy stores 1 xAI connection for each tenant.
+xAI uses an API key.
+The connection stores no endpoint.
+The approved base URL is `https://api.x.ai/v1`.
+The caller cannot select that URL.
+The caller cannot send `base_url`.
+A new deployment stays disabled until you set `--enabled true`.
+Enable this provider before you enable OpenRouter.
 The proxy encrypts the provider credential.
 `list-inference` does not show that credential.
-
-xAI uses an API key.
-OpenRouter uses an API key.
-Those providers store no endpoint.
-
-DGX uses an API key and 1 `https` endpoint.
-The endpoint has no user name and no password.
-The host is not a public provider host.
-The caller cannot select a provider URL.
-
 A deployment uses the same capability list as an OpenAI deployment.
-Do not pass `--default-max-output-tokens` for these providers.
-`validate-deployment` records `valid`, `invalid`, or `unvalidated`.
-The health status stays as it was.
-`set-deployment-health` records `unknown`, `healthy`, or `unhealthy`.
-The configuration version stays as it was.
+Do not pass `--default-max-output-tokens` for xAI.
+Do not pass an OpenRouter routing flag for xAI.
+The proxy does not send `X-OpenRouter-Metadata` to xAI.
+The proxy does not send the request again after an error.
+The proxy does not switch the model after an error.
+The proxy does not switch the provider after a stream starts.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-xai-connection \
   --tenant-id <tenant-id> --api-key "$XAI_API_KEY"
-docker compose run --rm app node dist/cli.js register-openrouter-connection \
-  --tenant-id <tenant-id> --api-key "$OPENROUTER_API_KEY"
-docker compose run --rm app node dist/cli.js register-dgx-connection \
-  --tenant-id <tenant-id> \
-  --api-key "$DGX_API_KEY" \
-  --endpoint https://dgx.lab.internal/v1
 docker compose run --rm app node dist/cli.js register-deployment \
   --tenant-id <tenant-id> \
   --provider xai \
@@ -562,12 +561,116 @@ docker compose run --rm app node dist/cli.js register-deployment \
   --timeout-ms 30000 \
   --capabilities temperature \
   --enabled false
+docker compose run --rm app node dist/cli.js set-deployment-enabled \
+  --tenant-id <tenant-id> \
+  --name xai-chat \
+  --enabled true
+docker compose run --rm app node dist/cli.js set-tenant-streaming \
+  --tenant-id <tenant-id> --enabled true
+docker compose run --rm app node dist/cli.js set-deployment-streaming \
+  --tenant-id <tenant-id> \
+  --deployment xai-chat \
+  --enabled true
+```
+
+## Send a chat to OpenRouter
+
+The proxy stores 1 OpenRouter connection for each tenant.
+OpenRouter uses an API key.
+The connection stores no endpoint.
+The approved base URL is `https://openrouter.ai/api/v1`.
+The caller cannot select that URL.
+The caller cannot send `provider`, `models`, or `route`.
+A new deployment stays disabled until you set `--enabled true`.
+Enable this provider only after you decide whether xAI stays disabled.
+The proxy sends a stored downstream list as `provider.only`.
+The proxy does not add a provider to that list.
+The proxy sends `data_collection` when you store `allow` or `deny`.
+The proxy sends `allow_fallbacks` when you store `true` or `false`.
+The proxy does not drop a stored restriction.
+The proxy does not widen a stored restriction.
+An empty downstream list is invalid.
+`--downstream-providers` accepts 1 to 8 unique slugs.
+A slug uses lowercase letters, digits, and hyphens.
+`--require-serving-provider true` demands a provider id in the response.
+The proxy sends `X-OpenRouter-Metadata` with the value `enabled`.
+OpenRouter names the selected provider in `openrouter_metadata`.
+The proxy reads that selected provider.
+The proxy matches that name to a stored slug.
+The match ignores letter case.
+The proxy keeps the provider name that OpenRouter reported.
+The proxy does not treat the model name as that provider.
+The proxy does not read a provider from a summary sentence.
+The proxy can read that name on the final stream chunk.
+A complete stream then ends with `[DONE]`.
+A required provider that the response does not name does not succeed.
+A reported provider outside the stored list does not succeed.
+The proxy does not send the request again after an error.
+The proxy does not choose a second model.
+Those 4 flags are invalid on a provider other than OpenRouter.
+
+```bash
+docker compose run --rm app node dist/cli.js register-openrouter-connection \
+  --tenant-id <tenant-id> --api-key "$OPENROUTER_API_KEY"
+docker compose run --rm app node dist/cli.js register-deployment \
+  --tenant-id <tenant-id> \
+  --provider openrouter \
+  --name router-chat \
+  --upstream-model openai/gpt-4o-mini \
+  --timeout-ms 30000 \
+  --capabilities temperature \
+  --downstream-providers anthropic \
+  --data-collection deny \
+  --allow-fallbacks false \
+  --require-serving-provider true \
+  --enabled false
+docker compose run --rm app node dist/cli.js set-deployment-enabled \
+  --tenant-id <tenant-id> \
+  --name router-chat \
+  --enabled true
+docker compose run --rm app node dist/cli.js set-tenant-streaming \
+  --tenant-id <tenant-id> --enabled true
+docker compose run --rm app node dist/cli.js set-deployment-streaming \
+  --tenant-id <tenant-id> \
+  --deployment router-chat \
+  --enabled true
+```
+
+## Record a private DGX endpoint
+
+The proxy stores 1 private DGX endpoint for a tenant.
+A chat completion does not use DGX.
+DGX uses an API key and 1 `https` endpoint.
+The endpoint has no user name and no password.
+The host is not a public provider host.
+The caller cannot select a provider URL.
+Do not pass `--default-max-output-tokens` for DGX.
+Do not pass an OpenRouter routing flag for DGX.
+`validate-deployment` records `valid`, `invalid`, or `unvalidated`.
+The health status stays as it was.
+`set-deployment-health` records `unknown`, `healthy`, or `unhealthy`.
+The configuration version stays as it was.
+DGX raises `streaming is not supported`.
+
+```bash
+docker compose run --rm app node dist/cli.js register-dgx-connection \
+  --tenant-id <tenant-id> \
+  --api-key "$DGX_API_KEY" \
+  --endpoint https://dgx.lab.internal/v1
+docker compose run --rm app node dist/cli.js register-deployment \
+  --tenant-id <tenant-id> \
+  --provider dgx \
+  --name dgx-chat \
+  --upstream-model private-model \
+  --timeout-ms 30000 \
+  --capabilities temperature \
+  --enabled false
 docker compose run --rm app node dist/cli.js validate-deployment \
-  --tenant-id <tenant-id> --deployment xai-chat --status valid
+  --tenant-id <tenant-id> --deployment dgx-chat --status valid
 docker compose run --rm app node dist/cli.js set-deployment-health \
-  --tenant-id <tenant-id> --deployment xai-chat --status healthy
+  --tenant-id <tenant-id> --deployment dgx-chat --status healthy
 docker compose run --rm app node dist/cli.js set-connection-enabled \
-  --tenant-id <tenant-id> --provider xai --enabled false
+  --tenant-id <tenant-id> --provider dgx --enabled false
 docker compose run --rm app node dist/cli.js list-inference --tenant-id <tenant-id>
 ```
 
@@ -582,6 +685,8 @@ You can set `stream` to `false`.
 The proxy accepts `stream` set to `true` for OpenAI.
 The proxy accepts `stream` set to `true` for Anthropic.
 The proxy accepts `stream` set to `true` for Vertex.
+The proxy accepts `stream` set to `true` for xAI.
+The proxy accepts `stream` set to `true` for OpenRouter.
 The tenant must have streaming enabled.
 The deployment must have streaming enabled.
 When `stream` is `true`, you can set `stream_options` to `{"include_usage":true}`.
@@ -657,13 +762,15 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 A success body is an OpenAI chat completion.
 `object` is `chat.completion`.
 `model` is the upstream model.
+The body includes `provider` when the upstream response names one.
+A stream frame does not include `provider`.
 The assistant text is in `choices`.
 The body contains `usage` only when the provider sent integer token counts.
 When the provider does not send usage, the body has no `usage`.
 The proxy does not invent a token count.
 
 An enabled stream uses `text/event-stream`.
-The deployment can be OpenAI, Anthropic, or Vertex.
+The deployment can be OpenAI, Anthropic, Vertex, xAI, or OpenRouter.
 The caller changes only the configured model.
 Each event is a `chat.completion.chunk`.
 The completion id does not change in that response.
@@ -678,6 +785,8 @@ A complete stream ends with 1 `data: [DONE]`.
 The proxy sends that marker only after the provider finish event.
 The proxy sends that marker only after the provider terminal event.
 For OpenAI, that event is `[DONE]`.
+For xAI, that event is `[DONE]`.
+For OpenRouter, that event is `[DONE]`.
 For Anthropic, that event is `message_stop`.
 For Vertex, that event is a finish reason.
 A timeout does not write `[DONE]`.
@@ -1061,6 +1170,7 @@ The new function allows OpenAI.
 The new function allows Anthropic.
 At that migration, another provider still raises `streaming is not supported`.
 Migration `009_vertex_provider.sql` later allows Vertex.
+Migration `010_compatible_providers.sql` later allows xAI and OpenRouter.
 The file does not drop a column.
 The file does not change an existing row.
 Streaming stays off until you enable it for that tenant and that deployment.
@@ -1247,6 +1357,56 @@ docker compose start app
 Do not remove the database volume.
 Do not edit a migration that is already applied.
 
+`010_compatible_providers.sql` stores an OpenRouter routing rule.
+The file allows an xAI deployment to stream.
+The file allows an OpenRouter deployment to stream.
+The file records the reported model on an attempt.
+The file records the reported provider on an attempt.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `009`.
+DGX still raises `streaming is not supported`.
+
+The image `a0d8156` stays ready on this database.
+A tenant that stores OpenAI, Anthropic, and Vertex can still send a chat completion.
+Its latest migration file is `009_vertex_provider.sql`.
+After `010_compatible_providers.sql` is applied, `schema_migrations` keeps `009_vertex_provider.sql`.
+The readiness route on image `a0d8156` can return HTTP 200.
+Build the image when your computer has no tag `llm-proxy:a0d8156`.
+Stop the proxy that is in operation.
+Start that image on the same database network.
+
+```bash
+git archive --format=tar a0d8156 | docker build -t llm-proxy:a0d8156 -
+docker compose stop app
+docker rm -f llm-proxy-a0d8156
+docker run -d --name llm-proxy-a0d8156 --network llm-proxy_default \
+  -p 8080:8080 \
+  -e HOST=0.0.0.0 -e PORT=8080 \
+  -e DATABASE_HOST=postgres -e DATABASE_PORT=5432 -e DATABASE_NAME=llm_proxy \
+  -e MIGRATOR_USER=llm_migrator -e MIGRATOR_PASSWORD=migrator_local_dev \
+  -e AUTH_USER=llm_auth -e AUTH_PASSWORD=auth_local_dev \
+  -e RUNTIME_USER=llm_runtime -e RUNTIME_PASSWORD=runtime_local_dev \
+  -e LOG_LEVEL=info \
+  -e INFERENCE_ENABLED=false \
+  -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}" \
+  -e PROVIDER_CREDENTIAL_KEY="$PROVIDER_CREDENTIAL_KEY" \
+  llm-proxy:a0d8156
+```
+
+That image stays ready.
+Do not delete an xAI row to roll back.
+Do not delete an OpenRouter row to roll back.
+Start the Compose proxy again with these commands:
+
+```bash
+docker rm -f llm-proxy-a0d8156
+docker compose start app
+```
+
+Do not remove the database volume.
+Do not edit a migration that is already applied.
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1258,6 +1418,10 @@ The tests start a local mock of the Anthropic Messages API.
 The tests do not send a request to a provider on the internet.
 A Vertex live test runs only when `VERTEX_LIVE` is `1`.
 `npm test` does not set `VERTEX_LIVE`.
+An xAI live test runs only when `XAI_LIVE` is `1`.
+`npm test` does not set `XAI_LIVE`.
+An OpenRouter live test runs only when `OPENROUTER_LIVE` is `1`.
+`npm test` does not set `OPENROUTER_LIVE`.
 
 ```bash
 nvm use 24
@@ -1347,17 +1511,36 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - Each adapter sets its base URL.
 - Anthropic records that URL on the tenant connection.
 - OpenAI uses `OPENAI_BASE_URL`.
+- xAI uses `https://api.x.ai/v1`.
+- OpenRouter uses `https://openrouter.ai/api/v1`.
+- The caller cannot change the xAI base URL.
+- The caller cannot change the OpenRouter base URL.
 - Git does not track `.env.live`.
 - A Docker build does not copy `.env.live`.
 
 ## Limits
 
-- A chat completion uses OpenAI, Anthropic, or an enabled Vertex deployment.
-- The registry can also store xAI, OpenRouter, and 1 private DGX endpoint.
-- The proxy does not send a chat completion to those 3 providers.
+- A chat completion uses OpenAI, Anthropic, an enabled Vertex deployment, an enabled xAI deployment, or an enabled OpenRouter deployment.
+- The registry can also store 1 private DGX endpoint.
+- The proxy does not send a chat completion to DGX.
 - OpenAI can stream a text chat when that tenant and that deployment both enable streaming.
 - Anthropic can stream a text chat when that tenant and that deployment both enable streaming.
 - Vertex can stream a text chat when that tenant and that deployment both enable streaming.
+- xAI can stream a text chat when that tenant and that deployment both enable streaming.
+- OpenRouter can stream a text chat when that tenant and that deployment both enable streaming.
+- A new xAI deployment stays disabled until you enable it.
+- A new OpenRouter deployment stays disabled until you enable it.
+- OpenRouter sends only the downstream providers that you stored.
+- OpenRouter sends a stored data-collection value.
+- OpenRouter sends a stored fallback value.
+- An OpenRouter request sends `X-OpenRouter-Metadata` with the value `enabled`.
+- OpenRouter serving identity is the selected provider in `openrouter_metadata`.
+- That name matches a stored slug. The match ignores letter case.
+- The proxy keeps the provider name that OpenRouter reported.
+- A non-stream body includes `provider` when the upstream response names one.
+- A stream frame does not include `provider`.
+- The proxy can read an OpenRouter provider from the final stream chunk.
+- A required serving provider that the response does not name does not succeed.
 - The proxy accepts a text chat completion in 1 response when `stream` is not `true`.
 - The proxy does not accept a tool.
 - The proxy does not accept an image.
@@ -1436,7 +1619,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 
 ## Work that is not complete
 
-- A chat completion for xAI, OpenRouter, or a private DGX endpoint.
+- A chat completion for a private DGX endpoint.
 - Input that is not text.
 - A tool call.
 - A second provider after an error.

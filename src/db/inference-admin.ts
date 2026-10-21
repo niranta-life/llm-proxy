@@ -163,6 +163,42 @@ export async function registerProviderDeployment(
   return { deploymentId: row.deployment_id, configVersion: row.config_version };
 }
 
+export async function registerOpenRouterDeployment(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    name: string;
+    upstreamModel: string;
+    timeoutMs: number;
+    capabilities: string[];
+    enabled: boolean;
+    downstreamProviders: string[] | null;
+    dataCollection: 'allow' | 'deny' | null;
+    allowFallbacks: boolean | null;
+    requireServingProvider: boolean;
+  },
+): Promise<{ deploymentId: string; configVersion: number }> {
+  const result = await pool.query<{ deployment_id: string; config_version: number }>(
+    `SELECT deployment_id, config_version
+     FROM register_openrouter_deployment($1::uuid, $2, $3, $4, $5::text[], $6, $7::text[], $8, $9, $10)`,
+    [
+      input.tenantId,
+      input.name,
+      input.upstreamModel,
+      input.timeoutMs,
+      input.capabilities,
+      input.enabled,
+      input.downstreamProviders,
+      input.dataCollection,
+      input.allowFallbacks,
+      input.requireServingProvider,
+    ],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not created');
+  return { deploymentId: row.deployment_id, configVersion: row.config_version };
+}
+
 export async function registerModelDeployment(
   pool: Pool,
   input: {

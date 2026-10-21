@@ -23,6 +23,7 @@ export type AppDeps = {
   maxActiveStreams: number;
   maxStreamsPerTenant: number;
   vertexClientFactory?: VertexClientFactory;
+  compatibleFetch?: typeof fetch;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -194,6 +195,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         reply: streamReply(reply),
         gate: streamGate,
         vertexClientFactory: deps.vertexClientFactory,
+        fetchImpl: deps.compatibleFetch,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;

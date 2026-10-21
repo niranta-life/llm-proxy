@@ -1,4 +1,12 @@
 import { APIError } from 'openai';
+import {
+  OPENROUTER_METADATA_HEADER,
+  OPENROUTER_METADATA_VALUE,
+  readReportedProvider,
+  servingIdentityError,
+  servingProviderAllowed,
+  type OpenRouterPolicy,
+} from './compatible.js';
 import { normalizeUpstreamError, proxyError } from './errors.js';
 import {
   createSseDecoder,
@@ -12,7 +20,7 @@ import type { ChatMessage } from './validate.js';
 
 export type UpstreamStreamItem =
   | { type: 'event'; event: CanonicalEvent }
-  | { type: 'done' }
+  | { type: 'done'; servingProvider?: string | null }
   | { type: 'closed' };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -31,6 +39,8 @@ export async function* streamOpenAiChat(input: {
   idleTimeoutMs: number;
   totalTimeoutMs: number;
   deadline: AbortController;
+  fetchImpl?: typeof fetch;
+  identity?: OpenRouterPolicy;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
@@ -75,14 +85,75 @@ export async function* streamOpenAiChat(input: {
   let cursor = initialChunkCursor();
   let sawDone = false;
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  const held: UpstreamStreamItem[] = [];
+  let released = input.identity?.requireServingProvider !== true;
+  let reportedProvider: string | null = null;
+  let providerConflict = false;
+  const doFetch = input.fetchImpl ?? fetch;
+
+  function noteProvider(parsed: unknown): void {
+    const reported = readReportedProvider(parsed, input.identity !== undefined);
+    if (reported === null) return;
+    if (reportedProvider !== null && reported.toLowerCase() !== reportedProvider.toLowerCase()) {
+      providerConflict = true;
+      reportedProvider = null;
+      if (input.identity !== undefined) throw servingIdentityError();
+      return;
+    }
+    if (providerConflict) return;
+    if (
+      input.identity?.downstreamProviders != null &&
+      !servingProviderAllowed(reported, input.identity.downstreamProviders)
+    ) {
+      throw servingIdentityError();
+    }
+    if (reportedProvider === null) reportedProvider = reported;
+    if (input.identity?.requireServingProvider === true) released = true;
+  }
+
+  function requireIdentity(): void {
+    if (input.identity?.requireServingProvider !== true) return;
+    if (providerConflict || reportedProvider === null) throw servingIdentityError();
+  }
+
+  function stage(item: UpstreamStreamItem): UpstreamStreamItem[] {
+    if (item.type === 'done') requireIdentity();
+    const stamped = item.type === 'done' && reportedProvider !== null ? { type: 'done' as const, servingProvider: reportedProvider } : item;
+    if (!released) {
+      held.push(stamped);
+      return [];
+    }
+    const ready = held.length === 0 ? [stamped] : [...held.splice(0, held.length), stamped];
+    return ready;
+  }
+
+  function itemsFromMessage(message: { data: string; done: boolean }): UpstreamStreamItem[] {
+    if (message.done) return stage({ type: 'done' });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message.data);
+    } catch (error) {
+      throw failParse(error);
+    }
+    if (isRecord(parsed) && parsed.error !== undefined) {
+      throw normalizeUpstreamError(APIError.generate(502, undefined, '', undefined), false);
+    }
+    noteProvider(parsed);
+    const mapped = eventsFromOpenAiChunk(parsed, cursor);
+    cursor = mapped.cursor;
+    const staged = mapped.events.flatMap((event) => stage({ type: 'event', event }));
+    if (staged.length === 0 && released && held.length > 0) return held.splice(0, held.length);
+    return staged;
+  }
 
   try {
-    const response = await fetch(url, {
+    const response = await doFetch(url, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${input.apiKey}`,
         'content-type': 'application/json',
         accept: 'text/event-stream',
+        ...(input.identity !== undefined ? { [OPENROUTER_METADATA_HEADER]: OPENROUTER_METADATA_VALUE } : {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -112,7 +183,11 @@ export async function* streamOpenAiChat(input: {
             yield item;
           }
         }
-        if (!sawDone) yield { type: 'closed' };
+        if (!sawDone) {
+          requireIdentity();
+          for (const item of held.splice(0, held.length)) yield item;
+          yield { type: 'closed' };
+        }
         return;
       }
       let messages;
@@ -147,22 +222,6 @@ export async function* streamOpenAiChat(input: {
     input.deadline.signal.removeEventListener('abort', onDeadline);
     abort();
     await reader?.cancel().catch(() => undefined);
-  }
-
-  function itemsFromMessage(message: { data: string; done: boolean }): UpstreamStreamItem[] {
-    if (message.done) return [{ type: 'done' }];
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(message.data);
-    } catch (error) {
-      throw failParse(error);
-    }
-    if (isRecord(parsed) && parsed.error !== undefined) {
-      throw normalizeUpstreamError(APIError.generate(502, undefined, '', undefined), false);
-    }
-    const mapped = eventsFromOpenAiChunk(parsed, cursor);
-    cursor = mapped.cursor;
-    return mapped.events.map((event) => ({ type: 'event', event }));
   }
 }
 

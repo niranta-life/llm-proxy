@@ -165,7 +165,7 @@ describe('vertex chat', () => {
     runCli(db, ['register-deployment', '--tenant-id', alpha.tenantId, '--provider', 'openai', '--name', 'openai-chat', '--upstream-model', 'gpt-vertex', '--timeout-ms', '5000', '--capabilities', 'temperature', '--enabled', 'true'], env);
     registerAnthropic(db, { tenantId: alpha.tenantId, apiKey: 'sk-ant-vertex', endpoint: anthropic.origin, deployment: 'claude-chat', upstreamModel: 'claude-vertex', alias: false });
     runCli(db, ['register-xai-connection', '--tenant-id', alpha.tenantId, '--api-key', 'xai-test-key-0123456789'], env);
-    runCli(db, ['register-deployment', '--tenant-id', alpha.tenantId, '--provider', 'xai', '--name', 'xai-chat', '--upstream-model', 'grok-test', '--timeout-ms', '5000', '--capabilities', 'temperature', '--enabled', 'true'], env);
+    runCli(db, ['register-deployment', '--tenant-id', alpha.tenantId, '--provider', 'xai', '--name', 'xai-chat', '--upstream-model', 'grok-test', '--timeout-ms', '5000', '--capabilities', 'temperature', '--enabled', 'false'], env);
     runCli(db, ['register-vertex-connection', '--tenant-id', beta.tenantId, '--auth-mode', 'impersonation', '--project', 'beta-vertex-proj', '--location', 'europe-west4', '--service-account', BETA_EMAIL, '--api-version', 'v1'], env);
     runCli(db, ['register-deployment', '--tenant-id', beta.tenantId, '--provider', 'vertex', '--name', 'gemini-beta', '--upstream-model', 'gemini-2.5-pro', '--timeout-ms', '2000', '--capabilities', 'temperature,max_tokens,stop', '--enabled', 'true'], env);
     runCli(db, ['set-alias', '--tenant-id', beta.tenantId, '--alias', 'auto', '--deployment', 'gemini-beta'], env);
@@ -291,7 +291,7 @@ describe('vertex chat', () => {
     expect(betaCall?.request.model).toBe('gemini-2.5-pro');
   });
 
-  it('serves OpenAI and Anthropic and refuses a disabled deployment and xAI', async () => {
+  it('serves OpenAI and Anthropic and refuses a disabled deployment', async () => {
     const before = calls.length;
     const openai = await clientFor(alpha.secret, alpha.tenantId).chat.completions.create({
       model: 'openai-chat',
@@ -308,7 +308,7 @@ describe('vertex chat', () => {
     ).rejects.toMatchObject({ status: 404 });
     await expect(
       clientFor(alpha.secret, alpha.tenantId).chat.completions.create({ model: 'xai-chat', messages: [{ role: 'user', content: 'xai' }] }),
-    ).rejects.toMatchObject({ status: 503 });
+    ).rejects.toMatchObject({ status: 404 });
     expect(calls.length).toBe(before);
   });
 

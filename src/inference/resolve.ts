@@ -26,6 +26,10 @@ export type DeploymentCandidate = {
   serviceAccountIdentity: string | null;
   apiVersion: string | null;
   connectionConfigVersion: number;
+  downstreamProviders: readonly string[] | null;
+  dataCollection: 'allow' | 'deny' | null;
+  allowFallbacks: boolean | null;
+  requireServingProvider: boolean;
 };
 
 export type AliasCandidate = {
@@ -58,6 +62,10 @@ export type ResolvedRoute = {
   serviceAccountIdentity: string | null;
   apiVersion: string | null;
   connectionConfigVersion: number;
+  downstreamProviders: readonly string[] | null;
+  dataCollection: 'allow' | 'deny' | null;
+  allowFallbacks: boolean | null;
+  requireServingProvider: boolean;
 };
 
 export function resolveModel(
@@ -95,5 +103,9 @@ export function resolveModel(
     serviceAccountIdentity: deployment.serviceAccountIdentity ?? null,
     apiVersion: deployment.apiVersion ?? null,
     connectionConfigVersion: deployment.connectionConfigVersion ?? 0,
+    downstreamProviders: deployment.downstreamProviders ?? null,
+    dataCollection: deployment.dataCollection ?? null,
+    allowFallbacks: deployment.allowFallbacks ?? null,
+    requireServingProvider: deployment.requireServingProvider ?? false,
   };
 }

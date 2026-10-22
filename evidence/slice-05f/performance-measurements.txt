@@ -1,0 +1,53 @@
+Performance measurements.
+
+The numbers below are copied from one line in vitest.txt.
+That line is the Rel Measure workload inside the full suite that exited 0.
+It is not a production traffic sample.
+The command is in commands.txt.
+
+RELIABILITY_MEASURE {"case":"workload","requests":21,"succeeded":20,"successRate":0.9523809523809523,"upstreamAttempts":21,"retryAmplification":1,"fallbacks":0,"fallbackRate":0,"providerFailures":1,"providerFailureRate":0.047619047619047616,"budgetDenials":0,"rateDenials":0,"reservationBacklog":0,"capturedDurationsMs":[110,113,135,136,137,144,169,181,196,210,211,218,230,256,310],"capturedP50Ms":181,"capturedP95Ms":310,"capturedP99Ms":310,"streamDurationsMs":[105,113,139,144],"streamP50Ms":113,"streamP95Ms":144,"streamP99Ms":144,"routeLatency":{"samples":21,"sumMs":825,"maxMs":148},"routeStreamDuration":{"samples":4,"p50":29,"p95":50},"slowElapsedMs":349,"mockDelayMs":100,"overheadMs":249,"contentionMs":219,"contentionResults":[{"status":200,"elapsedMs":169},{"status":200,"elapsedMs":196},{"status":200,"elapsedMs":211},{"status":200,"elapsedMs":218}],"concurrentStreams":0,"memoryRssBefore":62062592,"memoryRssAfter":148029440,"memoryHeapBefore":40601808,"memoryHeapAfter":40102072}
+
+Request success rate is 20 succeeded request ids over 21 request ids.
+Upstream attempt count is 21.
+Retry amplification is stored attempts divided by requests, which is 1.
+Fallback rate is 0.
+Provider failure rate is 1 failed attempt over 21 stored attempts.
+Budget denials in this workload are 0.
+Rate-limit denials in this workload are 0.
+Reservation backlog is 0 active reservations at the read.
+
+Captured latency uses the test wall clock.
+The sorted samples are the capturedDurationsMs array.
+P50 is 181.
+P95 is 310.
+P99 is 310.
+The index is ceil(p * n) - 1.
+n is 15.
+
+The metrics route latency object has samples 21, sumMs 825, and maxMs 148.
+That route does not return P50 or P95 for general latency.
+Stream duration on that route has samples 4, p50 29, and p95 50.
+Those values are duration_ms on the stream rows.
+The captured stream wall clock P50 is 113, P95 is 144, and P99 is 144.
+
+Proxy overhead is slowElapsedMs minus mockDelayMs.
+slowElapsedMs is 349.
+mockDelayMs is 100.
+overheadMs is 249.
+
+Database contention is contentionMs 219.
+The four overlapping results are status 200 with elapsed 169, 196, 211, and 218.
+
+Concurrent streams at the measure read is 0.
+The shutdown case in the same suite recorded activeBefore 1.
+That line is in deployment-and-measurements.txt.
+
+Memory is process.memoryUsage on the test process.
+rss before is 62062592.
+rss after is 148029440.
+heapUsed before is 40601808.
+heapUsed after is 40102072.
+
+Breaker transitions for the shared breaker case are 1.
+That line is in multi-instance.txt.
+The state moved from closed with reason enabled to open with reason failure_threshold.

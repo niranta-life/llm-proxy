@@ -1,0 +1,15 @@
+RELIABILITY_FAULT {"case":"normal","status":200,"hits":1,"failureClass":null,"amount":"0.07","costStatus":"estimated","reservation":"settled","elapsedMs":302}
+RELIABILITY_FAULT {"case":"slow","status":200,"hits":1,"elapsedMs":231,"mockDelayMs":81,"overheadMs":150,"amount":"0.07","costStatus":"estimated"}
+RELIABILITY_FAULT {"case":"missing-usage","status":200,"hits":1,"promptTokens":null,"amount":null,"costStatus":"unknown","reservation":"provisional"}
+RELIABILITY_FAULT {"case":"connection-refused","status":502,"code":"upstream_error","hits":0,"attempts":2,"failureClass":"connection_failure","amount":null,"elapsedMs":197}
+RELIABILITY_FAULT {"case":"timeout-before-send","status":504,"hits":1,"failureClass":"timeout_before_dispatch","amount":null,"expense":"none","elapsedMs":345}
+RELIABILITY_FAULT {"case":"timeout-after-send","status":504,"hits":1,"failureClass":"timeout_after_dispatch","costStatus":"unknown","amount":null,"expense":"uncertain","elapsedMs":297}
+RELIABILITY_FAULT {"case":"http-429","status":200,"hits":2,"failureClasses":["rate_limit",null],"elapsedMs":109}
+RELIABILITY_FAULT {"case":"http-429-cap","status":429,"hits":2,"attempts":2,"failureClass":"rate_limit"}
+RELIABILITY_FAULT {"case":"http-503","status":502,"code":"upstream_error","hits":2,"failureClass":"unavailable","elapsedMs":216}
+RELIABILITY_FAULT {"case":"provider-overload","injectedStatus":529,"status":502,"hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+RELIABILITY_FAULT {"case":"malformed","status":502,"code":"upstream_error","hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+RELIABILITY_FAULT {"case":"connection-close","status":502,"code":"upstream_error","hits":1,"attempts":1,"failureClass":"ambiguous_network","amount":null,"costStatus":"unknown","expense":"uncertain"}
+RELIABILITY_FAULT {"case":"partial-sse-nonstream","status":502,"code":"invalid_upstream_response","hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+RELIABILITY_FAULT {"case":"partial-sse","status":200,"hits":1,"failureClass":"stream_started","streamStatus":"stream_truncated","amount":null,"done":false}
+RELIABILITY_FAULT {"case":"unexpected-close-stream","status":502,"hits":1,"failureClass":"ambiguous_network","streamStatus":"provider_failed","amount":null,"model":"rel-partial","done":false}

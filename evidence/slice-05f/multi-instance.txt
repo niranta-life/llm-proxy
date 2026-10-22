@@ -1,0 +1,6 @@
+RELIABILITY_INSTANCE {"case":"atomic-budget","results":[{"status":429,"code":"budget_exceeded"},{"status":200,"code":null}],"hits":1,"winner":"bbbbbbbbbb"}
+RELIABILITY_INSTANCE {"case":"rate-limit","results":[{"status":200,"code":null},{"status":429,"code":"tenant_rate_limited"}],"hits":1}
+RELIABILITY_INSTANCE {"case":"concurrency-lease","results":[{"status":429,"code":"concurrency_limited"},{"status":200,"code":null}],"hits":1}
+RELIABILITY_INSTANCE {"case":"breaker","before":{"state":"closed","state_reason":"enabled"},"after":{"state":"open","state_reason":"failure_threshold"},"transitions":1,"blocked":[{"status":503,"code":"circuit_open"},{"status":503,"code":"circuit_open"}],"extraHits":0}
+RELIABILITY_INSTANCE {"case":"crash-settlement","exit":86,"backlogBefore":"1","backlogAfter":"0","recognized":"0.03","settlesAfterRecover":"1","settlesAfterLater":"2","crashHits":1,"laterStatus":200}
+RELIABILITY_INSTANCE {"case":"crash-lease","earlyExit":86,"earlyHits":0,"laterStatus":200,"laterHits":1}

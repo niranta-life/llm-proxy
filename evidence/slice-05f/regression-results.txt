@@ -1,0 +1,25 @@
+Regression results.
+
+Command.
+./node_modules/.bin/vitest run --reporter=verbose
+Node v24.22.0.
+Started 2026-10-22T07:43:00Z.
+Duration 606.71s.
+VITEST_EXIT 0.
+
+Test Files  43 passed | 2 skipped (45)
+Tests  309 passed | 3 skipped (312)
+
+The skipped tests are the xAI live test, the OpenRouter live test, and the Vertex live test.
+The new reliability cases are in the passed count.
+The full log is vitest.txt.
+
+The first pre-change suite exited 1.
+That failure is test/vertex-chat.test.ts.
+The stored stream status was timed_out.
+The test expected client_aborted.
+A later full suite passed that test before the cancel step was changed.
+The cancel step now waits for connecting.
+The connect deadline for that step is 5000 ms.
+The test restores the 400 ms deadline before the timeout check.
+The after suite exited 0.

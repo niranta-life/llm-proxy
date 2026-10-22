@@ -1,0 +1,35 @@
+Concurrent proxy test results.
+
+The file is test/limits.test.ts.
+Both runs used the shipped chat route, real PostgreSQL, and a local mock.
+Overlapping requests were held on barriers.
+A second process used test/limit-child.mjs on the same database.
+
+Shared provider connection.
+Run 1 admitted one call and rejected the other.
+LIMIT_CASE {"case":"shared-connection","results":[{"status":429,"code":"connection_limited"},{"status":200,"code":null}],"hits":1}
+Run 2 reversed the order and kept one hit.
+LIMIT_CASE {"case":"shared-connection","results":[{"status":200,"code":null},{"status":429,"code":"connection_limited"}],"hits":1}
+
+Lease expiry.
+Both runs returned HTTP 200 after the lease time passed.
+LIMIT_CASE {"case":"lease-expiry","status":200,"hits":2}
+
+Crash before the permit is released.
+The child exited 86.
+A later process completed the next chat.
+LIMIT_CASE {"case":"crash-permit","dead":86,"recovered":200,"hits":1}
+
+Database admission outage.
+The chat returned HTTP 503 with code admission_unavailable.
+LIMIT_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":2}
+The test holds an advisory lock and then sends one chat.
+That chat fails closed.
+The content db-down adds no mock hit.
+The hits value 2 is the two observation-mode chats that completed before the lock.
+
+Both limit runs exited 0.
+VITEST_EXIT=0
+VITEST_EXIT=0
+
+The same cases passed inside the post-edit full suite.

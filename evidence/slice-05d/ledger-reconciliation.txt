@@ -1,0 +1,106 @@
+Ledger reconciliation results.
+
+The file is test/budgets.test.ts.
+Both runs exited 0.
+Amounts are fixed decimals.
+
+Recognized expense and a second settlement.
+The corrected run is the budget file after settlement was capped at the reservation.
+BUDGET_CASE {"case":"reconcile","exact":{"recognized":"0.03","remaining":"0.97","again":"settled"},"clamp":{"recognized":"1","remaining":"1"}}
+The second close stayed settled.
+Recognized expense did not increase.
+Content x had input rate 1 and a reservation of 1.
+The provider reported 5 prompt tokens and the stored attempt cost stayed 5.
+The ledger recognized 1.
+The remaining budget stayed 1.
+It was not hidden by a floor at 0.
+
+A cache split stayed finite.
+An allocated-only price and a price with no external rate were rejected before the mock.
+BUDGET_CASE {"case":"bounds","cache":"0.100000000000","high":"budget_exceeded","allocated":"budget_unknown","empty":"budget_unknown","hits":1}
+The reserved amount for input 0.01, output 0.02, cache read 0.001, content hi, and max_tokens 4 was 0.10.
+The higher cache rate exceeded the budget and did not add a mock hit.
+
+UTC month rollover.
+BUDGET_CASE {"case":"rollover","january":"0.97","february":"1"}
+February started with its own allocation.
+
+Retry reservation.
+BUDGET_CASE {"case":"retry","recognized":"0.03","provisional":"0.08","settles":"1"}
+The success attempt recognized 0.03.
+The failed attempt stayed provisional at 0.08.
+One settle row was stored.
+
+Timeout.
+BUDGET_CASE {"case":"timeout","status":504,"reserved":"0.120000000000","remaining":"4.88","hits":1}
+The reserved amount stayed 0.12.
+The charge was not stored as zero.
+
+Crash before the mock and crash after the mock.
+The early child exited 86.
+The attempt stayed pending.
+The reservation stayed active.
+recover-budget closed 0 rows for that pending attempt.
+The test expects no mock hit for content crash-before.
+The logged hits value is the shared mock length after the later child.
+BUDGET_CASE {"case":"crash","early":{"exit":86,"status":"active","hits":1},"late":{"exit":86,"recognized":"0.03","remaining":"4.97"}}
+The later child exited 86 after the mock.
+recover-budget recognized 0.03 once.
+A second recover and a second close left recognized expense at 0.03.
+
+Missing price, unbounded cost, and disabled budget.
+BUDGET_CASE {"case":"modes","watch":"0","tight":"budget_exceeded","missing":"budget_unknown","unbounded":"budget_unbounded","disabled":"tenant_rate_limited","hits":3}
+Hard mode rejected the missing price and the unbounded estimate before the mock.
+Disabled budget did not reject for spend.
+The hard request limit still rejected.
+
+Hard budget database outage.
+BUDGET_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":0}
+
+The corrected budget file exited 0.
+VITEST_EXIT=0
+
+Observation overage.
+The later runs are OBSERVE FIX and OBSERVE FIX 2 in the budget log.
+Both exited 0.
+An observe budget of 0.01, input rate 0.01, and content abcd reserved the full estimate 0.04.
+The mock cost stayed 0.03.
+Recognized expense was 0.01.
+The other 0.02 stayed provisional.
+costStatus was provisional.
+The remaining budget was 0.
+It did not start with a minus sign.
+A second close stayed provisional and did not change the amounts.
+BUDGET_CASE {"case":"modes","watch":{"remaining":"0","recognized":"0.01","provisional":"0.02","costStatus":"provisional","reserved":"0.020000000000","estimate":"0.04"},"empty":{"remaining":"0","recognized":"0","provisional":"0.03","costStatus":"provisional","reserved":"0.030000000000"},"tight":"budget_exceeded","missing":"budget_unknown","unbounded":"budget_unbounded","disabled":"tenant_rate_limited","hits":4}
+
+An observe budget of 0 still called the mock for content zero-left.
+The known cost 0.03 was stored.
+The reservation was provisional.
+It was not an unknown null amount.
+Recognized expense stayed 0.
+The remaining budget stayed 0.
+
+The hard clamp stayed recognized 1 and remaining 1 in the same runs.
+BUDGET_CASE {"case":"reconcile","exact":{"recognized":"0.03","remaining":"0.97","again":"settled"},"clamp":{"recognized":"1","remaining":"1"}}
+
+Overlapping observe closes.
+The runs are OVERLAP FIX 2026-10-22T04:41:19Z and OVERLAP FIX 2 2026-10-22T04:42:55Z.
+Both exited 0.
+Test Files 2 passed.
+Tests 13 passed.
+The shipped chat route admitted two requests on two proxy processes.
+The mock held both before either close.
+Each estimate was 0.80 and each known cost was 0.70.
+The observe allocation was 1.
+GET /internal/v1/budgets/usage returned recognized 1 and provisional 0.4.
+Those are the canonical forms of 1.00 and 0.40.
+The remaining budget was 0.
+costStatus was provisional.
+Both requests returned 200.
+The direct split_known_charge selects passed in the same runs.
+BUDGET_CASE {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+
+The hard clamp stayed recognized 1 and remaining 1 in these runs.
+BUDGET_CASE {"case":"reconcile","exact":{"recognized":"0.03","remaining":"0.97","again":"settled"},"clamp":{"recognized":"1","remaining":"1"}}
+The abcd observe case stayed recognized 0.01 and provisional 0.02.
+The empty observe budget stayed provisional 0.03 and recognized 0.

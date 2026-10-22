@@ -726,7 +726,7 @@ describe('streaming production controls', () => {
         slowWrites += 1;
         if (slowWrites >= 24) return;
         response.write(chunk);
-        setImmediate(pump);
+        setTimeout(pump, 20);
       };
       pump();
     });

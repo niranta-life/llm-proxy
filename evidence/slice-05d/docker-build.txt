@@ -1,0 +1,94 @@
+Docker build.
+
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Started: 2026-10-22T03:37:14Z
+Image: llm-proxy-app:latest
+BUILD_EXIT=0
+
+This rebuild followed the budget settlement fix.
+docker image inspect --format '{{.Id}}' returned sha256:79062348524546a1b7efdbb01a02debc4885f6efcf156b56901ad84c15cda5a0
+Created: 2026-10-21T20:38:59.288963605-07:00
+INSPECT_EXIT=0
+
+The build log named docker.io/library/llm-proxy-app:latest.
+The build log exported manifest list sha256:79062348524546a1b7efdbb01a02debc4885f6efcf156b56901ad84c15cda5a0.
+The build log exported manifest sha256:4a6e2c50be70c12449dd8de696ef8861f358c09ce49e002a0713ca8a397e90b5.
+The build log exported config sha256:911cf738f5b2a27cf1a1e0174aed2775419676177b64a8612f6b5bf3dce6b0c6.
+
+A one-shot ls of the image listed migrations 001_schema.sql through 015_tenant_limits.sql.
+014_provider_breaker.sql is in the image.
+015_tenant_limits.sql is in the image.
+dist/db/admission.js is in the image.
+dist/inference/admission.js is in the image.
+.env.live is absent from the image.
+
+The app container was not started.
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was still present.
+It was not deleted.
+
+Later rebuild after the observation overage change.
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Started: 2026-10-22T04:20:40Z
+BUILD_EXIT=0
+
+docker image inspect --format '{{.Id}}' returned sha256:5f6686ca3ea7cb889370cb902cdb618cf226e6eda5874dd962631c85c64bd2d6
+Created: 2026-10-21T21:20:42.125513473-07:00
+INSPECT_EXIT=0
+
+The build log named docker.io/library/llm-proxy-app:latest.
+The build log exported manifest list sha256:5f6686ca3ea7cb889370cb902cdb618cf226e6eda5874dd962631c85c64bd2d6.
+The build log exported manifest sha256:714e5097fc68b3481dc944d4aa9be5e6c54424c047429cf1439d8a82baa6419d.
+The build log exported config sha256:d7b18c84504ad23a83eebd38a34684d2f1fd133af3b160bdd275e562709ed5df.
+
+A one-shot ls of the image listed migrations 001_schema.sql through 015_tenant_limits.sql.
+014_provider_breaker.sql is in the image.
+015_tenant_limits.sql is in the image.
+A one-shot grep found the line "Observe keeps the full estimate" in migrations/015_tenant_limits.sql.
+dist/db/admission.js is in the image.
+dist/inference/admission.js is in the image.
+.env.live is absent from the image.
+
+This rebuild did not start the app service.
+docker ps already showed llm-proxy-app-1.
+This rebuild did not stop that container.
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was still present.
+It was not deleted.
+
+Later rebuild after the overlap close change.
+Command: docker compose build app
+Host: unix:///Users/nitin/.colima/default/docker.sock
+Started: 2026-10-22T04:53:59Z
+BUILD_EXIT=0
+The migrations copy step was not cached.
+
+docker image inspect --format '{{.Id}}' returned sha256:b8e5f057a73b54ac427947f6d2682ad8737f76827e854fc2111d1672150f3684
+Created: 2026-10-21T21:54:01.514388867-07:00
+INSPECT_EXIT=0
+
+The build log named docker.io/library/llm-proxy-app:latest.
+The build log exported manifest list sha256:b8e5f057a73b54ac427947f6d2682ad8737f76827e854fc2111d1672150f3684.
+The build log exported manifest sha256:99910339b5bcfd01465444061b8b697c2e595ba10eef60ddd2887508d4d3e9da.
+The build log exported config sha256:de197c08cbecb36f4712a2ed5e17b6170dd44fa31a4ade9a3720a76e1eaaab49.
+
+A one-shot ls of the image listed migrations 001_schema.sql through 015_tenant_limits.sql.
+014_provider_breaker.sql is in the image.
+015_tenant_limits.sql is in the image.
+A one-shot grep found "CREATE FUNCTION split_known_charge" at line 641.
+A one-shot grep found "A sibling reservation is not an input" at line 675.
+dist/db/admission.js is in the image.
+dist/inference/admission.js is in the image.
+.env.live is absent from the image.
+
+This rebuild did not start the app service.
+docker ps already showed llm-proxy-app-1.
+This rebuild did not stop that container.
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was still present.
+It was not deleted.

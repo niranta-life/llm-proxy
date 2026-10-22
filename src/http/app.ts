@@ -8,6 +8,7 @@ import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
+import { readTenantCapacity } from '../db/admission.js';
 import { listBreakers } from '../db/breaker.js';
 import { listAttemptHistory, listVisibleModels, summarizeMetrics } from '../inference/store.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
@@ -28,6 +29,8 @@ export type AppDeps = {
   compatibleFetch?: typeof fetch;
   privateResolve?: (host: string) => Promise<readonly string[]>;
   now?: () => number;
+  afterAdmit?: () => Promise<void> | void;
+  beforeSettle?: () => Promise<void> | void;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -74,7 +77,10 @@ export function buildApp(deps: AppDeps): ProxyApp {
   app.streamGate = streamGate;
   app.drainStreams = (drainMs: number) => drainStreams(streamGate, drainMs);
 
-  async function rejectUnauthenticated(request: FastifyRequest, reply: FastifyReply): Promise<string | null> {
+  async function rejectUnauthenticated(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<{ tenantId: string; keyId: string } | null> {
     try {
       const auth = await authenticate(deps.authPool, request.headers);
       if (auth === null) {
@@ -84,7 +90,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
           .send(proxyError(401, 'authentication_error', 'invalid_api_key', null, 'Invalid authentication.').body());
         return null;
       }
-      return auth.tenantId;
+      return auth;
     } catch (error) {
       deps.logger.error('authentication failed', { message: errorMessage(error) });
       await reply
@@ -167,8 +173,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   });
 
   app.post('/v1/chat/completions', async (request, reply) => {
-    const tenantId = await rejectUnauthenticated(request, reply);
-    if (tenantId === null) return;
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const tenantId = auth.tenantId;
     const controller = new AbortController();
     const abortUpstream = (): void => {
       if (!controller.signal.aborted) controller.abort();
@@ -195,6 +202,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         upstreamBaseUrl: deps.upstreamBaseUrl,
         store: credentialStore,
         tenantId,
+        apiKeyId: auth.keyId,
         body: request.body,
         signal: controller.signal,
         reply: streamReply(reply),
@@ -203,6 +211,8 @@ export function buildApp(deps: AppDeps): ProxyApp {
         fetchImpl: deps.compatibleFetch,
         resolveHost: deps.privateResolve,
         nowMs,
+        afterAdmit: deps.afterAdmit,
+        beforeSettle: deps.beforeSettle,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -220,8 +230,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   });
 
   app.get('/v1/models', async (request, reply) => {
-    const tenantId = await rejectUnauthenticated(request, reply);
-    if (tenantId === null) return;
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const tenantId = auth.tenantId;
     try {
       const data = await withTenant(deps.runtimePool, tenantId, (client) => listVisibleModels(client));
       return { object: 'list', data };
@@ -236,8 +247,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   app.get<{ Querystring: { from?: string; to?: string } }>(
     '/internal/v1/metrics/summary',
     async (request, reply) => {
-      const tenantId = await rejectUnauthenticated(request, reply);
-      if (tenantId === null) return;
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      const tenantId = auth.tenantId;
       try {
         const window = parseMetricsWindow(request.query.from, request.query.to);
         return await withTenant(deps.runtimePool, tenantId, (client) =>
@@ -256,8 +268,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   app.get<{
     Querystring: { from?: string; to?: string; provider?: string; deployment?: string; model?: string };
   }>('/internal/v1/metrics/costs', async (request, reply) => {
-    const tenantId = await rejectUnauthenticated(request, reply);
-    if (tenantId === null) return;
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const tenantId = auth.tenantId;
     try {
       const window = parseMetricsWindow(request.query.from, request.query.to);
       const filters = parseCostFilters(request.query);
@@ -276,8 +289,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   app.get<{
     Querystring: { from?: string; to?: string; provider?: string; deployment?: string; model?: string };
   }>('/internal/v1/metrics/attempts', async (request, reply) => {
-    const tenantId = await rejectUnauthenticated(request, reply);
-    if (tenantId === null) return;
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const tenantId = auth.tenantId;
     try {
       const window = parseMetricsWindow(request.query.from, request.query.to);
       const filters = parseCostFilters(request.query);
@@ -298,8 +312,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
   });
 
   app.get<{ Querystring: { deployment?: string } }>('/internal/v1/metrics/breakers', async (request, reply) => {
-    const tenantId = await rejectUnauthenticated(request, reply);
-    if (tenantId === null) return;
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const tenantId = auth.tenantId;
     const deployment = request.query.deployment?.trim() ?? '';
     if (request.query.deployment !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(deployment)) {
       return reply
@@ -319,6 +334,23 @@ export function buildApp(deps: AppDeps): ProxyApp {
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
     }
   });
+
+  async function capacity(request: FastifyRequest, reply: FastifyReply) {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      return await readTenantCapacity(deps.runtimePool, auth.tenantId, new Date(nowMs()));
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('capacity read failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  }
+
+  app.get('/internal/v1/limits', capacity);
+  app.get('/internal/v1/budgets/usage', capacity);
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });

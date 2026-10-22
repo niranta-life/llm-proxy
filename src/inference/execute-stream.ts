@@ -11,6 +11,7 @@ import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from '.
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
+import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
 import {
@@ -80,6 +81,7 @@ export async function runChatStream(input: {
   upstreamBaseUrl: string;
   store: ProviderCredentialStore;
   tenantId: string;
+  apiKeyId: string;
   request: ChatRequest;
   route: ResolvedRoute;
   signal: AbortSignal;
@@ -89,6 +91,8 @@ export async function runChatStream(input: {
   fetchImpl?: typeof fetch;
   resolveHost?: (host: string) => Promise<readonly string[]>;
   nowMs?: () => number;
+  afterAdmit?: () => Promise<void> | void;
+  beforeSettle?: () => Promise<void> | void;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -231,6 +235,16 @@ export async function runChatStream(input: {
       breakerObservedAt = observedAt;
       trackedBreaker = gate.track;
       breakerProbe = gate.probe;
+      await admitChatAttempt(input.runtimePool, {
+        tenantId: input.tenantId,
+        apiKeyId: input.apiKeyId,
+        route: input.route,
+        request: input.request,
+        attemptId,
+        stream: true,
+        now: observedAt,
+      });
+      if (input.afterAdmit) await input.afterAdmit();
       const call = {
         apiKey,
         baseURL: transport.baseURL,
@@ -334,9 +348,9 @@ export async function runChatStream(input: {
       }
     } catch (error) {
       failure = error;
-      if (error instanceof ProxyError && error.code === 'circuit_open') {
+      if (error instanceof ProxyError && (error.code === 'circuit_open' || isAdmissionCode(error.code))) {
         machine = { ...machine, status: 'provider_failed' };
-        providerCode = 'circuit_open';
+        providerCode = error.code ?? 'admission_unavailable';
       } else if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
       else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
         machine = reduceStream(machine, { type: 'shutdown' });
@@ -368,12 +382,15 @@ export async function runChatStream(input: {
     if (!isTerminalStatus(machine.status)) {
       machine = reduceStream(machine, { type: 'upstream_closed' });
     }
-    if (failure instanceof ProxyError && failure.code === 'circuit_open') {
+    if (failure instanceof ProxyError && (failure.code === 'circuit_open' || isAdmissionCode(failure.code))) {
+      if (isAdmissionCode(failure.code) && trackedBreaker) {
+        await noteStreamBreaker(input, breakerObservedAt, breakerProbe, 'ignore');
+      }
       await recordStream(input, {
         requestId,
         attemptId,
         status: 'failed',
-        errorCode: 'circuit_open',
+        errorCode: failure.code ?? 'admission_unavailable',
         durationMs: elapsedMs(started),
         usage,
         uncachedInputTokens: null,
@@ -607,7 +624,13 @@ function httpError(status: TerminalStreamStatus, failure: unknown): ProxyError {
 }
 
 async function recordStream(
-  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  input: {
+    runtimePool: Pool;
+    logger: Logger;
+    tenantId: string;
+    nowMs?: () => number;
+    beforeSettle?: () => Promise<void> | void;
+  },
   result: {
     requestId: string;
     attemptId: string;
@@ -662,6 +685,14 @@ async function recordStream(
       });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
+    if (input.beforeSettle) await input.beforeSettle();
+    await settleChatAttempt(
+      input.runtimePool,
+      input.logger,
+      input.tenantId,
+      result.attemptId,
+      new Date((input.nowMs ?? Date.now)()),
+    );
   } catch (error) {
     input.logger.error('attempt result was not recorded', {
       severity: 'critical',

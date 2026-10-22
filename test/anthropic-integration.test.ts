@@ -293,6 +293,7 @@ describe('Anthropic integration', () => {
       '012_cost_accounting.sql',
       '013_execution_policy.sql',
       '014_provider_breaker.sql',
+      '015_tenant_limits.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

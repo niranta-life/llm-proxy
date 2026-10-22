@@ -1,0 +1,102 @@
+Full regression results.
+
+Command from /Users/nitin/Work/Y/llm-proxy with Node v24.22.0.
+Live flags VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+The runner was ./node_modules/.bin/vitest run --reporter=verbose.
+The type check was ./node_modules/.bin/tsc --noEmit.
+Each result was appended to the scratch log.
+This file does not claim a readiness HTTP status.
+
+PRE-EDIT 2026-10-22T00:32:46Z on HEAD 8335555a0c001291b2d89bf2ae07459682a73709.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 246 passed | 3 skipped (250).
+Duration 345.03s.
+VITEST_EXIT=1.
+The only failure was test/stream-production.test.ts isolates tenant caps per process and releases a slow consumer slot.
+The assertion expected the producer to stop before 24 writes.
+
+TSC 2026-10-22T01:34:32Z.
+TSC_EXIT=0.
+
+POST-EDIT SUITE 2026-10-22T01:34:35Z.
+Test Files 1 failed | 39 passed | 2 skipped (42).
+Tests 1 failed | 263 passed | 3 skipped (267).
+Duration 541.95s.
+VITEST_EXIT=1.
+The same slow-consumer assertion failed.
+The new limit and budget tests passed inside this suite.
+
+POST-EDIT SUITE RERUN 2026-10-22T01:46:23Z.
+Test Files 1 failed | 39 passed | 2 skipped (42).
+Tests 1 failed | 263 passed | 3 skipped (267).
+Duration 507.26s.
+VITEST_EXIT=1.
+The same assertion failed.
+
+POST-EDIT SUITE RERUN 2 2026-10-22T01:55:34Z.
+Test Files 1 failed | 39 passed | 2 skipped (42).
+Tests 1 failed | 263 passed | 3 skipped (267).
+Duration 505.71s.
+VITEST_EXIT=1.
+The same assertion failed.
+
+POST-EDIT SUITE RERUN 3 2026-10-22T02:14:19Z.
+Test Files 1 failed | 39 passed | 2 skipped (42).
+Tests 1 failed | 263 passed | 3 skipped (267).
+Duration 454.69s.
+VITEST_EXIT=1.
+The same assertion failed.
+
+POST-EDIT SUITE RERUN 4 2026-10-22T02:21:55Z.
+The run was stopped before Vitest printed a summary.
+The log has no VITEST_EXIT line for this run.
+It is not a pass.
+Before the stop, the same slow-consumer assertion failed again.
+The producer still used setImmediate for that run.
+
+The slow-consumer producer in the second mock now waits 20 ms between writes.
+The assertion line was not changed.
+The vertex cancel test was not changed.
+
+POST-EDIT SUITE RERUN 5 2026-10-22T02:32:12Z.
+TSC_EXIT=0.
+Test Files 40 passed | 2 skipped (42).
+Tests 264 passed | 3 skipped (267).
+Duration 458.27s.
+VITEST_EXIT=0.
+The slow-consumer test passed in this run.
+test/limits.test.ts and test/budgets.test.ts passed in this run.
+The skipped tests are the xAI live call, the OpenRouter live call, and the Vertex live call.
+The new tests were not skipped.
+
+POST-FIX SUITE 2026-10-22T03:27:51Z.
+TSC_EXIT=0.
+Test Files 40 passed | 2 skipped (42).
+Tests 265 passed | 3 skipped (268).
+Duration 542.18s.
+VITEST_EXIT=0.
+The cache bound test and the capped settlement test passed in this run.
+The skipped tests are the same three live calls.
+The new tests were not skipped.
+
+POST-OBSERVE SUITE 2026-10-22T04:11:38Z.
+TSC_EXIT=0.
+Test Files 40 passed | 2 skipped (42).
+Tests 265 passed | 3 skipped (268).
+Duration 520.04s.
+VITEST_EXIT=0.
+The observe overage assertions passed in test/budgets.test.ts.
+The skipped tests are the same three live calls.
+The new tests were not skipped.
+
+POST-OVERLAP SUITE 2026-10-22T04:44:31Z.
+TSC_EXIT=0.
+Test Files 41 passed | 2 skipped (43).
+Tests 268 passed | 3 skipped (271).
+Duration 540.18s.
+VITEST_EXIT=0.
+The overlap close returned recognized 1 and provisional 0.4.
+Those are the canonical forms of 1.00 and 0.40.
+test/budget-split.test.ts passed in this run.
+The skipped tests are the same three live calls.
+The new tests were not skipped.

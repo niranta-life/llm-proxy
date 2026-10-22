@@ -667,7 +667,9 @@ Do not pass `--default-max-output-tokens` for DGX.
 Do not pass an OpenRouter routing flag for DGX.
 A new DGX deployment stays disabled until you enable it.
 You can set a concurrency limit on that deployment.
-The concurrency limit is a count in this process.
+The concurrency limit from `set-deployment-concurrency` is a count in this process.
+A shared deployment limit uses `set-deployment-limit`.
+Refer to [Limits and budgets](#limits-and-budgets).
 DGX can stream when the tenant and the deployment both enable streaming.
 `validate-deployment` records `unvalidated`, `valid`, `invalid`, or `validated_mock`.
 `validate-deployment` does not record `validated_live`.
@@ -914,6 +916,8 @@ When the variable is absent, the limit is 32.
 When the variable is absent, the limit is 32.
 The two limits are in the memory of this process.
 A count in one process does not change the count in another process.
+A configured stream limit is separate from these two counts.
+Every proxy process shares that configured limit.
 One more stream receives HTTP 503.
 The code is `stream_capacity`.
 The proxy sends that response before an event.
@@ -938,8 +942,9 @@ An error body is an OpenAI error object:
 | 404 | `model_not_found` | The name is unknown, or the deployment is not enabled. |
 | 408 | `request_cancelled` | The caller closed the request. |
 | 429 | `rate_limit` | The provider returned HTTP 429. |
+| 429 | `tenant_rate_limited`, `api_key_rate_limited`, `concurrency_limited`, `api_key_concurrency_limited`, `stream_limited`, `api_key_stream_limited`, `connection_limited`, `deployment_limited`, `token_rate_limited`, `api_key_token_limited`, `budget_exceeded`, `budget_unbounded`, or `budget_unknown` | A hard limit or a hard budget rejected the request before the upstream call. |
 | 502 | `upstream_error` or `invalid_upstream_response` | The provider sent an error, or the body is not a chat completion. |
-| 503 | `inference_disabled`, `service_unavailable`, `stream_capacity`, `slow_consumer`, or `shutting_down` | Inference is off, the proxy cannot prepare the provider request, a stream limit is full, the caller does not read, or the process is shutting down. |
+| 503 | `inference_disabled`, `service_unavailable`, `stream_capacity`, `slow_consumer`, `shutting_down`, or `admission_unavailable` | Inference is off, the proxy cannot prepare the provider request, a stream limit is full, the caller does not read, the process is shutting down, or a hard admission check cannot reach the database. |
 | 504 | `timeout` | The deployment timeout is complete, or a stream timeout is complete before the response headers. |
 | 529 | `overloaded` | Anthropic returned HTTP 529. |
 
@@ -962,6 +967,8 @@ For HTTP 503, the proxy does not send the provider request when inference is off
 The proxy does not send the provider request when it cannot record the request row.
 The proxy does not send the provider request when a stream limit is full.
 The proxy does not send the provider request when the process is shutting down.
+The proxy does not send the provider request when a hard limit or a hard budget rejects the request.
+The proxy does not send the provider request when a hard admission check cannot reach the database.
 
 When the provider returns the chat completion and the proxy cannot record the status, the result is:
 
@@ -1745,6 +1752,109 @@ docker compose run --rm app node dist/cli.js reset-deployment-breaker \
   --deployment <name>
 ```
 
+## Limits and budgets
+
+`015_tenant_limits.sql` stores tenant limits, concurrency leases, monthly budgets, and a cost ledger.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `014`.
+
+The image `8335555` stays ready on this database.
+Its latest migration file is `014_provider_breaker.sql`.
+After `015_tenant_limits.sql` is applied, `schema_migrations` keeps `014_provider_breaker.sql`.
+The readiness route on that image checks for `014_provider_breaker.sql`.
+A later file does not remove that row.
+
+Start in observation mode.
+Observation mode records usage.
+Observation mode does not reject a request only because usage crossed the threshold.
+`GET /internal/v1/limits` uses the same tenant headers.
+`GET /internal/v1/budgets/usage` uses the same tenant headers.
+Compare those routes with the configured thresholds.
+Then enable hard limits for one test tenant.
+Confirm that an excess request is rejected before you widen the change.
+Hard limits are never silently bypassed.
+A hard rejection returns HTTP 429.
+The code names the limit or the budget reason.
+The proxy does not call the upstream model for that rejection.
+A hard check that cannot reach the database returns HTTP 503.
+The code is `admission_unavailable`.
+The proxy does not call the upstream model for that rejection.
+
+A limit can cover requests per minute, concurrent requests, concurrent streams, a provider connection, a deployment, and a token rate when the bound is known.
+An API key can have its own limit.
+The most restrictive hard limit applies.
+Those limits are shared by every proxy process that uses the database.
+A concurrency lease expires.
+A later request can take the permit after the lease expires.
+The proxy does not keep a database transaction open during the upstream call.
+
+A budget can be `observe`, `hard`, or `disabled`.
+The budget period is one UTC month.
+Amounts use a fixed decimal.
+The inspection routes show the allocated budget, the recognized expense, the active reservations, the remaining budget, and the cost status.
+A hard budget rejects an unknown or unbounded cost before the upstream call.
+A cache rate is a split of the prompt.
+The estimate uses the highest of the input rate and the cache rates.
+A price with no external rate and no request fee is unknown.
+A settled amount cannot exceed the reservation.
+An observation budget still allows the request when the estimate exceeds the remaining amount.
+The reservation is the full estimate.
+A known charge above the allocation stays provisional.
+The part that fits in the allocation is recognized.
+A known charge is still recorded when no allocation remains.
+Overlapping observation closes recognize against settled expense only.
+A sibling reservation does not reduce that room.
+The remaining budget is the allocation minus recognized expense, active reservations, and provisional charges.
+An observation excess does not push that remainder below zero.
+The excess stays visible as a provisional charge.
+A recognized amount above the allocation is not hidden.
+A timeout does not become a zero-cost call.
+An uncertain charge stays provisional until a verified accounting decision.
+A retry reserves its own amount.
+The same attempt is not settled twice.
+
+You change a limit or a budget only with the CLI.
+The proxy has no HTTP route that changes a limit or a budget.
+`set-deployment-concurrency` stores a count for this process.
+`set-deployment-limit` stores a limit that every proxy process shares.
+`recover-budget` closes a finished attempt that still holds a reservation.
+It does not free an uncertain charge.
+
+```bash
+docker compose run --rm app node dist/cli.js set-tenant-limits \
+  --tenant-id <tenant-id> \
+  --mode observe \
+  --requests-per-minute 60 \
+  --concurrent-requests 8 \
+  --concurrent-streams 4
+docker compose run --rm app node dist/cli.js set-tenant-budget \
+  --tenant-id <tenant-id> \
+  --mode observe \
+  --monthly-amount 100
+docker compose run --rm app node dist/cli.js set-tenant-limits \
+  --tenant-id <tenant-id> \
+  --mode hard \
+  --requests-per-minute 60
+docker compose run --rm app node dist/cli.js set-api-key-limits \
+  --tenant-id <tenant-id> \
+  --key-id <key-id> \
+  --mode hard \
+  --requests-per-minute 30
+docker compose run --rm app node dist/cli.js set-connection-limit \
+  --tenant-id <tenant-id> \
+  --provider openai \
+  --mode observe \
+  --max-concurrency 4
+docker compose run --rm app node dist/cli.js set-deployment-limit \
+  --tenant-id <tenant-id> \
+  --deployment <name> \
+  --mode observe \
+  --max-concurrency 2
+docker compose run --rm app node dist/cli.js recover-budget \
+  --tenant-id <tenant-id>
+```
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1945,7 +2055,13 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The schema permits 2 attempt rows for the same request.
 - The proxy records an estimated cost for each attempt.
 - The proxy does not take a payment.
-- The proxy does not set a maximum number of requests.
+- A tenant limit can set a maximum number of requests.
+- Observation mode records usage and does not reject only because usage crossed the threshold.
+- Hard limits are never silently bypassed.
+- A hard rejection returns HTTP 429 before the upstream call.
+- A hard check that cannot reach the database returns HTTP 503 with code `admission_unavailable`.
+- Start in observation mode and compare the inspection routes with the thresholds.
+- Then enable hard limits for one test tenant and confirm the rejection.
 - A price is a stored version.
 - The proxy does not embed a public price list.
 - The proxy has no quality score.
@@ -1985,6 +2101,8 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The stream limit is a count in this process.
 - The tenant stream limit is a count in this process.
 - Those counts are not shared with another process.
+- A configured concurrency limit is shared with another process.
+- The stricter of the process limit and the configured limit rejects the request.
 - A shutdown records `interrupted` when the row write succeeds.
 - A stream is `completed` only after the provider finish event.
 - An OpenAI stream is `completed` only after the provider `[DONE]` event.
@@ -2011,7 +2129,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - An HTTP route that changes a provider record.
 - Production control of a database role password.
 - Production control of the provider key.
-- A payment for use and a maximum number of requests.
+- A payment for use.
 
 ## License
 

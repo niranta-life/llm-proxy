@@ -1,0 +1,35 @@
+Budget race test results.
+
+The file is test/budgets.test.ts.
+Both runs used the shipped chat route, real PostgreSQL, and a local mock.
+Two proxy processes reserved the same hard budget at the same time.
+The budget equalled one estimate.
+One request was held on the mock.
+The other request was rejected before a second mock hit.
+
+Run 1.
+BUDGET_CASE {"case":"race","during":"0","after":"0.01","results":[{"status":429,"code":"budget_exceeded"},{"status":200,"code":null}],"hits":1}
+VITEST_EXIT=0.
+
+Run 2.
+BUDGET_CASE {"case":"race","during":"0","after":"0.01","results":[{"status":200,"code":null},{"status":429,"code":"budget_exceeded"}],"hits":1}
+VITEST_EXIT=0.
+
+During the overlap the remaining budget was 0.
+After settlement the remaining budget was 0.01.
+The mock recorded 1 hit.
+Available budget did not go negative.
+The same race also passed inside the post-edit full suite.
+That suite failed later on the existing slow-consumer assertion only.
+
+Observe overlap.
+Two proxy processes admitted two observe requests before either close.
+The mock held both.
+Each estimate was 0.80 and each known cost was 0.70.
+The allocation was 1.
+OVERLAP FIX 2026-10-22T04:41:19Z exited 0.
+OVERLAP FIX 2 2026-10-22T04:42:55Z exited 0.
+BUDGET_CASE {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+Recognized expense was the canonical form of 1.00.
+Provisional expense was the canonical form of 0.40.
+The remaining budget was 0.

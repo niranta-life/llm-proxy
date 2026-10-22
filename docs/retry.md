@@ -1,5 +1,11 @@
 # Retry
 
+Back to [README](../README.md)
+
+## Where it fits
+
+This page covers the retry decision in step 6. See the [request path](architecture.md#request-path).
+
 [llm-proxy](../README.md) sends one upstream attempt unless you turn retry on for that deployment. Retry stays off by default. There is no HTTP route that changes the policy.
 
 An enabled policy makes at most two upstream attempts. The second attempt uses the same provider and the same deployment. The proxy does not switch the model after an error. The same request does not retry and also fall back. Fallback is a separate control. See [Fallback](fallback.md).
@@ -8,7 +14,7 @@ Provider clients set `maxRetries` to `0`, so the SDK does not retry on its own.
 
 ## When the second attempt runs
 
-The second attempt can run for a rate limit, an unavailable response, or a connection failure before the request is sent.
+The second attempt can run for HTTP 429, HTTP 503, or a connection failure before the request is sent.
 
 It does not run for any other HTTP status. It does not run when the caller cancels. It does not run after a stream has sent output. It does not run for a timeout before the request is sent, a timeout after the request is sent, an exhausted total deadline, or an ambiguous network failure after the request is sent.
 
@@ -40,7 +46,7 @@ docker compose run --rm app node dist/cli.js set-execution-policy \
   --max-backoff-ms 0
 ```
 
-Use `--retries true` when you want the second attempt. The change applies to that deployment only.
+Use `--retries true` when you want the second attempt. The change applies to that deployment only. The command needs `--tenant-id`, `--deployment`, `--retries`, and all five deadline and backoff flags. A deployment name cannot be `auto`.
 
 ## Related
 

@@ -1,10 +1,16 @@
 # Metrics
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) exposes tenant metrics on internal routes. Each route uses the same `X-Tenant-ID` and `Authorization` headers as chat. Another tenant does not appear in the body.
 
-`from` and `to` are datetimes. The window includes `from` and excludes `to`. The longest window is 32 days.
+`from` and `to` are absolute timestamps with `Z` or an offset, such as `2026-01-01T00:00:00Z`. `to` must be later than `from`. The window includes `from` and excludes `to`. The longest window is 32 days.
 
 The summary has no price and no quality score. Empty latency and empty token sums are null. The proxy does not invent a zero.
+
+## Where it fits
+
+These routes read the rows written in step 3 and step 7. This page covers step 7. See the [request path](architecture.md#request-path).
 
 ## Summary
 

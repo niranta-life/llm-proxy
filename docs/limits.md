@@ -1,5 +1,7 @@
 # Limits and budgets
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) can cap how much a tenant sends, and how much it spends in a UTC month. Start in observation mode. Observation records usage and does not reject a request only because usage crossed the threshold.
 
 Compare the inspection routes with the thresholds. Then enable hard limits for one test tenant. Confirm that an excess request is rejected before you widen the change. Hard limits are never silently bypassed.
@@ -7,6 +9,10 @@ Compare the inspection routes with the thresholds. Then enable hard limits for o
 A hard rejection is HTTP 429. The code names the limit or the budget reason. The proxy does not call the upstream model. If a hard check cannot reach the database, the response is HTTP 503 `admission_unavailable`, and the provider is not called.
 
 You change a limit or a budget only with the CLI. There is no HTTP route for that.
+
+## Where it fits
+
+This page covers step 5. Admission runs after the breaker check, so a request rejected by an open breaker never reaches a limit or a reservation. See the [request path](architecture.md#request-path).
 
 ## What a limit can cover
 

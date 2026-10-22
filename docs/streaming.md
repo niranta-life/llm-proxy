@@ -1,5 +1,11 @@
 # Streaming
 
+Back to [README](../README.md)
+
+## Where it fits
+
+This page covers step 6 for streams. Streams also pass steps 4 and 5 before the first byte is sent. See the [request path](architecture.md#request-path).
+
 [llm-proxy](../README.md) can stream a text chat for OpenAI, Anthropic, Vertex, xAI, OpenRouter, and an approved DGX deployment. Streaming stays off until you enable it for the tenant and for that deployment. The caller changes only `model`.
 
 ```bash
@@ -9,7 +15,7 @@ docker compose run --rm app node dist/cli.js set-deployment-streaming \
   --tenant-id <tenant-id> --deployment primary --enabled true
 ```
 
-If you omit the timeout flags, the deployment timeout covers the connection, a provider that sends no text, the full stream, and a caller that does not read. Each text chunk resets the idle timer. The total timer can still end the stream while text is arriving.
+`set-deployment-streaming` also takes `--connect-timeout-ms`, `--idle-timeout-ms`, `--total-timeout-ms`, and `--backpressure-timeout-ms`. Each is an integer from 100 through 600000. If you omit a flag, the deployment timeout covers that stage: the connection, a provider that sends no text, the full stream, and a caller that does not read. Each run of the command replaces all four stored values. Each text chunk resets the idle timer. The total timer can still end the stream while text is arriving.
 
 `stream_options` may only be `{"include_usage":true}` or `{"include_usage":false}`. The request shape is in [Chat](chat.md).
 
@@ -57,7 +63,7 @@ A caller that does not read ends as `slow_consumer`. That end releases the slot,
 
 ## Shutdown
 
-`SIGTERM` and `SIGINT` stop new streams. The proxy waits for `STREAM_SHUTDOWN_DRAIN_MS`, which defaults to 5000 and may be an integer from 0 through 600000. A stream that finishes in that time can complete. The proxy then aborts each stream that is still open and records `interrupted` when that row write succeeds. It closes the server, then the database pools, and the process ends. A second signal does not start a second shutdown.
+`SIGTERM` and `SIGINT` stop new streams. A new stream gets HTTP 503 `shutting_down`. The proxy waits for `STREAM_SHUTDOWN_DRAIN_MS`, which defaults to 5000 and may be an integer from 0 through 600000. A stream that finishes in that time can complete. The proxy then aborts each stream that is still open and records `interrupted` when that row write succeeds. It closes the server, then the database pools, and the process ends. A second signal does not start a second shutdown. The process exits with code 1 if shutdown takes more than 15 seconds beyond the drain time.
 
 Send `SIGTERM` before the platform stops the process. Set the platform stop grace longer than `STREAM_SHUTDOWN_DRAIN_MS`.
 

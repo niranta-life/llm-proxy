@@ -1,5 +1,11 @@
 # Operations
 
+Back to [README](../README.md)
+
+## Where it fits
+
+This page covers the whole path. See the [request path](architecture.md#request-path).
+
 Day-to-day start steps are on the [home page](../README.md). This page is the operator reference: configuration, health, migrations, incidents, and tests.
 
 ## What you need
@@ -46,7 +52,7 @@ The process refuses to listen when a required value is missing or invalid.
 | Variable | Required | Use |
 | --- | --- | --- |
 | `DATABASE_HOST` | yes | PostgreSQL host. |
-| `DATABASE_PORT` | yes | PostgreSQL port. |
+| `DATABASE_PORT` | yes | PostgreSQL port. Integer from 1 through 65535. |
 | `DATABASE_NAME` | yes | Database name. |
 | `MIGRATOR_USER` | yes | Must be `llm_migrator`. |
 | `MIGRATOR_PASSWORD` | yes | Password for the migration role. |
@@ -55,11 +61,11 @@ The process refuses to listen when a required value is missing or invalid.
 | `RUNTIME_USER` | yes | Must be `llm_runtime`. |
 | `RUNTIME_PASSWORD` | yes | Password for the runtime role. |
 | `HOST` | no | Listen address. Default `0.0.0.0`. |
-| `PORT` | no | Listen port. Default `8080`. |
-| `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. |
-| `INFERENCE_ENABLED` | no | `true` or `false`. Default `false`. |
-| `PROVIDER_CREDENTIAL_KEY` | when inference is on | 32-byte key in base64. |
-| `OPENAI_BASE_URL` | no | OpenAI base URL. Default `https://api.openai.com/v1`. |
+| `PORT` | no | Listen port. Default `8080`. Integer from 1 through 65535. |
+| `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. Default `info`. |
+| `INFERENCE_ENABLED` | no | `true` or `false`. Default `false`. Any other value is invalid. |
+| `PROVIDER_CREDENTIAL_KEY` | when inference is on | 32-byte key in base64. The CLI needs it too when it stores a provider key. |
+| `OPENAI_BASE_URL` | no | OpenAI base URL. Default `https://api.openai.com/v1`. Must be an `http` or `https` URL with no user name or password. |
 | `MAX_ACTIVE_STREAMS` | no | Open streams in this process. Default `32`. Integer from 1 through 10000. |
 | `MAX_STREAMS_PER_TENANT` | no | Open streams for one tenant in this process. Default `32`. Same range. Not shared with another process. |
 | `STREAM_SHUTDOWN_DRAIN_MS` | no | Drain time after `SIGTERM` or `SIGINT`. Default `5000`. Integer from 0 through 600000. |
@@ -73,6 +79,8 @@ The proxy does not listen with TLS. Compose passwords are for local development.
 `GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` only when Postgres is reachable and `schema_migrations` contains the latest migration for this image. Otherwise it returns HTTP 503 `{"status":"not_ready","database":"unavailable"}`. Live stays 200.
 
 If the database drops after the process is listening, the process keeps running. Ready goes to 503. Live stays 200.
+
+Tenant routes are `GET /v1/tenant`, `GET /v1/models`, and `POST /v1/chat/completions`. The read routes under `/internal/v1/` use the same two tenant headers. Any other path returns HTTP 404 `{"error":"not_found"}`. An unhandled error returns HTTP 500 `{"error":"internal_error"}`.
 
 ## Database roles
 
@@ -123,11 +131,11 @@ To run an older image, build it from that commit, stop the current app, and star
 
 These changes affect one tenant, or one deployment, and do not call the provider for the thing you just disabled.
 
-- Turn retry off with `set-execution-policy` and `--retries false`.
+- Turn retry off with `set-execution-policy`, `--deployment`, and `--retries false`. The command also needs the three deadline flags and the two backoff flags. See [Retry](retry.md).
 - Turn fallback off with `set-fallback-policy` and `--enabled false`. A named deployment still does not switch.
 - Disable one deployment with `set-deployment-enabled`, `--name`, and `--enabled false`. The next request for that name returns `model_not_found`.
-- Disable one breaker with `set-deployment-breaker` and `--enabled false`.
-- Reset one breaker with `reset-deployment-breaker`. The next chat can reach the upstream.
+- Disable one breaker with `set-deployment-breaker`, `--deployment`, and `--enabled false`.
+- Reset one breaker with `reset-deployment-breaker` and `--deployment`. The next chat can reach the upstream.
 - Run `recover-budget` to close a finished attempt that still holds a reservation. A second run does not settle it again. An uncertain charge stays provisional.
 
 A hard check that cannot reach the database returns HTTP 503 `admission_unavailable` and does not call the provider.

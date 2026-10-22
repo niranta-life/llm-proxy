@@ -1,8 +1,14 @@
 # Providers
 
+Back to [README](../README.md)
+
+## Where it fits
+
+This page covers steps 2 and 6, where each provider's rules apply. See the [request path](architecture.md#request-path).
+
 [llm-proxy](../README.md) can call OpenAI, Anthropic, Vertex, xAI, OpenRouter, and one private DGX endpoint per tenant. Each tenant has one connection per provider. The caller cannot send a provider URL or a provider API key.
 
-Provider keys are AES-256-GCM ciphertext with the prefix `aes-256-gcm$`. The key is `PROVIDER_CREDENTIAL_KEY`, a 32-byte value in base64. Postgres does not store that key. `list-inference` does not print a provider credential. A new Anthropic, Vertex, xAI, OpenRouter, or DGX deployment stays disabled until you enable it.
+Provider keys are AES-256-GCM ciphertext with the prefix `aes-256-gcm$`. The key is `PROVIDER_CREDENTIAL_KEY`, a 32-byte value in base64. Postgres does not store that key. `list-inference` does not print a provider credential. A new deployment stays disabled until you pass `--enabled true` or run `set-deployment-enabled`. A new connection is enabled. `register-deployment` takes `--timeout-ms` for every provider.
 
 Chat itself is the same request for every provider. See [Chat](chat.md).
 
@@ -53,7 +59,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
 
 Anthropic uses the Messages API. The endpoint is stored on the tenant connection. `OPENAI_BASE_URL` is not that endpoint. There is no Anthropic environment variable. `register-anthropic-connection` enables the connection. The deployment stays off until `--enabled true` or `set-deployment-enabled`.
 
-An Anthropic deployment must have `--default-max-output-tokens`. `--workspace-id` is optional.
+An Anthropic deployment must have `--default-max-output-tokens`. `--workspace-id` is optional and belongs to `register-anthropic-connection`.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-anthropic-connection \
@@ -152,8 +158,6 @@ A live Vertex test runs only when `VERTEX_LIVE` is `1`. `npm test` does not set 
 
 Each tenant has one xAI connection. The base URL is fixed at `https://api.x.ai/v1`. The connection stores no endpoint. The caller cannot send `base_url`. Capabilities match an OpenAI deployment. Do not pass `--default-max-output-tokens` or an OpenRouter routing flag. The proxy does not send `X-OpenRouter-Metadata` to xAI.
 
-Enable xAI before you enable OpenRouter. Turn on one of those two providers at a time.
-
 ```bash
 docker compose run --rm app node dist/cli.js register-xai-connection \
   --tenant-id <tenant-id> --api-key "$XAI_API_KEY"
@@ -175,9 +179,7 @@ A live xAI test runs only when `XAI_LIVE` is `1`. `npm test` does not set that v
 
 Each tenant has one OpenRouter connection. The base URL is fixed at `https://openrouter.ai/api/v1`. The connection stores no endpoint. The caller cannot send `provider`, `models`, `route`, or a base URL.
 
-Enable OpenRouter only after you decide whether xAI stays disabled.
-
-You store 1 to 8 unique downstream slugs. A slug uses lowercase letters, digits, and hyphens. The proxy sends that list as `provider.only` and does not add to it. `--data-collection` is `allow` or `deny`. `--allow-fallbacks` is the OpenRouter routing flag. The proxy [fallback policy](fallback.md) is separate. The proxy does not drop or widen a stored restriction. An empty downstream list is invalid.
+You store 1 to 8 unique downstream slugs. A slug uses lowercase letters, digits, and hyphens. The proxy sends that list as `provider.only` and does not add to it. `--data-collection` is `allow` or `deny`. `--allow-fallbacks` is the OpenRouter routing flag. The proxy [fallback policy](fallback.md) is separate. The proxy does not drop or widen a stored restriction. An empty downstream list is invalid. To change the data handling of a stored deployment, run `set-deployment-data-collection` with `--tenant-id`, `--deployment`, and `--data-collection allow` or `deny`. It raises the deployment config version.
 
 `--require-serving-provider true` demands a provider id in the response. The proxy sends `X-OpenRouter-Metadata: enabled` and reads the selected provider from `openrouter_metadata`. The name must match a stored slug, ignoring letter case. The proxy keeps the name OpenRouter reported. It does not treat the model name as the provider, and it does not read a provider out of a summary sentence. On a stream, it can read the name from the final chunk. A complete stream then ends with `[DONE]`.
 
@@ -239,6 +241,8 @@ docker compose run --rm app node dist/cli.js validate-deployment \
 docker compose run --rm app node dist/cli.js set-deployment-health \
   --tenant-id <tenant-id> --deployment dgx-chat --status healthy
 ```
+
+`list-private-models` reads `/models` from the stored endpoint and prints the model ids. `probe-private-health` calls the stored health endpoint and prints the HTTP status. Both take `--tenant-id` and `--deployment`. `probe-private-health` fails when no health endpoint is stored. `approve-private-endpoint` takes `--tls-verify` (default `true`) and `--health-endpoint` (optional). `--max-concurrency` on `set-deployment-concurrency` is an integer, or `none` to remove the limit.
 
 `validate-deployment` can record `unvalidated`, `valid`, `invalid`, or `validated_mock`. It refuses `validated_live`. Live DGX is not verified. `set-deployment-health` records `unknown`, `healthy`, or `unhealthy` and does not change the validation status. Tests use a local mock and do not call a DGX host.
 

@@ -1,5 +1,7 @@
 # Fallback
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) can try one more deployment when the alias `auto` fails before any output. The behavior stays off until you store an enabled policy for that alias. A missing policy does not choose another deployment. A disabled policy does not either. An existing alias stays on its current deployment until you store a policy.
 
 A request that names a deployment never switches. Retry and fallback do not run on the same request. See [Retry](retry.md).
@@ -7,6 +9,10 @@ A request that names a deployment never switches. Retry and fallback do not run 
 The proxy uses at most two attempts, even when the stored maximum is higher. It does not ask a model to choose. It does not select a deployment by a quality score. OpenRouter `allow_fallbacks` is a separate stored flag. See [Providers](providers.md).
 
 There is no HTTP route that writes the policy.
+
+## Where it fits
+
+This page covers the fallback choice in step 6. See the [request path](architecture.md#request-path).
 
 ## When it runs
 
@@ -24,7 +30,7 @@ The proxy walks the stored order and uses the first candidate that passes every 
 - Its provider is in the approved list.
 - Its data handling value matches the policy.
 - If the policy lists regions, the connection location is one of those regions. A missing location does not match. An empty region list adds no region limit.
-- It supports each required capability.
+- It supports each required capability and each capability the request uses.
 - Its stored context limit covers the requested output bound. That bound is `max_tokens`, `max_completion_tokens`, or 1. It is not the character length.
 - The circuit breaker permits the call. An open breaker on a candidate skips that candidate.
 - The rate and concurrency limits permit the call.
@@ -48,7 +54,7 @@ The headers do not include a credential or the approved list.
 
 ## Commands
 
-`show-fallback-policy` prints the stored policy. `set-fallback-policy` stores a new version and points the alias at that version. A stored policy is not edited. You replace it by storing another version. To turn the behavior off, store a version with `--enabled false`. Do not delete the policy row. The migration stays applied.
+`show-fallback-policy` prints the stored policy. `set-fallback-policy` stores a new version and points the alias at that version. It also takes `--capabilities`, `--regions`, and `--min-remaining-deadline-ms`. A stored policy is not edited. You replace it by storing another version. To turn the behavior off, store a version with `--enabled false`. Do not delete the policy row. The migration stays applied.
 
 ```bash
 docker compose run --rm app node dist/cli.js show-fallback-policy \

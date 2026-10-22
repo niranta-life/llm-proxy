@@ -1,16 +1,22 @@
 # Circuit breaker
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) can stop calling one deployment after that deployment keeps failing. The breaker stays off until you enable it for that deployment. A deployment with no breaker row is closed and disabled.
 
 The command does not move the alias `auto`. It does not change health status `unknown`, `healthy`, or `unhealthy`.
 
 An open breaker rejects a new chat before the upstream request. The caller receives HTTP 503 with code `circuit_open`.
 
+## Where it fits
+
+This page covers step 4. Breaker outcomes are recorded after step 6. See the [request path](architecture.md#request-path).
+
 ## What moves the breaker
 
 A rate limit does not open the breaker. A caller validation error, an authentication failure, and a caller cancellation do not change it.
 
-A connection failure counts when the provider does not accept the body. A timeout counts in that same case, including a stream. An ambiguous network failure does not open the breaker.
+A connection failure counts when the provider does not accept the body. A timeout counts in that same case, including a stream. An upstream error or an unavailable provider also counts. An ambiguous network failure does not open the breaker.
 
 The breaker opens only when the sample count and the failure count both reach the configured limits. After the cooldown, only the configured number of probes reach the upstream. A successful probe closes the breaker. A failed probe opens it again.
 
@@ -21,6 +27,8 @@ An open breaker on a fallback candidate skips that candidate. See [Fallback](fal
 ## Commands
 
 Disable or reset the breaker instead of deleting the row. After a reset, the next chat can reach the upstream.
+
+When you enable it, `--window-ms`, `--min-samples`, `--failure-threshold`, `--cooldown-ms`, and `--max-probes` are all required. `--failure-threshold` cannot be higher than `--min-samples`.
 
 ```bash
 docker compose run --rm app node dist/cli.js set-deployment-breaker \

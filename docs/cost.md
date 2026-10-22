@@ -1,8 +1,14 @@
 # Cost
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) records a cost for each attempt. You supply the price. The proxy does not embed a public price list, and it does not take a payment. A missing price does not change the chat completion. A cost recording error does not change it either.
 
 Currency is USD. A rate is a decimal. A later price does not change an amount that is already stored.
+
+## Where it fits
+
+This page covers step 7. See the [request path](architecture.md#request-path).
 
 ## How an amount is classed
 

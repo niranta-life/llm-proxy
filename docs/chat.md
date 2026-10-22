@@ -1,6 +1,12 @@
 # Chat
 
+Back to [README](../README.md)
+
 [llm-proxy](../README.md) accepts one text chat and returns an OpenAI chat completion. The caller uses the same JSON for every provider. Setup for each provider is in [Providers](providers.md).
+
+## Where it fits
+
+This page covers the whole path. See the [request path](architecture.md#request-path).
 
 ## Request
 
@@ -24,7 +30,7 @@ Any other field is sent only when the deployment lists that capability:
 - `seed`
 - `n`, only with the value `1`
 - `user`
-- `response_format`, only `{"type":"text"}`
+- `response_format`, only `{"type":"text"}`. The deployment capability name is `response_format_text`.
 
 The proxy does not accept tools, images, or audio. It does not remove a field it cannot accept. It refuses the request instead.
 
@@ -38,7 +44,7 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 
 ## Provider differences
 
-Anthropic accepts `temperature` from 0 through 1, `stop`, `max_tokens`, and `max_completion_tokens`. If you send both token limits, the values must be equal. If you send neither, the proxy uses the deployment's default max output tokens.
+Anthropic accepts `temperature` from 0 through 1, `stop`, `max_tokens`, and `max_completion_tokens`. If you send both token limits, the values must be equal. If you send neither, the proxy uses the deployment's default max output tokens. If the deployment has no default, the request is refused with 400 `invalid_parameter`.
 
 Anthropic also needs a first system message if you send one, then user and assistant text that alternates, and a user message last. A developer message is refused. A tool, an image, or a capability the deployment does not list is refused.
 
@@ -72,7 +78,7 @@ An error body is an OpenAI error object:
 
 | Status | Code | When |
 | --- | --- | --- |
-| 400 | `unsupported_parameter` or `unknown_parameter` | The deployment does not accept the field, or streaming is off. |
+| 400 | `unsupported_parameter`, `unknown_parameter`, `invalid_parameter`, `unsupported_message`, or `unsupported_response_format` | A field or value is invalid, the deployment does not accept the field, a message role or content is not supported, or streaming is off. |
 | 401 | `invalid_api_key` | The tenant secret is not valid. |
 | 401 | `upstream_auth_error` | Anthropic rejected the provider API key. The message is unchanged, and the code is not `invalid_api_key`. |
 | 404 | `model_not_found` | The name is unknown, or the deployment is disabled. |

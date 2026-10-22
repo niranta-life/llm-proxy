@@ -160,7 +160,7 @@ llm-proxy is built for a network that you control. Keys, costs, policies, and th
 - **Secrets at rest.** The database stores a scrypt verifier, not the tenant secret. Provider keys are AES-256-GCM ciphertext. The encryption key comes from `PROVIDER_CREDENTIAL_KEY`, not from Postgres.
 - **Least-privilege database roles.** The runtime role cannot read provider ciphertext or verifiers. No role that the proxy logs in as can bypass row-level security.
 - **Redacted logs.** Logs remove secrets, prompts, and chat messages.
-- **No HTTP admin surface.** Tenants, providers, limits, and policies change only through the CLI. No network request can change them. Only an operator with CLI and database access can.
+- **No HTTP admin surface.** Tenants, providers, limits, and policies change only through the CLI, with flags or `--interactive`. No network request can change them. Only an operator with CLI and database access can.
 - **Private model endpoints.** A self-hosted model, such as one on DGX, must be on an allowlist with pinned addresses. The proxy does not follow redirects.
 - **Data residency.** Fallback checks region and data-handling values, so `auto` never moves a request to a region or provider that your policy did not approve. OpenRouter calls go only to the downstream providers that you list.
 
@@ -216,6 +216,14 @@ docker compose run --rm app node dist/cli.js set-alias \
 ```
 
 The CLI prints the tenant secret once. Save it. The database stores only a verifier.
+
+The same commands can run as prompts. `--interactive` has to be the only argument:
+
+```bash
+docker compose run --rm -it app node dist/cli.js --interactive
+```
+
+Answer `create`, `update`, or `validate`, then the command name, then each field. A blank line leaves that field unset. `done` ends the session. Standard output is the same JSON the flag command prints. Prompts go to standard error. Flag commands keep the arguments shown above.
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions \

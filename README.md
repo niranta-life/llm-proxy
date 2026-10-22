@@ -247,7 +247,19 @@ The same commands can run as prompts. `--interactive` has to be the only argumen
 docker compose run --rm -it app node dist/cli.js --interactive
 ```
 
-Answer `create`, `update`, or `validate`, then the command name, then each field. A blank line leaves that field unset. `done` ends the session. Standard output is the same JSON the flag command prints. Prompts go to standard error. Flag commands keep the arguments shown above.
+In a terminal, the CLI shows a guided menu:
+
+```text
+What do you want to do?
+  1) create    Add tenants, secrets, provider connections, deployments, and prices
+  2) update    Change secrets, keys, aliases, streaming, limits, budgets, and policies
+  3) validate  Check deployments and providers, or show the current setup
+action: 1
+```
+
+Pick by number or name. Each field shows a hint, such as the values it accepts. Press Enter to leave a field blank. Before a command runs, the CLI shows a summary (provider keys are hidden) and asks `Run <command>? [Y/n]`. A failed command does not end the session. Type `help` to see the menu again, `back` to go up, or `quit` to stop.
+
+When input is piped, the CLI uses plain prompts for scripts: answer `create`, `update`, or `validate`, then the command name, then each field. A blank line leaves that field unset. `done` ends the session, and the first error stops it. In both modes, standard output is the same JSON the flag command prints and prompts go to standard error. Flag commands keep the arguments shown above.
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions \

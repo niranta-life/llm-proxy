@@ -354,6 +354,18 @@ function parsePrice(values: Flags): {
   };
 }
 
+// Guided mode runs many commands in one session, so each command gets a fresh exit code
+// and a thrown error is reported without ending the session.
+async function runGuidedCommand(pool: Pool, config: Config, logger: Logger, command: string, values: Flags): Promise<void> {
+  process.exitCode = 0;
+  try {
+    await runCommand(pool, config, logger, command, values);
+  } catch (error) {
+    logger.error('command failed', { message: errorMessage(error) });
+    process.exitCode = 1;
+  }
+}
+
 async function runCommand(pool: Pool, config: Config, logger: Logger, command: string, values: Flags): Promise<void> {
   if (command === 'provision-tenant') {
     const name = values.name?.trim() ?? '';
@@ -1261,10 +1273,17 @@ async function main(): Promise<void> {
     }
     const pool = createPool(config, 'migrator', logger, 1);
     const input = openInteractiveInput();
+    const guided = Boolean(process.stdin.isTTY && process.stderr.isTTY);
     try {
       await runInteractiveSession({
+        guided,
         ask: (prompt) => input.ask(prompt),
-        run: (nextCommand, nextValues) => runCommand(pool, config, logger, nextCommand, nextValues as Flags),
+        say: (text) => {
+          process.stderr.write(`${text}\n`);
+        },
+        run: guided
+          ? (nextCommand, nextValues) => runGuidedCommand(pool, config, logger, nextCommand, nextValues as Flags)
+          : (nextCommand, nextValues) => runCommand(pool, config, logger, nextCommand, nextValues as Flags),
         failed: () => process.exitCode === 1,
         reject(message) {
           logger.error(message);

@@ -30,6 +30,7 @@ import {
 import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
+import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, loadCatalog } from './store.js';
 import type { StreamGate } from './stream.js';
@@ -110,6 +111,7 @@ export async function executeChat(input: {
   upstreamBaseUrl: string;
   store: ProviderCredentialStore | null;
   tenantId: string;
+  apiKeyId: string;
   body: unknown;
   signal: AbortSignal;
   reply: StreamHttp;
@@ -118,6 +120,8 @@ export async function executeChat(input: {
   fetchImpl?: typeof fetch;
   resolveHost?: (host: string) => Promise<readonly string[]>;
   nowMs?: () => number;
+  afterAdmit?: () => Promise<void> | void;
+  beforeSettle?: () => Promise<void> | void;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
@@ -146,6 +150,7 @@ export async function executeChat(input: {
       upstreamBaseUrl: input.upstreamBaseUrl,
       store: input.store,
       tenantId: input.tenantId,
+      apiKeyId: input.apiKeyId,
       request,
       route,
       signal: input.signal,
@@ -155,6 +160,8 @@ export async function executeChat(input: {
       fetchImpl: input.fetchImpl,
       resolveHost: input.resolveHost,
       nowMs: input.nowMs,
+      afterAdmit: input.afterAdmit,
+      beforeSettle: input.beforeSettle,
     });
     return undefined;
   }
@@ -236,6 +243,16 @@ export async function executeChat(input: {
       try {
         gate = await guardUpstream(input.runtimePool, input.tenantId, route.deploymentId, observedAt);
         if (!gate.allow) throw circuitOpenError();
+        await admitChatAttempt(input.runtimePool, {
+          tenantId: input.tenantId,
+          apiKeyId: input.apiKeyId,
+          route,
+          request,
+          attemptId,
+          stream: false,
+          now: observedAt,
+        });
+        if (input.afterAdmit) await input.afterAdmit();
         const completion = await adapter.execute({
           apiKey,
           baseURL,
@@ -273,12 +290,15 @@ export async function executeChat(input: {
         }
         return completion.response;
       } catch (error) {
-        if (error instanceof ProxyError && error.code === 'circuit_open') {
+        if (error instanceof ProxyError && (error.code === 'circuit_open' || isAdmissionCode(error.code))) {
+          if (isAdmissionCode(error.code) && gate.track) {
+            await noteBreaker(input, route.deploymentId, observedAt, gate.probe, 'ignore');
+          }
           await recordResult(input, {
             requestId,
             attemptId,
             status: 'failed',
-            errorCode: 'circuit_open',
+            errorCode: error.code ?? 'admission_unavailable',
             durationMs: elapsedMs(started),
             usage: emptyUsage(),
             providerRequestId: null,
@@ -419,7 +439,13 @@ async function closePending(
 }
 
 async function recordResult(
-  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  input: {
+    runtimePool: Pool;
+    logger: Logger;
+    tenantId: string;
+    nowMs?: () => number;
+    beforeSettle?: () => Promise<void> | void;
+  },
   result: {
     requestId: string;
     attemptId: string;
@@ -446,6 +472,14 @@ async function recordResult(
       await finishAttempt(client, { tenantId: input.tenantId, ...result });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
+    if (input.beforeSettle) await input.beforeSettle();
+    await settleChatAttempt(
+      input.runtimePool,
+      input.logger,
+      input.tenantId,
+      result.attemptId,
+      new Date((input.nowMs ?? Date.now)()),
+    );
   } catch (error) {
     input.logger.error('attempt result was not recorded', {
       severity: 'critical',

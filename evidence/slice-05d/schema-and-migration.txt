@@ -1,0 +1,67 @@
+Schema and migration evidence.
+
+The new file is migrations/015_tenant_limits.sql.
+Files 001 through 014 are unchanged.
+git status shows only the untracked file 015_tenant_limits.sql under migrations.
+A search for DROP in that file found no match.
+The file does not add a failure_class value.
+The file does not edit model_attempts_failure_class_check.
+
+The file adds tenant limit policies, API key limit policies, connection limit policies, deployment limit policies, connection share groups, limit counters, concurrency leases, attempt admissions, tenant budgets, budget reservations, and a cost ledger.
+Money columns use numeric(38, 12).
+Admission and settlement run as SECURITY DEFINER functions.
+The runtime role has no direct insert, update, or delete on those tables.
+
+A live query during the post-edit full suite read schema_migrations and the new tables.
+The saved result is below.
+The test database password was not copied.
+
+schema_migrations:
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+006_anthropic_streaming.sql
+007_stream_interrupted.sql
+008_provider_registry.sql
+009_vertex_provider.sql
+010_compatible_providers.sql
+011_private_endpoint.sql
+012_cost_accounting.sql
+013_execution_policy.sql
+014_provider_breaker.sql
+015_tenant_limits.sql
+
+tables:
+api_key_limit_policies rls=true forced=true
+attempt_admissions rls=true forced=true
+budget_reservations rls=true forced=true
+concurrency_leases rls=true forced=true
+connection_limit_policies rls=true forced=true
+connection_share_groups rls=false forced=false
+cost_ledger rls=true forced=true
+deployment_limit_policies rls=true forced=true
+limit_counters rls=true forced=true
+tenant_budgets rls=true forced=true
+tenant_limit_policies rls=true forced=true
+
+checks:
+model_attempts_attempt_ordinal_check
+model_attempts_failure_class_check
+
+connection_share_groups stores a group name and an id.
+It stores no tenant row.
+The other new tables force row-level security.
+
+014_provider_breaker.sql remains in schema_migrations after 015_tenant_limits.sql.
+This file does not claim a readiness HTTP status.
+
+Later edit inside 015_tenant_limits.sql.
+The file still has no DROP COLUMN and no DROP TABLE.
+It adds split_known_charge.
+close_attempt_admission calls that function.
+Observe room is the sum of other settle rows only.
+A sibling reservation is not an input to that split.
+The fresh test database applied this file in OVERLAP FIX.
+That run called split_known_charge and exited 0.

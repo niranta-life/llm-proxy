@@ -99,6 +99,15 @@ export function multiplyDecimal(rate: string, count: number): string {
   return formatUnits(part.units * BigInt(count), part.scale);
 }
 
+export function maxDecimal(left: string, right: string): string {
+  const first = parts(left);
+  const second = parts(right);
+  if (first.negative || second.negative) throw new Error('invalid decimal');
+  const scale = Math.max(first.scale, second.scale);
+  const scaled = (part: { units: bigint; scale: number }): bigint => part.units * 10n ** BigInt(scale - part.scale);
+  return scaled(first) >= scaled(second) ? canonicalDecimal(left) : canonicalDecimal(right);
+}
+
 export function addDecimal(left: string, right: string): string {
   const first = parts(left);
   const second = parts(right);

@@ -1,0 +1,52 @@
+Limit rejection API responses.
+
+The file is test/limits.test.ts.
+Both runs used the shipped chat route.
+A hard rejection returned before the extra mock hit.
+Both runs exited 0.
+
+Request rate.
+LIMIT_CASE {"case":"rate","status":429,"code":"tenant_rate_limited","hits":1}
+
+Concurrent requests.
+LIMIT_CASE {"case":"concurrency","status":429,"code":"concurrency_limited","hits":2}
+Two overlapping calls were in flight.
+The third call was rejected.
+
+Concurrent streams.
+LIMIT_CASE {"case":"stream","status":429,"code":"stream_limited","plain":200}
+The stream over the cap was rejected.
+The non-stream request in that window returned HTTP 200.
+
+API key limit.
+LIMIT_CASE {"case":"tenants","alpha":"api_key_rate_limited","betaHits":2}
+The tighter API key limit rejected the first tenant.
+The second tenant completed two chats.
+
+Deployment and token rate.
+LIMIT_CASE {"case":"deployment-token","deployment":"deployment_limited","token":"token_rate_limited","quiet":200}
+The known token bound was rejected before the mock.
+A request with no output bound and no usage returned HTTP 200.
+The test expects no tenant token counter whose amount is the decimal 0.
+
+Observation mode over the threshold still called the mock.
+The usage read showed 2 requests in the window against a limit of 1.
+LIMIT_CASE {"case":"observe","configuredLimits":{"mode":"observe","requestsPerMinute":1,"concurrentRequests":null,"concurrentStreams":null,"tokenRatePerMinute":null,"leaseMs":120000,"apiKeys":[],"connections":[],"deployments":[]},"observedUsage":{"requestsInWindow":"2","tokensInWindow":"0","concurrentRequests":"0","concurrentStreams":"0"},"reservedCapacity":{"concurrency":"0","activeReservations":"0","provisional":"0","unknownCharges":"0"},"remainingBudget":null,"costStatus":"none"}
+
+Admission unavailable.
+LIMIT_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":2}
+
+Process-local caps still reject when they are stricter.
+LIMIT_CASE {"case":"local-stream","status":503,"code":"stream_capacity"}
+LIMIT_CASE {"case":"private-cap","status":429,"hits":1}
+The private body contains concurrency_limit.
+The distributed deployment limit on that deployment was 5.
+The process-local cap of 1 rejected first.
+
+Budget rejections from test/budgets.test.ts.
+HTTP 429 code budget_exceeded.
+HTTP 429 code budget_unknown.
+HTTP 429 code budget_unbounded.
+HTTP 429 code tenant_rate_limited while the budget mode was disabled.
+HTTP 504 for the timeout, with the reservation kept.
+HTTP 503 code admission_unavailable when the hard budget could not reach PostgreSQL.

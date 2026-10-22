@@ -103,6 +103,8 @@ export async function createTestApp(
     compatibleFetch?: typeof fetch;
     privateResolve?: (host: string) => Promise<readonly string[]>;
     now?: () => number;
+    afterAdmit?: () => Promise<void> | void;
+    beforeSettle?: () => Promise<void> | void;
   } = {},
 ) {
   const config = configFor(db);
@@ -123,6 +125,8 @@ export async function createTestApp(
     compatibleFetch: options.compatibleFetch,
     privateResolve: options.privateResolve,
     now: options.now,
+    afterAdmit: options.afterAdmit,
+    beforeSettle: options.beforeSettle,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

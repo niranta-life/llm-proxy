@@ -1,0 +1,43 @@
+Tenant isolation report.
+
+Two tenants do not consume each other's request permits.
+LIMIT_CASE {"case":"tenants","alpha":"api_key_rate_limited","betaHits":2}
+Alpha was rejected by its API key limit.
+Beta completed two chats on its own limit.
+
+Inspection uses the same tenant headers as the other internal metric routes.
+GET /internal/v1/limits and GET /internal/v1/budgets/usage returned the caller rows.
+A missing secret and a wrong secret returned HTTP 401.
+Those bodies do not include configured limits or remaining budget.
+POST /internal/v1/limits returned HTTP 404.
+POST /v1/limits returned HTTP 404.
+The mode stayed observe and the request limit stayed 9 after those posts.
+
+Authenticated alpha body.
+configuredLimits.mode is observe.
+configuredLimits.requestsPerMinute is 9.
+configuredLimits.concurrentRequests is 3.
+observedUsage.requestsInWindow is 1.
+remainingBudget is 12.5.
+costStatus is unknown.
+budget.allocated is 12.5.
+budget.available is 12.5.
+budget.unknownCharges is 1.
+The same body was returned on both runs.
+The wrong-secret status in the log is 401.
+
+Authenticated beta body.
+configuredLimits.requestsPerMinute is null.
+budget.allocated is null.
+remainingBudget is null.
+observedUsage.requestsInWindow is 0.
+The beta body does not contain the alpha key id.
+
+Budget isolation.
+BUDGET_CASE {"case":"isolation","alpha":"0.92","beta":"3","visible":[]}
+Alpha remaining budget was 0.92.
+Beta remaining budget stayed 3.
+Beta did not see Alpha reservation rows.
+
+Row-level security is forced on the tenant limit tables, the reservation table, and the cost ledger.
+connection_share_groups stores no tenant row.

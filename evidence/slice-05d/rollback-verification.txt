@@ -1,0 +1,38 @@
+Rollback verification.
+
+The additive file is migrations/015_tenant_limits.sql.
+It does not drop a column.
+It does not drop a table.
+It does not edit migrations 001 through 014.
+A search of that file found no DROP.
+
+A live query during the post-edit suite listed schema_migrations.
+The list is recorded in schema-and-migration.txt.
+014_provider_breaker.sql is present after 015_tenant_limits.sql.
+model_attempts_failure_class_check is still present.
+model_attempts_attempt_ordinal_check is still present.
+
+README states these rollback facts.
+The image 8335555 stays ready on this database.
+Its latest migration file is 014_provider_breaker.sql.
+After 015_tenant_limits.sql is applied, schema_migrations keeps 014_provider_breaker.sql.
+The readiness route on that image checks for 014_provider_breaker.sql.
+A later file does not remove that row.
+
+README states the release order.
+Start in observation mode.
+Compare GET /internal/v1/limits and GET /internal/v1/budgets/usage with the configured thresholds.
+Then enable hard limits for one test tenant.
+Confirm that an excess request is rejected before you widen the change.
+Hard limits are never silently bypassed.
+A hard check that cannot reach the database rejects the request.
+The proxy does not call the upstream model for that rejection.
+
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was not deleted.
+No container was booted for this proof.
+
+The overlap close change stayed inside 015_tenant_limits.sql.
+No later migration file was added.
+014_provider_breaker.sql remains the readiness check for image 8335555.

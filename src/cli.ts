@@ -29,6 +29,14 @@ import { prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
+import {
+  recoverTenantBudget,
+  setApiKeyLimits,
+  setConnectionLimit,
+  setDeploymentLimit,
+  setTenantBudget,
+  setTenantLimits,
+} from './db/admission.js';
 import { resetDeploymentBreaker, setDeploymentBreaker } from './db/breaker.js';
 import { setDeploymentExecutionPolicy } from './db/execution-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
@@ -121,6 +129,14 @@ type Flags = {
   'failure-threshold'?: string;
   'cooldown-ms'?: string;
   'max-probes'?: string;
+  mode?: string;
+  'requests-per-minute'?: string;
+  'concurrent-requests'?: string;
+  'concurrent-streams'?: string;
+  'token-rate'?: string;
+  'lease-ms'?: string;
+  'share-group'?: string;
+  'monthly-amount'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -139,6 +155,16 @@ function parseBounded(value: string | undefined, minimum: number, maximum: numbe
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) return undefined;
   return parsed;
+}
+
+function parseLimitValue(value: string | undefined, minimum: number, maximum: number): number | null | undefined {
+  if (value === undefined || value === 'none') return null;
+  return parseBounded(value, minimum, maximum);
+}
+
+function parseMode(value: string | undefined, allowed: readonly string[]): string | undefined {
+  if (value === undefined) return undefined;
+  return allowed.includes(value) ? value : undefined;
 }
 
 function parsePolicyMs(value: string | undefined, minimum: number): number | undefined {
@@ -385,6 +411,14 @@ async function main(): Promise<void> {
         'failure-threshold': { type: 'string' },
         'cooldown-ms': { type: 'string' },
         'max-probes': { type: 'string' },
+        mode: { type: 'string' },
+        'requests-per-minute': { type: 'string' },
+        'concurrent-requests': { type: 'string' },
+        'concurrent-streams': { type: 'string' },
+        'token-rate': { type: 'string' },
+        'lease-ms': { type: 'string' },
+        'share-group': { type: 'string' },
+        'monthly-amount': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -402,7 +436,43 @@ async function main(): Promise<void> {
     || (values.addresses !== undefined && command !== 'approve-private-endpoint')
     || (values['tls-verify'] !== undefined && command !== 'approve-private-endpoint')
     || (values['health-endpoint'] !== undefined && command !== 'approve-private-endpoint')
-    || (values['max-concurrency'] !== undefined && command !== 'set-deployment-concurrency')
+    || (
+      values['max-concurrency'] !== undefined
+      && command !== 'set-deployment-concurrency'
+      && command !== 'set-connection-limit'
+      && command !== 'set-deployment-limit'
+    )
+    || (
+      values.mode !== undefined
+      && command !== 'set-tenant-limits'
+      && command !== 'set-api-key-limits'
+      && command !== 'set-connection-limit'
+      && command !== 'set-deployment-limit'
+      && command !== 'set-tenant-budget'
+    )
+    || (
+      values['requests-per-minute'] !== undefined
+      && command !== 'set-tenant-limits'
+      && command !== 'set-api-key-limits'
+    )
+    || (
+      values['concurrent-requests'] !== undefined
+      && command !== 'set-tenant-limits'
+      && command !== 'set-api-key-limits'
+    )
+    || (
+      values['concurrent-streams'] !== undefined
+      && command !== 'set-tenant-limits'
+      && command !== 'set-api-key-limits'
+    )
+    || (
+      values['token-rate'] !== undefined
+      && command !== 'set-tenant-limits'
+      && command !== 'set-api-key-limits'
+    )
+    || (values['lease-ms'] !== undefined && command !== 'set-tenant-limits')
+    || (values['share-group'] !== undefined && command !== 'set-connection-limit')
+    || (values['monthly-amount'] !== undefined && command !== 'set-tenant-budget')
     || (values['effective-at'] !== undefined && command !== 'register-price')
     || (values.source !== undefined && command !== 'register-price')
     || (values['serving-provider'] !== undefined && command !== 'register-price')
@@ -1067,6 +1137,146 @@ async function main(): Promise<void> {
         maxBackoffMs,
       );
       process.stdout.write(`${JSON.stringify({ policyId, retriesEnabled })}\n`);
+      return;
+    }
+
+    if (command === 'set-tenant-limits') {
+      const tenantId = requireTenant(values);
+      const mode = parseMode(values.mode, ['observe', 'hard']);
+      const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
+      const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
+      const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
+      const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
+      const leaseMs = parseLimitValue(values['lease-ms'], 100, 600_000);
+      if (
+        tenantId === undefined
+        || mode === undefined
+        || requestsPerMinute === undefined
+        || concurrentRequests === undefined
+        || concurrentStreams === undefined
+        || tokenRate === undefined
+        || leaseMs === undefined
+      ) {
+        logger.error('limit arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      await setTenantLimits(
+        pool,
+        tenantId,
+        mode,
+        requestsPerMinute,
+        concurrentRequests,
+        concurrentStreams,
+        tokenRate,
+        leaseMs,
+      );
+      process.stdout.write(`${JSON.stringify({ tenantId, mode })}\n`);
+      return;
+    }
+
+    if (command === 'set-api-key-limits') {
+      const tenantId = requireTenant(values);
+      const keyId = values['key-id'] ?? '';
+      const mode = values.mode === 'none' ? null : parseMode(values.mode, ['observe', 'hard']);
+      const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
+      const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
+      const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
+      const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
+      if (
+        tenantId === undefined
+        || !UUID.test(keyId)
+        || (values.mode !== undefined && values.mode !== 'none' && mode === undefined)
+        || requestsPerMinute === undefined
+        || concurrentRequests === undefined
+        || concurrentStreams === undefined
+        || tokenRate === undefined
+      ) {
+        logger.error('limit arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      await setApiKeyLimits(
+        pool,
+        tenantId,
+        keyId,
+        mode ?? null,
+        requestsPerMinute,
+        concurrentRequests,
+        concurrentStreams,
+        tokenRate,
+      );
+      process.stdout.write(`${JSON.stringify({ tenantId, keyId, mode })}\n`);
+      return;
+    }
+
+    if (command === 'set-connection-limit') {
+      const tenantId = requireTenant(values);
+      const provider = values.provider ?? '';
+      const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
+      const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
+      const shareGroup = values['share-group'] === 'none' ? null : values['share-group'] ?? null;
+      const shareValid = shareGroup === null || /^[a-z0-9][a-z0-9-]{0,63}$/.test(shareGroup);
+      if (
+        tenantId === undefined
+        || !['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx'].includes(provider)
+        || maxConcurrency === undefined
+        || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
+        || !shareValid
+      ) {
+        logger.error('connection arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      await setConnectionLimit(pool, tenantId, provider, mode, maxConcurrency, shareGroup);
+      process.stdout.write(`${JSON.stringify({ tenantId, provider, mode, maxConcurrency, shareGroup })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-limit') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
+      const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
+      if (
+        tenantId === undefined
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+        || name === 'auto'
+        || maxConcurrency === undefined
+        || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      await setDeploymentLimit(pool, tenantId, name, mode, maxConcurrency);
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, mode, maxConcurrency })}\n`);
+      return;
+    }
+
+    if (command === 'set-tenant-budget') {
+      const tenantId = requireTenant(values);
+      const mode = parseMode(values.mode, ['observe', 'hard', 'disabled']);
+      const amount = values['monthly-amount'] ?? '';
+      if (tenantId === undefined || mode === undefined || !/^(0|[1-9][0-9]*)(\.[0-9]{1,12})?$/.test(amount)) {
+        logger.error('budget arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      await setTenantBudget(pool, tenantId, mode, amount);
+      process.stdout.write(`${JSON.stringify({ tenantId, mode, monthlyAmount: amount })}\n`);
+      return;
+    }
+
+    if (command === 'recover-budget') {
+      const tenantId = requireTenant(values);
+      if (tenantId === undefined) {
+        logger.error('tenant-id is required');
+        process.exitCode = 1;
+        return;
+      }
+      const closed = await recoverTenantBudget(pool, tenantId, new Date());
+      process.stdout.write(`${JSON.stringify({ tenantId, closed })}\n`);
       return;
     }
 

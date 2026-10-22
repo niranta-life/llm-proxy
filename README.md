@@ -1056,7 +1056,7 @@ Each attempt is one row.
 `GET /internal/v1/metrics/breakers` uses the same tenant headers.
 The query can contain `deployment`.
 The body lists the breaker for each deployment.
-Each item contains the state, the reason, the time, the health sample count, the failure count, and the rate-limit count.
+Each item contains the state, the reason, the time, the health sample count, the failure count, the rate-limit count, and the probe count.
 A rate-limit count is separate from the failure count.
 A deployment with no breaker is closed and disabled.
 You record a price with the CLI.
@@ -1708,9 +1708,19 @@ A rate limit does not open the breaker.
 A caller validation error does not change the breaker.
 A caller authentication failure does not change the breaker.
 A caller cancellation does not change the breaker.
+A connection failure counts when the provider does not accept the body.
+A timeout counts when the provider does not accept the body.
+This is true for a stream.
+An ambiguous network failure does not open the breaker.
+The breaker opens only when the sample count and the failure count both reach the configured limits.
+The caller receives HTTP 503 when the breaker is open.
+The error code is `circuit_open`.
 After the cooldown, only the configured number of probes reach the upstream.
 A successful probe closes the breaker.
 A failed probe opens the breaker again.
+A caller abort during a probe releases that probe.
+The probe count returns to zero.
+The abort does not open the breaker.
 You disable the breaker with `set-deployment-breaker` and `--enabled false`.
 You reset the breaker with `reset-deployment-breaker`.
 The next chat then reaches the upstream.
@@ -1922,7 +1932,12 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - An invalid Retry-After does not add wait beyond the bounded backoff.
 - The breaker stays off until you enable it for that deployment.
 - An open breaker does not send the upstream request.
+- An open breaker returns HTTP 503 with code `circuit_open`.
 - A rate limit does not open the breaker.
+- A connection failure before the body is accepted can open the breaker.
+- A timeout before the body is accepted can open the breaker.
+- A caller abort during a probe releases that probe.
+- An ambiguous network failure does not open the breaker.
 - The alias `auto` stays on the same deployment.
 - A dispatched failure without usage is an uncertain expense.
 - The amount for that expense stays null.

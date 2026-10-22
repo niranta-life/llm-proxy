@@ -127,6 +127,13 @@ async function healthCounts(
   return result.rows[0] ?? { samples: 0, failures: 0 };
 }
 
+export async function breakerAllows(pool: Pool, tenantId: string, deploymentId: string, now: Date): Promise<boolean> {
+  return withTenant(pool, tenantId, async (client) => {
+    const row = await readBreaker(client, deploymentId);
+    return decideAdmission(row === null ? null : viewOf(row), now.getTime()) !== 'reject';
+  });
+}
+
 export async function guardUpstream(
   pool: Pool,
   tenantId: string,

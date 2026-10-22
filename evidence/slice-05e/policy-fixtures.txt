@@ -1,0 +1,37 @@
+Policy fixtures.
+
+The additive file is migrations/016_fallback_policy.sql.
+A missing alias policy stays null.
+That is the disabled default.
+The test tenant Fallback Plain has no policy.
+show-fallback-policy returns attached false for that alias.
+The test tenant Fallback Main stores a policy only on the alias auto.
+
+The passing test stores two versions for that alias.
+The second version is a new policy id and a higher policy version.
+The shown policy matches these fields.
+enabled is true.
+maxAttempts is 5.
+allowedFailures are unavailable, rate_limit, timeout_after_dispatch, and upstream_error.
+requiredCapabilities is temperature.
+allowedProviders is openai.
+allowedRegions is empty.
+dataCollection is allow.
+minRemainingDeadlineMs is 0.
+deployments is fb-secondary.
+
+The runtime uses at most 2 attempts when the stored maximum is 5.
+A later test stores maxAttempts 1 and makes one upstream call.
+A disabled policy on the same alias makes one upstream call.
+No other alias is changed by that policy.
+
+Command: ./node_modules/.bin/vitest run test/fallback-policy.test.ts
+Node: v24.22.0
+Run 1 start: 23:39:45
+Run 1 exit: 0
+Run 2 start: 23:40:47
+Run 2 exit: 0
+Both runs passed 26 tests.
+Both runs passed stores a versioned policy and falls back for one alias.
+The permitted response content is from-fb-secondary.
+The response model is fb-secondary.

@@ -1855,6 +1855,91 @@ docker compose run --rm app node dist/cli.js recover-budget \
   --tenant-id <tenant-id>
 ```
 
+## Fallback policy
+
+`016_fallback_policy.sql` stores a versioned fallback policy for the alias `auto`.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `015`.
+
+The image `1bbe7a1` stays ready on this database.
+Its latest migration file is `015_tenant_limits.sql`.
+After `016_fallback_policy.sql` is applied, `schema_migrations` keeps `015_tenant_limits.sql`.
+The readiness route on that image checks for `015_tenant_limits.sql`.
+A later file does not remove that row.
+
+A missing policy does not choose another deployment.
+A disabled policy does not choose another deployment.
+An existing alias stays on its current deployment until you store a policy for that alias.
+A request that names a deployment does not use another deployment.
+
+`show-fallback-policy` prints the stored policy.
+`set-fallback-policy` stores a new version and points the alias at that version.
+A stored policy is not edited.
+You replace it by storing another version.
+Rollback of the behavior sets enabled to false.
+The migration stays applied.
+The proxy has no HTTP route that writes the policy.
+OpenRouter `allow_fallbacks` stays a separate stored flag.
+
+The proxy uses the first approved deployment that passes every check.
+The checks use the stored order.
+The proxy does not ask a model to choose the deployment.
+The candidate must belong to the same tenant.
+The candidate must be enabled.
+The candidate must have validation status `validated_live`.
+The provider must be in the approved list.
+The data handling value must match the policy.
+A listed region requires the connection location.
+A missing location does not match a listed region.
+An empty region list does not add a region limit.
+The deployment must support each required capability.
+The stored context limit must cover the requested output bound.
+That bound is `max_tokens` or `max_completion_tokens` or 1.
+The bound is not the character length.
+The circuit breaker must permit the call.
+The rate and concurrency limits must permit the call.
+The budget reservation must succeed.
+The remaining deadline must meet the stored minimum.
+
+The proxy uses at most 2 attempts even when the stored maximum is higher.
+A fallback does not run again after the second attempt.
+The same request does not retry and fall back.
+A fallback runs only before the proxy sends a response header or a response byte.
+After output starts, the proxy does not switch models.
+After output starts, the proxy does not restart the body.
+A failure after output starts does not end with a successful `[DONE]`.
+The proxy records that partial failure.
+A caller cancellation does not start a fallback.
+
+A successful fallback returns the secondary completion.
+The response headers name the request id, the actual deployment, the attempt count, and whether fallback occurred.
+The headers do not include a credential.
+The headers do not include the approved list.
+`GET /internal/v1/metrics/attempts` shows both attempts.
+Each attempt keeps its own reservation.
+
+```bash
+docker compose run --rm app node dist/cli.js show-fallback-policy \
+  --tenant-id <tenant-id> \
+  --alias auto
+docker compose run --rm app node dist/cli.js set-fallback-policy \
+  --tenant-id <tenant-id> \
+  --alias auto \
+  --enabled false \
+  --deployments <name> \
+  --failures unavailable \
+  --max-attempts 2 \
+  --capabilities temperature \
+  --providers openai \
+  --data-collection allow \
+  --min-remaining-deadline-ms 0
+docker compose run --rm app node dist/cli.js set-deployment-context-limit \
+  --tenant-id <tenant-id> \
+  --deployment <name> \
+  --context-limit 128
+```
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -2005,9 +2090,12 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The proxy does not accept a tool.
 - The proxy does not accept an image.
 - The proxy does not accept audio.
-- The proxy does not send the request to a second provider.
-- The proxy sends 1 attempt when retry is off.
+- The proxy sends a second deployment only when an enabled fallback policy on the alias `auto` allows that failure and no output has started.
+- A request that names a deployment does not use another deployment.
+- An alias without an enabled fallback policy stays on one deployment.
+- The proxy sends 1 attempt when retry is off and fallback is not enabled.
 - An enabled retry can send 1 more attempt to the same deployment.
+- That request does not also switch deployments.
 - The proxy does not select a deployment by a quality score.
 - Anthropic accepts 1 system message, and that message must be first.
 - Anthropic accepts a user message and an assistant message as text.
@@ -2024,18 +2112,19 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The proxy records a cache count on the attempt only when Anthropic sends that count.
 - The proxy does not invent a cache count.
 - Public `usage` has the 3 OpenAI token fields.
-- The proxy sends 1 attempt for each accepted request when retry is off.
+- The proxy sends 1 attempt for each accepted request when retry is off and fallback is not enabled.
 - An enabled retry permits 2 attempts for that request.
-- That second attempt uses the same provider and the same deployment.
-- A rate limit and an unavailable response can use the second attempt.
-- A connection failure before the request is sent can use the second attempt.
-- Another HTTP status does not use the second attempt.
-- A client cancellation does not use the second attempt.
-- A stream that has sent output does not use the second attempt.
-- A timeout before the request is sent does not use the second attempt.
-- A timeout after the request is sent does not use the second attempt.
-- An exhausted total deadline does not use the second attempt.
-- An ambiguous network failure after the request is sent does not use the second attempt.
+- That retry uses the same provider and the same deployment.
+- A rate limit and an unavailable response can use that retry.
+- A connection failure before the request is sent can use that retry.
+- Another HTTP status does not use that retry.
+- A client cancellation does not use that retry.
+- A stream that has sent output does not use that retry.
+- A timeout before the request is sent does not use that retry.
+- A timeout after the request is sent does not use that retry.
+- An exhausted total deadline does not use that retry.
+- An ambiguous network failure after the request is sent does not use that retry.
+- An enabled fallback policy can use another approved deployment for an allowed failure before output starts.
 - A response header ends the connection deadline.
 - The response body can still finish inside the attempt deadline.
 - A valid Retry-After is used only when the wait fits the remaining deadlines.
@@ -2048,7 +2137,8 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - A timeout before the body is accepted can open the breaker.
 - A caller abort during a probe releases that probe.
 - An ambiguous network failure does not open the breaker.
-- The alias `auto` stays on the same deployment.
+- The alias `auto` stays on its stored deployment until an enabled fallback policy selects another approved deployment.
+- An open breaker on a fallback candidate does not send that candidate.
 - A dispatched failure without usage is an uncertain expense.
 - The amount for that expense stays null.
 - A missing usage count is not stored as zero.
@@ -2120,8 +2210,6 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - A live call to a DGX host.
 - Input that is not text.
 - A tool call.
-- A second provider after an error.
-- A fallback deployment after the breaker opens.
 - An automatic retry for every error.
 - Selection of a deployment by a quality score.
 - OAuth, a login, saved caller state, and a user account.

@@ -8,6 +8,7 @@ import { openAiAdapter } from './adapter.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
 import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
+import { beginFallbackAttempt, chooseFallback, fallbackAttemptCap, fallbackPermitted } from './fallback.js';
 import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
@@ -52,10 +53,22 @@ import type { ChatRequest } from './validate.js';
 
 export type StreamHttp = FrameSocket & {
   hijack(): void;
+  header(name: string, value: string): void;
   writeHead(status: number, headers: Record<string, string>): void;
   end(): void;
   headersSent(): boolean;
 };
+
+export function stampProxyOutcome(
+  reply: StreamHttp,
+  facts: { requestId: string; deployment: string; attemptCount: number; fallback: boolean },
+): void {
+  if (reply.headersSent()) return;
+  reply.header('x-request-id', facts.requestId);
+  reply.header('x-deployment', facts.deployment);
+  reply.header('x-attempt-count', String(facts.attemptCount));
+  reply.header('x-fallback', facts.fallback ? 'true' : 'false');
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
@@ -104,7 +117,7 @@ export async function runChatStream(input: {
   ) {
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
-  const transport = await bindRouteTransport({
+  let transport = await bindRouteTransport({
     runtimePool: input.runtimePool,
     tenantId: input.tenantId,
     route: input.route,
@@ -126,7 +139,10 @@ export async function runChatStream(input: {
   let attemptId = '';
   let apiKey = '';
   let opened = false;
-  const timeouts = streamTimeouts(input.route);
+  let ordinal = 1;
+  let fellBack = false;
+  let fallbackUsed = false;
+  let timeouts = streamTimeouts(input.route);
   const shutdownState = { fired: false };
   let abortShutdown = (): void => {
     shutdownState.fired = true;
@@ -154,6 +170,8 @@ export async function runChatStream(input: {
 
     const requestStarted = process.hrtime.bigint();
     const { policy, deadlinesActive } = policyFor(input.route);
+    const originTimeoutMs = input.route.timeoutMs;
+    const ceiling = Math.max(policyAttempts(policy), fallbackAttemptCap(input.route.fallbackPolicy ?? null));
     const total = startTotalDeadline(deadlinesActive, policy.totalDeadlineMs);
     const deadline = new AbortController();
     abortShutdown = (): void => {
@@ -161,9 +179,8 @@ export async function runChatStream(input: {
       if (!deadline.signal.aborted) deadline.abort(new StreamShutdownError());
     };
     if (shutdownState.fired && !deadline.signal.aborted) deadline.abort(new StreamShutdownError());
-    let ordinal = 1;
     try {
-    while (ordinal <= policyAttempts(policy)) {
+    while (ordinal <= ceiling) {
     if (deadlinesActive && elapsedMs(requestStarted) >= policy.totalDeadlineMs) {
       await recordStream(input, {
         requestId,
@@ -321,6 +338,10 @@ export async function runChatStream(input: {
             'cache-control': 'no-cache, no-transform',
             connection: 'keep-alive',
             'x-accel-buffering': 'no',
+            'x-request-id': requestId,
+            'x-deployment': input.route.deploymentName,
+            'x-attempt-count': String(ordinal),
+            'x-fallback': fellBack ? 'true' : 'false',
           });
           machine = reduceStream(machine, { type: 'downstream_open' });
         }
@@ -440,7 +461,30 @@ export async function runChatStream(input: {
           streamBreakerKind(failed, failure, facts.callerAborted, decision?.failureClass ?? null),
         )
       : false;
-    const retry = decision !== null && decision.retry && !suppressRetry && !opened && ordinal < policyAttempts(policy);
+    const outputStarted = opened || input.reply.headersSent();
+    const budgetMs = deadlinesActive ? policy.totalDeadlineMs : originTimeoutMs;
+    const permitted = failed && decision !== null && fallbackPermitted({
+      route: input.route,
+      failureClass: decision.failureClass,
+      ordinal,
+      outputStarted,
+      callerAborted: facts.callerAborted,
+      fallbackUsed,
+      remainingMs: budgetMs - elapsedMs(requestStarted),
+    });
+    const next = permitted
+      ? await chooseFallback({
+          pool: input.runtimePool,
+          tenantId: input.tenantId,
+          apiKeyId: input.apiKeyId,
+          request: input.request,
+          failedRoute: input.route,
+          now: new Date((input.nowMs ?? Date.now)()),
+          stream: true,
+          releasingAttemptId: attemptId,
+        })
+      : null;
+    const retry = next === null && !permitted && decision !== null && decision.retry && !suppressRetry && !outputStarted && ordinal < policyAttempts(policy);
     await recordStream(input, {
       requestId,
       attemptId,
@@ -463,16 +507,49 @@ export async function runChatStream(input: {
       failureClass: decision?.failureClass ?? null,
       dispatched: failed ? facts.dispatched : true,
       expenseCertainty: decision?.expenseCertainty ?? 'known',
-      closeRequest: !retry,
+      closeRequest: next === null && !retry,
     });
 
-    if (opened) {
+    if (outputStarted) {
       try {
         input.reply.end();
       } catch {
         // The caller may already have closed the socket.
       }
       return;
+    }
+    if (next !== null && decision !== null) {
+      try {
+        const adopted = await beginFallbackAttempt({
+          runtimePool: input.runtimePool,
+          tenantId: input.tenantId,
+          requestId,
+          route: next,
+          ordinal: ordinal + 1,
+          triggerReason: decision.failureClass,
+          store: input.store,
+          upstreamBaseUrl: input.upstreamBaseUrl,
+          fetchImpl: input.fetchImpl,
+          resolveHost: input.resolveHost,
+          prepare: (selected) => prepareProvider(input.request, selected),
+        });
+        const previous = transport;
+        transport = adopted.transport;
+        await previous.release();
+        apiKey = adopted.apiKey;
+        attemptId = adopted.attemptId;
+        input.route = next;
+        timeouts = streamTimeouts(next);
+        fallbackUsed = true;
+        fellBack = true;
+        ordinal += 1;
+        continue;
+      } catch (switchError) {
+        await closeStreamRequest(input, requestId);
+        if (switchError instanceof ProxyError) throw switchError;
+        input.logger.error('request persistence failed', { message: errorMessage(switchError) });
+        throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+      }
     }
     if (!retry) throw httpError(terminal, failure);
     const signals = total.signal === null ? [input.signal] : [input.signal, total.signal];
@@ -485,7 +562,7 @@ export async function runChatStream(input: {
       throw timeoutProxy(deadlineKindOf(total.signal ?? undefined) ?? 'total');
     }
     ordinal += 1;
-    if (ordinal > policyAttempts(policy)) throw httpError(terminal, failure);
+    if (ordinal > ceiling) throw httpError(terminal, failure);
     try {
       attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
         insertAttempt(client, input.tenantId, requestId, input.route, ordinal),
@@ -502,11 +579,25 @@ export async function runChatStream(input: {
       total.cancel();
     }
   } finally {
+    if (requestId !== '' && !opened && !input.reply.headersSent()) {
+      stampProxyOutcome(input.reply, {
+        requestId,
+        deployment: input.route.deploymentName,
+        attemptCount: ordinal,
+        fallback: fellBack,
+      });
+    }
     apiKey = '';
     untrack();
     input.gate.release(input.tenantId);
     await transport.release();
   }
+}
+
+function prepareProvider(request: ChatRequest, route: ResolvedRoute): void {
+  if (route.provider === 'anthropic') anthropicAdapter.prepare(request, route);
+  else if (route.provider === 'vertex') vertexAdapter.prepare(request, route);
+  else openAiAdapter.prepare(request, route);
 }
 
 function policyFor(route: ResolvedRoute): { policy: PolicyInput; deadlinesActive: boolean } {

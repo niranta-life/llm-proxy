@@ -1,0 +1,24 @@
+Attempt history.
+
+GET /internal/v1/metrics/attempts returns both attempts for the permitted fallback.
+The first trigger reason is primary.
+The second trigger reason is unavailable.
+The first deployment is fb-primary.
+The second deployment is fb-secondary.
+The second fallback policy version equals the stored policy version.
+Both attempts have a duration.
+Both attempts have a reserved amount.
+The attempt ids differ.
+
+The caller response headers are x-request-id, x-deployment, x-attempt-count, and x-fallback.
+x-deployment is fb-secondary.
+x-attempt-count is 2.
+x-fallback is true.
+The headers and the body do not contain the provider credential.
+The headers and the body do not contain the policy id.
+The headers and the body do not contain allowedFailures.
+The headers and the body do not contain minRemainingDeadlineMs.
+
+Command: ./node_modules/.bin/vitest run test/fallback-policy.test.ts
+Run 2 exit: 0
+The permitted fallback test passed.

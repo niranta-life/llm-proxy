@@ -33,11 +33,28 @@ export type DeploymentCandidate = {
   requireServingProvider: boolean;
   maxConcurrency: number | null;
   executionPolicy?: StoredExecutionPolicy | null;
+  validationStatus?: string;
+  contextLimit?: number | null;
+};
+
+export type FallbackPolicy = {
+  id: string;
+  version: number;
+  enabled: boolean;
+  maxAttempts: number;
+  deploymentIds: readonly string[];
+  allowedFailures: readonly string[];
+  requiredCapabilities: readonly string[];
+  allowedProviders: readonly string[];
+  allowedRegions: readonly string[];
+  dataCollection: 'allow' | 'deny';
+  minRemainingDeadlineMs: number;
 };
 
 export type AliasCandidate = {
   alias: string;
   deploymentId: string;
+  fallbackPolicy?: FallbackPolicy | null;
 };
 
 export type ResolvedRoute = {
@@ -71,18 +88,18 @@ export type ResolvedRoute = {
   requireServingProvider: boolean;
   maxConcurrency: number | null;
   executionPolicy?: StoredExecutionPolicy | null;
+  routedByAlias?: boolean;
+  fallbackPolicy?: FallbackPolicy | null;
+  validationStatus?: string;
+  contextLimit?: number | null;
 };
 
-export function resolveModel(
+export function routeForDeployment(
   requestedModel: string,
-  deployments: readonly DeploymentCandidate[],
-  aliases: readonly AliasCandidate[],
-): ResolvedRoute | null {
-  const alias = aliases.find((item) => item.alias === requestedModel);
-  const deployment = alias
-    ? deployments.find((item) => item.id === alias.deploymentId)
-    : deployments.find((item) => item.name === requestedModel);
-  if (deployment === undefined || !deployment.enabled || !deployment.connectionEnabled) return null;
+  deployment: DeploymentCandidate,
+  routedByAlias: boolean,
+  policy: FallbackPolicy | null,
+): ResolvedRoute {
   return {
     requestedModel,
     deploymentId: deployment.id,
@@ -114,5 +131,22 @@ export function resolveModel(
     requireServingProvider: deployment.requireServingProvider ?? false,
     maxConcurrency: deployment.maxConcurrency ?? null,
     executionPolicy: deployment.executionPolicy ?? null,
+    routedByAlias,
+    fallbackPolicy: policy,
+    validationStatus: deployment.validationStatus ?? 'unvalidated',
+    contextLimit: deployment.contextLimit ?? null,
   };
+}
+
+export function resolveModel(
+  requestedModel: string,
+  deployments: readonly DeploymentCandidate[],
+  aliases: readonly AliasCandidate[],
+): ResolvedRoute | null {
+  const alias = aliases.find((item) => item.alias === requestedModel);
+  const deployment = alias
+    ? deployments.find((item) => item.id === alias.deploymentId)
+    : deployments.find((item) => item.name === requestedModel);
+  if (deployment === undefined || !deployment.enabled || !deployment.connectionEnabled) return null;
+  return routeForDeployment(requestedModel, deployment, alias !== undefined, alias?.fallbackPolicy ?? null);
 }

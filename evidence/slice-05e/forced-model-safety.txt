@@ -1,0 +1,20 @@
+Forced model safety.
+
+The alias auto on Fallback Main has an enabled fallback policy.
+The approved deployment is fb-secondary.
+The request names the deployment fb-primary.
+The primary mock returns HTTP 503.
+The response is not success.
+The upstream calls are only fb-primary.
+The header x-fallback is false.
+The header x-attempt-count is 1.
+
+A second tenant named Fallback Plain has the alias auto and no fallback policy.
+That alias is not changed when Fallback Main stores a policy.
+A 503 on the plain alias calls only plain-primary.
+
+Command: ./node_modules/.bin/vitest run test/fallback-policy.test.ts
+Run 1 exit: 0
+Run 2 exit: 0
+Both runs passed does not change an explicit deployment.
+Both runs passed does not fall back when the policy is missing or disabled.

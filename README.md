@@ -1,8 +1,26 @@
 # llm-proxy
 
-llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent decisions.
+**Give every team AI access without giving up control.**
 
-It runs inside your network and needs only PostgreSQL. Your apps keep one client and one request format. The proxy keeps the provider keys, the models each tenant may call, and the rules for spend, retries, and failover. It does only what you approved, and it shows you what it did.
+llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent decisions. It runs in your cloud VPC or on-prem in your own data center, and needs only PostgreSQL. Security gets one place for provider keys. Finance gets per-team spend it can trust. Compliance knows the approved model is the one that answered. Developers keep the OpenAI SDK and never handle a provider key.
+
+## For enterprises
+
+- **Pass your security review.** It runs inside your network. No vendor holds your data, so there is no new third-party risk and no data-residency question.
+- **One place for provider keys.** No keys spread across app `.env` files. If a key leaks, you rotate it once, and no app redeploys.
+- **The approved model is the one that answered.** A named model never switches. Audits and regulated workloads get the model you tested.
+- **Spend you can defend.** Cost per team and per attempt, with no hidden $0 failures. Budgets stop overspend before the invoice.
+- **Small to run.** One container and PostgreSQL. No vendor control plane and no extra services to patch or staff.
+- **AI where the internet is not allowed.** It can run air-gapped with a model that you host. A live DGX call is not yet validated.
+
+## For developers
+
+- **No new SDK.** Keep the OpenAI client and change the base URL. The same code works for OpenAI, Anthropic, Vertex, Grok, OpenRouter, or your own model.
+- **Change models without a deploy.** Point the alias `auto` at a new deployment with the CLI.
+- **No provider keys in your app.** You hold one tenant secret. No key rotation work.
+- **Reliability is built in.** Retries, deadlines, fallback, and the circuit breaker are set once by the platform team, not rebuilt in each service.
+- **Easy to debug.** Errors use the OpenAI shape. The `x-deployment`, `x-attempt-count`, and `x-fallback` headers show what happened. A field the model does not accept is refused, not dropped without notice.
+- **Streams you can trust.** The proxy never joins output from two models into one answer.
 
 Two words appear throughout. A **tenant** is one team or app with its own secret, models, limits, and budget. A **deployment** is one model at one provider that you registered.
 
@@ -14,7 +32,7 @@ Without a gateway, each app has its own provider keys in its own `.env` file. Ke
 
 llm-proxy is built on three promises:
 
-- **Contained.** Provider keys and prompts stay inside your network. A caller never sees a provider key or a provider URL. The database enforces tenant isolation.
+- **Contained.** Provider keys stay inside your network. Prompts go only to the provider that you chose, and to no one at all with a self-hosted model. A caller never sees a provider key or a provider URL. The database enforces tenant isolation.
 - **Approved.** Every control is off until you turn it on. A request that names a model never switches to a different model. Fallback happens only for the alias `auto`, only to a deployment that passed your policy, and only before the first byte of output.
 - **Provable.** Each attempt records which deployment answered and what it cost. Each cost is estimated (verified price, full usage), provisional (unverified price or partial usage), or unknown (no usage reported). A timeout is never recorded as a zero-cost call.
 
@@ -124,7 +142,7 @@ There are many LLM gateways. Most of them compete on breadth: more models, more 
 
 | Question | llm-proxy | Typical gateway |
 | --- | --- | --- |
-| Where does it run? | In your network. Only PostgreSQL is needed. | SaaS, hybrid, or self-hosted with extra services. |
+| Where does it run? | Your cloud VPC or your own data center. Only PostgreSQL is needed. | SaaS, hybrid, or self-hosted with extra services. |
 | Who sees the provider keys? | Only the proxy. AES-256-GCM ciphertext; the key is not in Postgres. | Gateway config, env vars, or the vendor's secret store. |
 | How are tenants isolated? | PostgreSQL row-level security on every tenant query. | Teams or virtual keys in app logic. Some tiers are enterprise-only. |
 | Can my model change without notice? | No. A named model never switches. | Often yes: automatic fallbacks, budget fallbacks, or mid-stream continuation. |
@@ -149,9 +167,15 @@ Summary of the market as of October 2026 (full table with sources in [Comparison
 
 Use a different gateway today if you need tools, images, audio, embeddings, MCP, an admin UI, SSO, or hundreds of models through one hosted key. llm-proxy does not include them yet.
 
-## Run it inside your VPC
+## Run it in your VPC or on-prem
 
-llm-proxy is built for a network that you control. Keys, costs, policies, and the attempt trail all stay in your own PostgreSQL. Prompts pass through to the provider that you chose and nowhere else.
+llm-proxy is built for a network that you control. It is one container and one PostgreSQL 16 database, so it runs anywhere you run containers:
+
+- **Cloud VPC.** AWS, Google Cloud, Azure, or any other cloud, in a private subnet behind your own load balancer.
+- **On-prem.** Your own servers and data center, next to your own GPUs.
+- **Air-gapped.** With no internet access, when it routes only to a model endpoint that you host, such as a DGX system. Hosted providers (OpenAI, Anthropic, Vertex, xAI, OpenRouter) need outbound access to their APIs. A live DGX call is not yet validated.
+
+In every case, keys, costs, policies, and the attempt trail all stay in your own PostgreSQL. Prompts pass through to the provider that you chose and nowhere else.
 
 - **No prompt storage.** The database stores token counts, not prompt or completion text.
 - **Small footprint.** One Node.js process and PostgreSQL 16. Seven runtime packages, with a lockfile.

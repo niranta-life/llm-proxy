@@ -1,0 +1,28 @@
+Rollback proof.
+
+Emergency disable and reset are admin CLI commands.
+Neither command deletes the migration.
+Neither command changes the operator health label.
+Neither command moves the alias auto.
+
+The proof is the shipped chat route against a mock provider and real PostgreSQL.
+The dedicated run started at 13:08:22.
+EXIT:0.
+
+Disable closes the breaker and turns it off.
+The next chat reaches the upstream.
+A later provider error does not open it.
+The health label stays healthy.
+BREAKER_CASE {"case":"cli-disable","view":{"deployment":"breaker-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":"2026-10-21T20:09:00.434Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"result":{"status":200,"code":null,"hits":1},"still":{"deployment":"breaker-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":"2026-10-21T20:09:00.434Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"health":"healthy"}
+
+Reset closes the breaker and keeps it enabled.
+The next chat reaches the upstream.
+BREAKER_CASE {"case":"cli-reset","reset":{"deploymentId":"db782b9b-2080-44e6-9433-960b36389108","state":"closed"},"view":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"reset","changedAt":"2026-10-21T20:09:01.454Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"result":{"status":200,"code":null,"hits":1}}
+
+Do not delete a breaker row to roll back.
+The test did not boot a container for this proof.
+This file does not claim a readiness HTTP status.
+Image fc4a63c remains the published parent.
+Its latest migration file is 013_execution_policy.sql.
+014_provider_breaker.sql is additive.
+schema_migrations keeps 013_execution_policy.sql after 014 is applied.

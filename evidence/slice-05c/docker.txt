@@ -1,0 +1,11 @@
+Docker.
+
+The command was docker image inspect llm-proxy:fc4a63c.
+The socket was unix:///Users/nitin/.colima/default/docker.sock.
+The daemon returned: Error response from daemon: No such image: llm-proxy:fc4a63c
+INSPECT_EXIT:1
+
+No compose boot was run.
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+llm-proxy_pgdata was not deleted.

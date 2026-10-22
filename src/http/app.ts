@@ -8,6 +8,7 @@ import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
+import { listBreakers } from '../db/breaker.js';
 import { listAttemptHistory, listVisibleModels, summarizeMetrics } from '../inference/store.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
@@ -26,6 +27,7 @@ export type AppDeps = {
   vertexClientFactory?: VertexClientFactory;
   compatibleFetch?: typeof fetch;
   privateResolve?: (host: string) => Promise<readonly string[]>;
+  now?: () => number;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -68,6 +70,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
   const credentialStore: ProviderCredentialStore | null =
     deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
   const streamGate = createStreamGate(deps.maxActiveStreams, deps.maxStreamsPerTenant);
+  const nowMs = deps.now ?? ((): number => Date.now());
   app.streamGate = streamGate;
   app.drainStreams = (drainMs: number) => drainStreams(streamGate, drainMs);
 
@@ -199,6 +202,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         vertexClientFactory: deps.vertexClientFactory,
         fetchImpl: deps.compatibleFetch,
         resolveHost: deps.privateResolve,
+        nowMs,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -287,6 +291,29 @@ export function buildApp(deps: AppDeps): ProxyApp {
     } catch (error) {
       if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
       deps.logger.error('attempt history read failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
+
+  app.get<{ Querystring: { deployment?: string } }>('/internal/v1/metrics/breakers', async (request, reply) => {
+    const tenantId = await rejectUnauthenticated(request, reply);
+    if (tenantId === null) return;
+    const deployment = request.query.deployment?.trim() ?? '';
+    if (request.query.deployment !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(deployment)) {
+      return reply
+        .code(400)
+        .send(proxyError(400, 'invalid_request_error', 'invalid_parameter', 'deployment', 'The deployment name is invalid.').body());
+    }
+    try {
+      const breakers = await withTenant(deps.runtimePool, tenantId, (client) =>
+        listBreakers(client, new Date(nowMs()), deployment.length === 0 ? null : deployment),
+      );
+      return { breakers };
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('breaker read failed', { message: errorMessage(error) });
       return reply
         .code(500)
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());

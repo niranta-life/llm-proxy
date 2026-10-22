@@ -1052,6 +1052,13 @@ The item contains `dispatched`.
 A cost amount in that list is text.
 A missing amount is null.
 Each attempt is one row.
+
+`GET /internal/v1/metrics/breakers` uses the same tenant headers.
+The query can contain `deployment`.
+The body lists the breaker for each deployment.
+Each item contains the state, the reason, the time, the health sample count, the failure count, the rate-limit count, and the probe count.
+A rate-limit count is separate from the failure count.
+A deployment with no breaker is closed and disabled.
 You record a price with the CLI.
 The proxy does not embed a public price list.
 You supply each rate.
@@ -1682,6 +1689,62 @@ docker compose run --rm app node dist/cli.js set-execution-policy \
   --max-backoff-ms 0
 ```
 
+`014_provider_breaker.sql` stores a breaker for one deployment.
+The file does not drop a column.
+The file does not drop a table.
+The file does not edit migrations `001` through `013`.
+
+The image `fc4a63c` stays ready on this database.
+Its latest migration file is `013_execution_policy.sql`.
+After `014_provider_breaker.sql` is applied, `schema_migrations` keeps `013_execution_policy.sql`.
+The readiness route on that image checks for `013_execution_policy.sql`.
+A later file does not remove that row.
+
+The breaker stays off until you enable it for one deployment.
+The command does not move the alias `auto`.
+The command does not change `unknown`, `healthy`, or `unhealthy`.
+An open breaker rejects a new chat before the upstream request.
+A rate limit does not open the breaker.
+A caller validation error does not change the breaker.
+A caller authentication failure does not change the breaker.
+A caller cancellation does not change the breaker.
+A connection failure counts when the provider does not accept the body.
+A timeout counts when the provider does not accept the body.
+This is true for a stream.
+An ambiguous network failure does not open the breaker.
+The breaker opens only when the sample count and the failure count both reach the configured limits.
+The caller receives HTTP 503 when the breaker is open.
+The error code is `circuit_open`.
+After the cooldown, only the configured number of probes reach the upstream.
+A successful probe closes the breaker.
+A failed probe opens the breaker again.
+A caller abort during a probe releases that probe.
+The probe count returns to zero.
+The abort does not open the breaker.
+You disable the breaker with `set-deployment-breaker` and `--enabled false`.
+You reset the breaker with `reset-deployment-breaker`.
+The next chat then reaches the upstream.
+Do not delete a breaker row to roll back.
+
+```bash
+docker compose run --rm app node dist/cli.js set-deployment-breaker \
+  --tenant-id <tenant-id> \
+  --deployment <name> \
+  --enabled true \
+  --window-ms 60000 \
+  --min-samples 4 \
+  --failure-threshold 3 \
+  --cooldown-ms 30000 \
+  --max-probes 1
+docker compose run --rm app node dist/cli.js set-deployment-breaker \
+  --tenant-id <tenant-id> \
+  --deployment <name> \
+  --enabled false
+docker compose run --rm app node dist/cli.js reset-deployment-breaker \
+  --tenant-id <tenant-id> \
+  --deployment <name>
+```
+
 ## Tests
 
 `npm test` must use Node.js 24.
@@ -1867,6 +1930,15 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - The response body can still finish inside the attempt deadline.
 - A valid Retry-After is used only when the wait fits the remaining deadlines.
 - An invalid Retry-After does not add wait beyond the bounded backoff.
+- The breaker stays off until you enable it for that deployment.
+- An open breaker does not send the upstream request.
+- An open breaker returns HTTP 503 with code `circuit_open`.
+- A rate limit does not open the breaker.
+- A connection failure before the body is accepted can open the breaker.
+- A timeout before the body is accepted can open the breaker.
+- A caller abort during a probe releases that probe.
+- An ambiguous network failure does not open the breaker.
+- The alias `auto` stays on the same deployment.
 - A dispatched failure without usage is an uncertain expense.
 - The amount for that expense stays null.
 - A missing usage count is not stored as zero.
@@ -1931,6 +2003,7 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - Input that is not text.
 - A tool call.
 - A second provider after an error.
+- A fallback deployment after the breaker opens.
 - An automatic retry for every error.
 - Selection of a deployment by a quality score.
 - OAuth, a login, saved caller state, and a user account.

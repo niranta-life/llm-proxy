@@ -362,7 +362,9 @@ describe('controlled retries', () => {
     mode = { type: 'status', status: 401 };
     times.length = 0;
     mock.hits.length = 0;
-    const authSince = new Date();
+    // The database clock can lead the host clock. A host timestamp can include the prior row.
+    const marked = await admin.query<{ now: Date }>(`SELECT clock_timestamp() AS now`);
+    const authSince = marked.rows[0]?.now ?? new Date();
     const unauthorized = await chat(opted, 'http-401');
     const authRows = await rowsSince(opted.tenantId, authSince);
     report('http-401', unauthorized.response.statusCode, mock.hits, authRows, unauthorized.elapsedMs);

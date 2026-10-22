@@ -337,6 +337,25 @@ export type FrameSocket = {
   off(event: 'drain', listener: () => void): void;
 };
 
+// The pull runs when the client accepts the request body. The caller can
+// record connecting after that and before the upstream headers arrive.
+export function jsonRequestStream(payload: string, onQueued: () => void): ReadableStream<Uint8Array> {
+  const bytes = Buffer.from(payload);
+  let queued = false;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (queued) {
+        controller.close();
+        return;
+      }
+      queued = true;
+      controller.enqueue(bytes);
+      controller.close();
+      onQueued();
+    },
+  });
+}
+
 export function writeFrame(
   socket: FrameSocket,
   frameText: string,

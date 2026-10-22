@@ -1,0 +1,127 @@
+Full regression results.
+
+Node was v24.22.0.
+Vitest was v3.2.7.
+The command was env -u VERTEX_LIVE -u XAI_LIVE -u OPENROUTER_LIVE ./node_modules/.bin/vitest run --reporter=verbose from llm-proxy.
+VERTEX_LIVE was unset.
+XAI_LIVE was unset.
+OPENROUTER_LIVE was unset.
+tsc --noEmit exited 0 before the passing run.
+
+Sixteen completed full runs failed before the passing run.
+One run was interrupted and has no exit code.
+
+Reruns 1, 2, and 3 failed 1 test.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 242 passed | 3 skipped (246).
+Durations were 352.44s, 351.72s, and 388.58s.
+EXIT:1.
+The failed assertion was test/stream-production.test.ts:763.
+The assertion was expect(slowStopped || slowWrites < 24).toBe(true).
+
+Rerun 4 failed that same test at test/stream-production.test.ts:698.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 242 passed | 3 skipped (246).
+Duration 409.32s.
+EXIT:1.
+Later runs did not fail line 698.
+
+Rerun 5 failed 2 tests.
+Test Files 2 failed | 36 passed | 2 skipped (40).
+Tests 2 failed | 241 passed | 3 skipped (246).
+Duration 379.44s.
+EXIT:1.
+One failure was test/retry-policy.test.ts selecting the prior HTTP 400 row.
+The other was test/stream-production.test.ts:763.
+
+Rerun 6 failed only the retry-policy row check.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 242 passed | 3 skipped (246).
+Duration 365.06s.
+EXIT:1.
+Line 763 did not fail in that run.
+
+Rerun 7 failed the retry-policy row check and line 763.
+Test Files 2 failed | 36 passed | 2 skipped (40).
+Tests 2 failed | 241 passed | 3 skipped (246).
+Duration 363.87s.
+EXIT:1.
+
+The retry-policy test now reads the database clock.
+Reruns 8 through 18 did not fail that row check.
+
+Reruns 8, 9, 10, 11, 12, 13, 14, 16, and 17 failed only line 763.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 242 passed | 3 skipped (246).
+EXIT:1.
+Durations were 400.62s, 371.24s, 355.47s, 335.39s, 336.91s, 338.23s, 345.19s, 332.19s, and 340.16s.
+
+Rerun 15 was interrupted before vitest printed a summary.
+That run has no exit code.
+
+That stream-production check is the existing slow consumer slot check.
+The assertion was not changed.
+
+The passing full run started at 2026-10-21T23:08:45Z.
+Test Files 38 passed | 2 skipped (40).
+Tests 243 passed | 3 skipped (246).
+Duration 333.50s.
+EXIT:0.
+
+The skipped tests were the existing live suites.
+test/compatible-live.test.ts skipped the xAI live call because XAI_LIVE was unset.
+test/compatible-live.test.ts skipped the OpenRouter live call because OPENROUTER_LIVE was unset.
+test/vertex-live.test.ts skipped the Vertex live call because VERTEX_LIVE was unset.
+
+The new tests passed and were not skipped.
+test/breaker.test.ts passed 22 tests.
+The chat tests use mock providers and real PostgreSQL.
+The breaker clock is injected.
+The fault responses are scripted.
+
+A later change records a streamed probe before the upstream body is accepted.
+tsc --noEmit exited 0 before the later full runs.
+Node was v24.22.0.
+Vitest was v3.2.7.
+The same command ran again with VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE unset.
+
+The first later full run started at 2026-10-21T23:36:31Z.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 246 passed | 3 skipped (250).
+Duration 348.91s.
+EXIT:1.
+The failed test was test/vertex-chat.test.ts.
+The stored stream status was timed_out.
+The expected status was client_aborted.
+The same test passed when the whole vertex file ran on its own.
+The slow-consumer assertion was not changed.
+
+The second later full run started at 2026-10-21T23:47:08Z.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 246 passed | 3 skipped (250).
+Duration 339.34s.
+EXIT:1.
+The failed assertion was test/stream-production.test.ts:763.
+
+The third later full run started at 2026-10-21T23:53:02Z.
+Test Files 1 failed | 37 passed | 2 skipped (40).
+Tests 1 failed | 246 passed | 3 skipped (250).
+Duration 353.89s.
+EXIT:1.
+The failed assertion was test/stream-production.test.ts:763.
+
+The passing later full run started at 2026-10-21T23:58:58Z.
+Test Files 38 passed | 2 skipped (40).
+Tests 247 passed | 3 skipped (250).
+Duration 353.06s.
+EXIT:0.
+
+The skipped tests were the existing live suites.
+test/compatible-live.test.ts skipped the xAI live call.
+test/compatible-live.test.ts skipped the OpenRouter live call.
+test/vertex-live.test.ts skipped the Vertex live call.
+VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+
+test/breaker.test.ts passed 26 tests in that run.
+Those tests were not skipped.
+Four of them cover a streamed connection refusal, a streamed connect timeout, a streamed caller abort, and a closed breaker opened by streamed connection failures.

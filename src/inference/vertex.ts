@@ -163,6 +163,7 @@ export const vertexAdapter: ProviderAdapter & {
         deadline: call.deadline,
         fetchImpl: call.fetchImpl,
         retryAfter: () => call.attemptTrace?.retryAfter ?? null,
+        onDispatched: call.onDispatched,
       })) {
         if (!noted) {
           noted = true;

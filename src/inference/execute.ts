@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { ProviderCredentialStore } from '../credentials.js';
+import { guardUpstream, noteUpstream } from '../db/breaker.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { anthropicAdapter } from './anthropic.js';
@@ -26,6 +27,7 @@ import {
   type FailureInput,
   type PolicyInput,
 } from './execution-policy.js';
+import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
 import { recordAttemptCostSafely } from './cost-store.js';
@@ -115,6 +117,7 @@ export async function executeChat(input: {
   vertexClientFactory?: VertexClientFactory;
   fetchImpl?: typeof fetch;
   resolveHost?: (host: string) => Promise<readonly string[]>;
+  nowMs?: () => number;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   if (!input.inferenceEnabled || input.store === null) {
@@ -151,6 +154,7 @@ export async function executeChat(input: {
       vertexClientFactory: input.vertexClientFactory,
       fetchImpl: input.fetchImpl,
       resolveHost: input.resolveHost,
+      nowMs: input.nowMs,
     });
     return undefined;
   }
@@ -227,7 +231,11 @@ export async function executeChat(input: {
         attemptMs,
       });
       const started = process.hrtime.bigint();
+      const observedAt = new Date((input.nowMs ?? Date.now)());
+      let gate: { allow: boolean; probe: boolean; track: boolean } = { allow: true, probe: false, track: false };
       try {
+        gate = await guardUpstream(input.runtimePool, input.tenantId, route.deploymentId, observedAt);
+        if (!gate.allow) throw circuitOpenError();
         const completion = await adapter.execute({
           apiKey,
           baseURL,
@@ -260,8 +268,32 @@ export async function executeChat(input: {
           expenseCertainty: 'known',
           closeRequest: true,
         });
+        if (gate.track) {
+          await noteBreaker(input, route.deploymentId, observedAt, gate.probe, 'success');
+        }
         return completion.response;
       } catch (error) {
+        if (error instanceof ProxyError && error.code === 'circuit_open') {
+          await recordResult(input, {
+            requestId,
+            attemptId,
+            status: 'failed',
+            errorCode: 'circuit_open',
+            durationMs: elapsedMs(started),
+            usage: emptyUsage(),
+            providerRequestId: null,
+            stopReason: null,
+            uncachedInputTokens: null,
+            cacheCreationInputTokens: null,
+            cacheReadInputTokens: null,
+            thoughtsTokens: null,
+            failureClass: null,
+            dispatched: false,
+            expenseCertainty: 'none',
+            closeRequest: true,
+          });
+          throw error;
+        }
         const normalized = asProxy(error, isCallerAbort(input.signal));
         const facts = failureFacts({
           caller: input.signal,
@@ -280,7 +312,20 @@ export async function executeChat(input: {
           random: Math.random,
           failure: facts,
         });
-        const retry = decision.retry && ordinal < policyAttempts(policy);
+        const suppressRetry = gate.track
+          ? await noteBreaker(
+              input,
+              route.deploymentId,
+              observedAt,
+              gate.probe,
+              classifyBreakerOutcome({
+                succeeded: false,
+                callerAborted: facts.callerAborted,
+                failureClass: decision.failureClass,
+              }),
+            )
+          : false;
+        const retry = decision.retry && !suppressRetry && ordinal < policyAttempts(policy);
         const attemptFacts = normalized.attempt;
         await recordResult(input, {
           requestId,
@@ -333,6 +378,29 @@ export async function executeChat(input: {
 
 function emptyUsage(): { promptTokens: null; completionTokens: null; totalTokens: null } {
   return { promptTokens: null, completionTokens: null, totalTokens: null };
+}
+
+async function noteBreaker(
+  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  deploymentId: string,
+  now: Date,
+  probe: boolean,
+  kind: BreakerOutcome,
+): Promise<boolean> {
+  try {
+    const noted = await noteUpstream(input.runtimePool, input.tenantId, deploymentId, now, probe, kind);
+    return noted.suppressRetry;
+  } catch (error) {
+    input.logger.error('breaker observation was not recorded', { message: errorMessage(error) });
+    if (probe) {
+      try {
+        await noteUpstream(input.runtimePool, input.tenantId, deploymentId, now, true, 'ignore');
+      } catch (releaseError) {
+        input.logger.error('breaker probe was not released', { message: errorMessage(releaseError) });
+      }
+    }
+    return false;
+  }
 }
 
 async function closePending(

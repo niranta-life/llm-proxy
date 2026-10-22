@@ -1,0 +1,19 @@
+Migration.
+
+The new file is migrations/014_provider_breaker.sql.
+Files 001 through 013 are unchanged.
+git status shows only the untracked file 014_provider_breaker.sql under migrations.
+The file does not drop a column.
+The file does not drop a table.
+A search for DROP COLUMN and DROP TABLE in that file found no match.
+
+The file adds deployment_breakers and breaker_observations.
+The breaker is disabled until an operator enables it.
+Runtime update rights are limited to state, state_reason, state_changed_at, cooldown_until, and probes_inflight.
+Enable, disable, and reset run as security definer functions granted only to llm_migrator.
+
+Image fc4a63c stays ready on this database.
+Its latest migration file is 013_execution_policy.sql.
+schema_migrations keeps that row after 014_provider_breaker.sql is applied.
+The readiness route on that image checks for 013_execution_policy.sql.
+This file does not claim a readiness HTTP status.

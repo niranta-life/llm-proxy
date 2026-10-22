@@ -9,6 +9,7 @@ llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent d
 - **Pass your security review.** It runs inside your network. No vendor holds your data, so there is no new third-party risk and no data-residency question.
 - **One place for provider keys.** No keys spread across app `.env` files. If a key leaks, you rotate it once, and no app redeploys.
 - **The approved model is the one that answered.** A named model never switches. Audits and regulated workloads get the model you tested.
+- **See the kind of work, not the prompt.** Each completed chat stores the task category, the model, and the outcome. The prompt and the answer stay out of the database.
 - **Spend you can defend.** Cost per team and per attempt, with no hidden $0 failures. Budgets stop overspend before the invoice.
 - **Small to run.** One container and PostgreSQL. No vendor control plane and no extra services to patch or staff.
 - **AI where the internet is not allowed.** It can run air-gapped with a model that you host. A live DGX call is not yet validated.
@@ -20,6 +21,7 @@ llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent d
 - **No provider keys in your app.** You hold one tenant secret. No key rotation work.
 - **Reliability is built in.** Retries, deadlines, fallback, and the circuit breaker are set once by the platform team, not rebuilt in each service.
 - **Easy to debug.** Errors use the OpenAI shape. The `x-deployment`, `x-attempt-count`, and `x-fallback` headers show what happened. A field the model does not accept is refused, not dropped without notice.
+- **Label the task when you know it.** Optional `task` must be a known category. The proxy stores it and does not send it to the provider.
 - **Streams you can trust.** The proxy never joins output from two models into one answer.
 
 Two words appear throughout. A **tenant** is one team or app with its own secret, models, limits, and budget. A **deployment** is one model at one provider that you registered.
@@ -51,7 +53,7 @@ flowchart TB
         adapters["Provider Adapters"]
         retry["Retries + Failover"]
         cost["Usage + Cost Tracking"]
-        telem["Request Telemetry"]
+        telem["Request Telemetry<br/>metrics + characteristics"]
         auth --> norm --> cap --> router --> retry --> adapters
         adapters --> cost --> telem
     end
@@ -100,9 +102,17 @@ Solid lines are shipped. Dashed lines are planned. Today the only runtime depend
 6. **Provider Adapters.** One adapter per provider family turns the canonical request into the provider's API and back into an OpenAI chat completion or a streamed response.
 7. **Retries + Failover.** Retry makes at most one more attempt on the same deployment, within one deadline. Fallback moves `auto` to one approved deployment, only before any output. A new attempt goes back to step 5.
 8. **Usage + Cost Tracking.** Each attempt is priced from prices that you registered. The budget reservation is settled.
-9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
+9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Each completed chat also stores one [request-characteristics](#request-characteristics) record, without the prompt or the answer. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
 
 Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, and the trust boundaries.
+
+### Request characteristics
+
+Each completed chat stores one versioned record for that tenant. The record has the task category, how that category was chosen, the requested model, the selected deployment, the size, the latency, and the outcome. It does not contain the prompt, the answer, or a credential.
+
+You can set `task` to `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, or `unknown`. Any other value is rejected. When `task` is absent, local rules choose the category, or it stays `unknown`. The proxy does not call a model to classify the text, and it does not send `task` to the provider.
+
+List and by-id reads use the same tenant headers as chat. A page holds at most 50 rows. Another tenant's rows are not returned. See [Metrics](docs/metrics.md#request-features).
 
 ### Continuous Learning System (planned, not built)
 
@@ -112,7 +122,7 @@ The learning system closes the loop from your own traffic:
 - **Evaluator** replays stored requests against other deployments and scores them with a judge model.
 - **Optimizer** ranks deployments per task. The router can then use these rankings for `auto`, inside the same policy checks that fallback uses today.
 
-It will need Redis and a durable job queue for replay work. This release does not include it. The router does not choose a model by quality score today.
+Request characteristics are already stored. Replay, a judge, and rankings are not in this release. They will need Redis and a durable job queue. The router does not choose a model by quality score today.
 
 ### How this architecture compares
 
@@ -134,7 +144,7 @@ The main design differences:
 - **Fallback that never joins two models in one answer.** Some gateways continue a broken stream on another model. llm-proxy never falls back after the first byte, so the answer you audit is the answer one model gave.
 - **Policy-checked fallback.** A fallback target must be in the same tenant, pass a live check, come from an approved provider, match your data-handling rule, sit in an allowed region, and accept the required fields.
 - **Honest cost.** Unknown stays unknown. A hard budget refuses a call whose cost it cannot estimate in advance.
-- **One dependency.** PostgreSQL holds config, policy, keys, costs, and the attempt trail. No vendor control plane.
+- **One dependency.** PostgreSQL holds config, policy, keys, costs, the attempt trail, and request characteristics. No vendor control plane.
 
 ## Why not an existing gateway?
 
@@ -146,7 +156,7 @@ There are many LLM gateways. Most of them compete on breadth: more models, more 
 | Who sees the provider keys? | Only the proxy. AES-256-GCM ciphertext; the key is not in Postgres. | Gateway config, env vars, or the vendor's secret store. |
 | How are tenants isolated? | PostgreSQL row-level security on every tenant query. | Teams or virtual keys in app logic. Some tiers are enterprise-only. |
 | Can my model change without notice? | No. A named model never switches. | Often yes: automatic fallbacks, budget fallbacks, or mid-stream continuation. |
-| How do I know what happened? | Headers and per-attempt rows name the deployment, attempt count, and fallback. | Logs or a hosted dashboard. |
+| How do I know what happened? | Headers and per-attempt rows name the deployment, the attempt count, and any fallback. A characteristics record names the task and the outcome, without the prompt. | Logs or a hosted dashboard. |
 | Is a cost figure ever a guess shown as fact? | No. Each amount is estimated, provisional, or unknown. | Often a public price list; failed calls can show $0. |
 | License | MIT. No paid enterprise tier. | Mixed: open core with paid enterprise features is common. |
 
@@ -177,7 +187,7 @@ llm-proxy is built for a network that you control. It is one container and one P
 
 In every case, keys, costs, policies, and the attempt trail all stay in your own PostgreSQL. Prompts pass through to the provider that you chose and nowhere else.
 
-- **No prompt storage.** The database stores token counts, not prompt or completion text.
+- **No prompt storage.** The database stores token counts and request characteristics, not prompt or completion text.
 - **Small footprint.** One Node.js process and PostgreSQL 16. Seven runtime packages, with a lockfile.
 - **No telemetry.** The proxy calls only the providers that you register. It sends nothing to the maintainers or anyone else.
 - **Caller never holds a provider key.** The caller sends a tenant id and a tenant secret. It cannot send a provider key or a provider URL.
@@ -292,12 +302,13 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
 - **[Metrics](docs/metrics.md).** Counts, latency, stream percentiles, attempts, breaker state, and cost for the caller's own tenant.
+- **[Request characteristics](docs/metrics.md#request-features).** One versioned record per completed chat: the task, the model, the size, and the outcome. The prompt and the answer are not stored.
 - **[Operations](docs/operations.md).** Configuration, health, shutdown, migrations, incidents, and tests.
 - **[Comparison](docs/comparison.md).** The LLM gateway market, with sources.
 
 ## Roadmap
 
-- **Continuous Learning System:** History, Evaluator, and Optimizer, as shown in the architecture.
+- **Continuous Learning System:** History, Evaluator, and Optimizer, as shown in the architecture. Request characteristics are already stored. Replay and rankings are not.
 - **Redis and a durable job queue** for replay and evaluation work.
 - **External secret manager** support for provider keys.
 - **A verified live call to a private endpoint** (DGX), so it can be `validated_live`.

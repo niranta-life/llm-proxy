@@ -1,0 +1,46 @@
+Eligibility results.
+
+The shipped chat route drives every case.
+PostgreSQL comes from the test database.
+The upstream server is the local mock.
+The tests do not mock the route.
+
+Each rejected candidate has no upstream call.
+The primary call is the only hit.
+
+Skipped because the deployment is disabled.
+The next approved deployment fb-secondary is called.
+Skipped because the deployment belongs to another tenant.
+Skipped because the deployment lacks max_tokens.
+Skipped because the stored context limit is 4 and max_tokens is 16.
+The request content in that case is the word short.
+Character length is not the context bound.
+A long prompt of 4000 characters with max_tokens 16 and context limit 128 does fall back.
+The approved order fb-left then fb-right selects fb-left.
+The reversed order selects fb-right.
+validated_mock is not called.
+valid is not called.
+unvalidated is not called.
+invalid is not called.
+validated_live is the status that is called.
+A Vertex deployment in europe-west4 is not called when the policy region is us-central1.
+That case records zero Vertex client calls.
+An unknown price under a hard budget is not called.
+A secondary estimate that does not fit the hard budget is not called.
+An open circuit breaker is not called.
+
+A hard concurrent request cap of 1 still calls the secondary.
+A hard concurrent stream cap of 1 still calls the secondary.
+The preview does not count the failed attempt.
+Settlement releases that attempt before the next admission.
+
+Command: ./node_modules/.bin/vitest run test/fallback-policy.test.ts
+Node: v24.22.0
+Run 1 start: 23:39:45
+Run 1 duration: 51.84s
+Run 1 exit: 0
+Run 2 start: 23:40:47
+Run 2 duration: 49.32s
+Run 2 exit: 0
+Tests 26 passed in each run.
+The permitted response content is from-fb-secondary.

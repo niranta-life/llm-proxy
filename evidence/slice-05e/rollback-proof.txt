@@ -1,0 +1,30 @@
+Rollback proof.
+
+The additive file is migrations/016_fallback_policy.sql.
+It does not drop a column.
+It does not drop a table.
+It does not edit migrations 001 through 015.
+A search of that file found no DROP.
+git diff on migrations 001 through 015 is empty.
+
+README states these rollback facts.
+The image 1bbe7a1 stays ready on this database.
+Its latest migration file is 015_tenant_limits.sql.
+After 016_fallback_policy.sql is applied, schema_migrations keeps 015_tenant_limits.sql.
+The readiness route on that image checks for 015_tenant_limits.sql.
+A later file does not remove that row.
+
+Inspection is show-fallback-policy.
+Replacement is set-fallback-policy.
+Rollback of the behavior sets enabled to false.
+The migration stays applied.
+The proxy has no HTTP route that writes the policy.
+
+An explicit deployment name does not change.
+An alias without a policy stays on one deployment.
+Existing auto aliases are not retargeted by the migration.
+
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was not deleted.
+The container llm-proxy-app-1 was not stopped.

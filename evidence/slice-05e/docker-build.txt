@@ -1,0 +1,42 @@
+Docker build.
+
+Command: docker compose build app
+Working directory: /Users/nitin/Work/Y/llm-proxy
+DOCKER_HOST was unset.
+The active context was colima.
+That context host is unix:///Users/nitin/.colima/default/docker.sock.
+The default socket symlink target /Users/rashmi/.docker/run/docker.sock was absent.
+The build used the active Colima context.
+Started: 2026-10-22T06:50:38Z
+Ended: 2026-10-22T06:51:42Z
+Image: llm-proxy-app:latest
+BUILD_EXIT=0
+
+docker image inspect --format '{{.Id}}' returned sha256:e7edff53854650f4625024f4854abcfd171188946d0f6a4d6a00241171e62193
+Created: 2026-10-21T23:51:42.064226221-07:00
+INSPECT_EXIT=0
+
+The build log named docker.io/library/llm-proxy-app:latest.
+The build log exported manifest list sha256:e7edff53854650f4625024f4854abcfd171188946d0f6a4d6a00241171e62193.
+The build log exported manifest sha256:535c571627fca7f6835f4fd54e562fbbce280dba941a0c314c6302e3b0b528b0.
+The build log exported config sha256:e63334cd415336b0ad16fe540f26cba6f8850a675eec62886710f769dbe83963.
+
+The image build copied src and ran npm run build.
+A one-shot ls found migrations/016_fallback_policy.sql.
+A one-shot ls found dist/inference/fallback.js.
+A one-shot search of dist/inference/admission.js found the lease preview line attempt_id IS DISTINCT FROM.
+A one-shot search of 016_fallback_policy.sql in the image found no DROP.
+.env.live is absent from the image.
+
+An earlier build at 2026-10-22T06:22:17Z produced sha256:d4eb8e2522a5077b53275aa289241a722272b070f54f2a5542671eb60da596da.
+That image was built before the concurrency preview change.
+The image recorded above is the later build.
+
+The app service was not started by this build.
+docker ps already showed llm-proxy-app-1.
+That container id stayed 78aeff0661bc.
+This build did not stop that container.
+This file does not claim a readiness HTTP status.
+Colima was not stopped.
+The volume llm-proxy_pgdata was still present.
+It was not deleted.

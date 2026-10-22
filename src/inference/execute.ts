@@ -9,7 +9,8 @@ import { bindRouteTransport } from './private-serve.js';
 import type { ProviderAdapter } from './contract.js';
 import type { VertexClientFactory } from './vertex-client.js';
 import { vertexAdapter } from './vertex.js';
-import { runChatStream, type StreamHttp } from './execute-stream.js';
+import { runChatStream, stampProxyOutcome, type StreamHttp } from './execute-stream.js';
+import { beginFallbackAttempt, chooseFallback, fallbackAttemptCap, fallbackPermitted } from './fallback.js';
 import {
   deadlineKindOf,
   decideRetry,
@@ -135,13 +136,13 @@ export async function executeChat(input: {
       streamingEnabled: catalog.streamingEnabled,
     };
   });
-  const route = loaded.route;
-  if (route === null) {
+  if (loaded.route === null) {
     throw proxyError(404, 'invalid_request_error', 'model_not_found', 'model', 'The model is not available.');
   }
+  let route: ResolvedRoute = loaded.route;
   assertStreamAllowed(request, route, loaded.streamingEnabled);
   assertCapabilities(request, route.capabilities);
-  const adapter = adapterFor(route.provider);
+  let adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {
     await runChatStream({
@@ -165,7 +166,7 @@ export async function executeChat(input: {
     });
     return undefined;
   }
-  const transport = await bindRouteTransport({
+  let transport = await bindRouteTransport({
     runtimePool: input.runtimePool,
     tenantId: input.tenantId,
     route,
@@ -173,7 +174,6 @@ export async function executeChat(input: {
     fetchImpl: input.fetchImpl,
     resolveHost: input.resolveHost,
   });
-  const baseURL = transport.baseURL;
 
   let requestId = '';
   let attemptId = '';
@@ -200,10 +200,14 @@ export async function executeChat(input: {
 
   const requestStarted = process.hrtime.bigint();
   const { policy, deadlinesActive } = policyFor(route);
+  const originTimeoutMs = route.timeoutMs;
+  const ceiling = Math.max(policyAttempts(policy), fallbackAttemptCap(route.fallbackPolicy ?? null));
   const total = startTotalDeadline(deadlinesActive, policy.totalDeadlineMs);
   let ordinal = 1;
+  let fellBack = false;
+  let fallbackUsed = false;
   try {
-    while (ordinal <= policyAttempts(policy)) {
+    while (ordinal <= ceiling) {
       const elapsed = elapsedMs(requestStarted);
       if (deadlinesActive && elapsed >= policy.totalDeadlineMs) {
         const timeout = timeoutProxy('total');
@@ -255,7 +259,7 @@ export async function executeChat(input: {
         if (input.afterAdmit) await input.afterAdmit();
         const completion = await adapter.execute({
           apiKey,
-          baseURL,
+          baseURL: transport.baseURL,
           request,
           route: deadlinesActive ? { ...route, timeoutMs: attemptMs } : route,
           signal: window.signal,
@@ -345,7 +349,30 @@ export async function executeChat(input: {
               }),
             )
           : false;
-        const retry = decision.retry && !suppressRetry && ordinal < policyAttempts(policy);
+        const elapsedNow = elapsedMs(requestStarted);
+        const budgetMs = deadlinesActive ? policy.totalDeadlineMs : originTimeoutMs;
+        const permitted = fallbackPermitted({
+          route,
+          failureClass: decision.failureClass,
+          ordinal,
+          outputStarted: false,
+          callerAborted: facts.callerAborted,
+          fallbackUsed,
+          remainingMs: budgetMs - elapsedNow,
+        });
+        const next: ResolvedRoute | null = permitted
+          ? await chooseFallback({
+              pool: input.runtimePool,
+              tenantId: input.tenantId,
+              apiKeyId: input.apiKeyId,
+              request,
+              failedRoute: route,
+              now: new Date((input.nowMs ?? Date.now)()),
+              stream: false,
+              releasingAttemptId: attemptId,
+            })
+          : null;
+        const retry = next === null && !permitted && decision.retry && !suppressRetry && ordinal < policyAttempts(policy);
         const attemptFacts = normalized.attempt;
         await recordResult(input, {
           requestId,
@@ -367,8 +394,43 @@ export async function executeChat(input: {
           failureClass: decision.failureClass,
           dispatched: facts.dispatched,
           expenseCertainty: decision.expenseCertainty,
-          closeRequest: !retry,
+          closeRequest: next === null && !retry,
         });
+        if (next !== null) {
+          try {
+            const adopted = await beginFallbackAttempt({
+              runtimePool: input.runtimePool,
+              tenantId: input.tenantId,
+              requestId,
+              route: next,
+              ordinal: ordinal + 1,
+              triggerReason: decision.failureClass,
+              store: input.store,
+              upstreamBaseUrl: input.upstreamBaseUrl,
+              fetchImpl: input.fetchImpl,
+              resolveHost: input.resolveHost,
+              prepare: (selected) => {
+                adapter = adapterFor(selected.provider);
+                adapter.prepare(request, selected);
+              },
+            });
+            const previous = transport;
+            transport = adopted.transport;
+            await previous.release();
+            apiKey = adopted.apiKey;
+            attemptId = adopted.attemptId;
+            route = next;
+            fallbackUsed = true;
+            fellBack = true;
+            ordinal += 1;
+            continue;
+          } catch (switchError) {
+            await closePending(input, requestId);
+            if (switchError instanceof ProxyError) throw switchError;
+            input.logger.error('request persistence failed', { message: errorMessage(switchError) });
+            throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+          }
+        }
         if (!retry) throw normalized;
         const signals = total.signal === null ? [input.signal] : [input.signal, total.signal];
         const slept = await waitForRetry(decision.waitMs, signals);
@@ -380,7 +442,7 @@ export async function executeChat(input: {
           throw timeoutProxy(deadlineKindOf(total.signal ?? undefined) ?? 'total');
         }
         ordinal += 1;
-        if (ordinal > policyAttempts(policy)) throw normalized;
+        if (ordinal > ceiling) throw normalized;
         attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
           insertAttempt(client, input.tenantId, requestId, route, ordinal),
         );
@@ -391,6 +453,14 @@ export async function executeChat(input: {
     throw proxyError(502, 'server_error', 'upstream_error', null, 'The upstream model request failed.');
   } finally {
     total.cancel();
+    if (requestId !== '') {
+      stampProxyOutcome(input.reply, {
+        requestId,
+        deployment: route.deploymentName,
+        attemptCount: ordinal,
+        fallback: fellBack,
+      });
+    }
     apiKey = '';
     await transport.release();
   }

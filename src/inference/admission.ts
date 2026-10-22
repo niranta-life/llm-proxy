@@ -182,6 +182,249 @@ export async function settleChatAttempt(
   }
 }
 
+export async function fallbackResourcesAllow(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    apiKeyId: string;
+    route: ResolvedRoute;
+    request: ChatRequest;
+    stream: boolean;
+    now: Date;
+    releasingAttemptId: string;
+  },
+): Promise<boolean> {
+  try {
+    return await withTenant(pool, input.tenantId, async (client) => {
+      const quote = await quoteAttempt(client, input);
+      if (!(await budgetAllows(client, input.tenantId, input.now, quote))) return false;
+      return limitsAllow(client, input, tokenBound(input.request, input.route));
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function budgetAllows(
+  client: PoolClient,
+  tenantId: string,
+  now: Date,
+  quote: ChargeEstimate,
+): Promise<boolean> {
+  const budget = await client.query<{ mode: string }>(
+    `SELECT mode FROM tenant_budgets WHERE tenant_id = $1`,
+    [tenantId],
+  );
+  const mode = budget.rows[0]?.mode;
+  if (mode === undefined || mode === 'disabled' || mode === 'observe') return true;
+  if (mode !== 'hard') return false;
+  if (quote.kind !== 'bounded' || quote.amount === null) return false;
+  const fit = await client.query<{ allowed: boolean }>(
+    `SELECT (
+       $1::numeric <= (
+         b.monthly_amount
+         - COALESCE((
+             SELECT SUM(amount)
+             FROM cost_ledger
+             WHERE tenant_id = b.tenant_id
+               AND period_start = $2::date
+               AND entry_type = 'settle'
+           ), 0)
+         - COALESCE((
+             SELECT SUM(reserved_amount)
+             FROM budget_reservations
+             WHERE tenant_id = b.tenant_id
+               AND period_start = $2::date
+               AND status IN ('active', 'provisional')
+               AND reserved_amount IS NOT NULL
+           ), 0)
+       )
+     ) AS allowed
+     FROM tenant_budgets b
+     WHERE b.tenant_id = $3 AND b.mode = 'hard'`,
+    [quote.amount, periodStart(now.getTime()), tenantId],
+  );
+  return fit.rows[0]?.allowed === true;
+}
+
+async function limitsAllow(
+  client: PoolClient,
+  input: {
+    tenantId: string;
+    apiKeyId: string;
+    route: ResolvedRoute;
+    stream: boolean;
+    now: Date;
+    releasingAttemptId: string;
+  },
+  tokens: number | null,
+): Promise<boolean> {
+  const window = windowStart(input.now.getTime());
+  const tenant = await client.query<{
+    mode: string;
+    requests_per_minute: number | null;
+    concurrent_requests: number | null;
+    concurrent_streams: number | null;
+    token_rate_per_minute: string | null;
+  }>(
+    `SELECT mode, requests_per_minute, concurrent_requests, concurrent_streams, token_rate_per_minute::text
+     FROM tenant_limit_policies
+     WHERE tenant_id = $1`,
+    [input.tenantId],
+  );
+  const key = await client.query<{
+    mode: string | null;
+    requests_per_minute: number | null;
+    concurrent_requests: number | null;
+    concurrent_streams: number | null;
+    token_rate_per_minute: string | null;
+  }>(
+    `SELECT mode, requests_per_minute, concurrent_requests, concurrent_streams, token_rate_per_minute::text
+     FROM api_key_limit_policies
+     WHERE api_key_id = $1`,
+    [input.apiKeyId],
+  );
+  if (!(await rateAllows(client, input.tenantId, 'tenant_requests', input.tenantId, window, tenant.rows[0]?.mode ?? null, tenant.rows[0]?.requests_per_minute ?? null))) {
+    return false;
+  }
+  if (!(await rateAllows(client, input.tenantId, 'api_key_requests', input.apiKeyId, window, key.rows[0]?.mode ?? null, key.rows[0]?.requests_per_minute ?? null))) {
+    return false;
+  }
+  if (!(await leaseAllows(client, 'tenant_request', input.tenantId, input.now, tenant.rows[0]?.mode ?? null, tenant.rows[0]?.concurrent_requests ?? null, input.releasingAttemptId))) {
+    return false;
+  }
+  if (!(await leaseAllows(client, 'api_key_request', input.apiKeyId, input.now, key.rows[0]?.mode ?? null, key.rows[0]?.concurrent_requests ?? null, input.releasingAttemptId))) {
+    return false;
+  }
+  if (input.stream) {
+    if (!(await leaseAllows(client, 'tenant_stream', input.tenantId, input.now, tenant.rows[0]?.mode ?? null, tenant.rows[0]?.concurrent_streams ?? null, input.releasingAttemptId))) {
+      return false;
+    }
+    if (!(await leaseAllows(client, 'api_key_stream', input.apiKeyId, input.now, key.rows[0]?.mode ?? null, key.rows[0]?.concurrent_streams ?? null, input.releasingAttemptId))) {
+      return false;
+    }
+  }
+  if (tokens !== null) {
+    if (!(await tokenAllows(client, input.tenantId, 'tenant_tokens', input.tenantId, window, tenant.rows[0]?.mode ?? null, tenant.rows[0]?.token_rate_per_minute ?? null, tokens))) {
+      return false;
+    }
+    if (!(await tokenAllows(client, input.tenantId, 'api_key_tokens', input.apiKeyId, window, key.rows[0]?.mode ?? null, key.rows[0]?.token_rate_per_minute ?? null, tokens))) {
+      return false;
+    }
+  }
+  const connection = await client.query<{ mode: string; max_concurrency: number; share_group: string | null }>(
+    `SELECT mode, max_concurrency, share_group
+     FROM connection_limit_policies
+     WHERE connection_id = $1`,
+    [input.route.connectionId],
+  );
+  const connectionRow = connection.rows[0];
+  if (connectionRow !== undefined && connectionRow.mode === 'hard') {
+    if (connectionRow.share_group === null) {
+      if (!(await leaseAllows(client, 'connection', input.route.connectionId, input.now, 'hard', connectionRow.max_concurrency, input.releasingAttemptId))) {
+        return false;
+      }
+    } else {
+      const group = await client.query<{ id: string }>(
+        `SELECT id FROM connection_share_groups WHERE name = $1`,
+        [connectionRow.share_group],
+      );
+      const cap = await client.query<{ max: number | null }>(
+        `SELECT MIN(max_concurrency)::int AS max
+         FROM connection_limit_policies
+         WHERE share_group = $1 AND mode = 'hard'`,
+        [connectionRow.share_group],
+      );
+      const groupId = group.rows[0]?.id;
+      const max = cap.rows[0]?.max ?? null;
+      if (groupId === undefined || max === null) return false;
+      if (!(await leaseAllows(client, 'connection_group', groupId, input.now, 'hard', max, input.releasingAttemptId))) return false;
+    }
+  }
+  const deployment = await client.query<{ mode: string; max_concurrency: number }>(
+    `SELECT mode, max_concurrency
+     FROM deployment_limit_policies
+     WHERE deployment_id = $1`,
+    [input.route.deploymentId],
+  );
+  const deploymentRow = deployment.rows[0];
+  if (deploymentRow !== undefined && deploymentRow.mode === 'hard') {
+    if (!(await leaseAllows(client, 'deployment', input.route.deploymentId, input.now, 'hard', deploymentRow.max_concurrency, input.releasingAttemptId))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function rateAllows(
+  client: PoolClient,
+  tenantId: string,
+  scope: string,
+  scopeId: string,
+  window: Date,
+  mode: string | null,
+  limit: number | null,
+): Promise<boolean> {
+  if (mode !== 'hard' || limit === null) return true;
+  const amount = await counterAmount(client, tenantId, scope, scopeId, window);
+  return amount + 1 <= limit;
+}
+
+async function tokenAllows(
+  client: PoolClient,
+  tenantId: string,
+  scope: string,
+  scopeId: string,
+  window: Date,
+  mode: string | null,
+  limit: string | null,
+  tokens: number,
+): Promise<boolean> {
+  if (mode !== 'hard' || limit === null) return true;
+  const amount = await counterAmount(client, tenantId, scope, scopeId, window);
+  return amount + tokens <= Number(limit);
+}
+
+async function leaseAllows(
+  client: PoolClient,
+  scope: string,
+  scopeId: string,
+  now: Date,
+  mode: string | null,
+  limit: number | null,
+  releasingAttemptId: string,
+): Promise<boolean> {
+  if (mode !== 'hard' || limit === null) return true;
+  // Settlement releases this attempt before the next admission.
+  // The preview must not count leases that release will clear.
+  const result = await client.query<{ count: number }>(
+    `SELECT count(*)::int AS count
+     FROM concurrency_leases
+     WHERE scope = $1 AND scope_id = $2 AND released_at IS NULL AND expires_at > $3
+       AND attempt_id IS DISTINCT FROM $4::uuid`,
+    [scope, scopeId, now, releasingAttemptId],
+  );
+  return (result.rows[0]?.count ?? 0) < limit;
+}
+
+async function counterAmount(
+  client: PoolClient,
+  tenantId: string,
+  scope: string,
+  scopeId: string,
+  window: Date,
+): Promise<number> {
+  const result = await client.query<{ amount: string }>(
+    `SELECT COALESCE((
+       SELECT amount
+       FROM limit_counters
+       WHERE tenant_id = $1 AND scope = $2 AND scope_id = $3 AND window_start = $4
+     ), 0)::text AS amount`,
+    [tenantId, scope, scopeId, window],
+  );
+  return Number(result.rows[0]?.amount ?? '0');
+}
+
 function integerOption(optional: Record<string, unknown>, key: string): number | null {
   const value = optional[key];
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) return null;

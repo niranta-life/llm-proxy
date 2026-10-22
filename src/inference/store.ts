@@ -4,7 +4,7 @@ import { proxyError } from './errors.js';
 import type { PrivateApproval } from './private.js';
 import type { RegistryProviderName } from './contract.js';
 import type { ExpenseCertainty, StoredExecutionPolicy } from './execution-policy.js';
-import type { AliasCandidate, DeploymentCandidate, ResolvedRoute } from './resolve.js';
+import type { AliasCandidate, DeploymentCandidate, FallbackPolicy, ResolvedRoute } from './resolve.js';
 import type { TokenUsage } from './adapter.js';
 import type { StreamStatus } from './stream.js';
 
@@ -48,6 +48,24 @@ type DeploymentRow = {
   total_deadline_ms: number | null;
   initial_backoff_ms: number | null;
   max_backoff_ms: number | null;
+  validation_status: string;
+  context_limit: number | null;
+};
+
+type AliasRow = {
+  alias: string;
+  deployment_id: string;
+  fallback_policy_id: string | null;
+  fb_version: number | null;
+  fb_enabled: boolean | null;
+  fb_max_attempts: number | null;
+  fb_failures: string[] | null;
+  fb_capabilities: string[] | null;
+  fb_providers: string[] | null;
+  fb_regions: string[] | null;
+  fb_data_collection: string | null;
+  fb_min_remaining_deadline_ms: number | null;
+  fb_deployment_ids: string[] | null;
 };
 
 function providerName(value: string): RegistryProviderName {
@@ -97,6 +115,37 @@ function readPolicy(row: DeploymentRow): StoredExecutionPolicy | null {
   };
 }
 
+function readFallback(row: AliasRow): FallbackPolicy | null {
+  if (row.fallback_policy_id === null) return null;
+  if (
+    row.fb_version === null ||
+    row.fb_enabled === null ||
+    row.fb_max_attempts === null ||
+    row.fb_failures === null ||
+    row.fb_capabilities === null ||
+    row.fb_providers === null ||
+    row.fb_regions === null ||
+    row.fb_min_remaining_deadline_ms === null ||
+    row.fb_deployment_ids === null ||
+    (row.fb_data_collection !== 'allow' && row.fb_data_collection !== 'deny')
+  ) {
+    throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
+  }
+  return {
+    id: row.fallback_policy_id,
+    version: row.fb_version,
+    enabled: row.fb_enabled,
+    maxAttempts: row.fb_max_attempts,
+    deploymentIds: row.fb_deployment_ids,
+    allowedFailures: row.fb_failures,
+    requiredCapabilities: row.fb_capabilities,
+    allowedProviders: row.fb_providers,
+    allowedRegions: row.fb_regions,
+    dataCollection: row.fb_data_collection,
+    minRemainingDeadlineMs: row.fb_min_remaining_deadline_ms,
+  };
+}
+
 function readDownstream(value: string[] | null): readonly string[] | null {
   if (value === null) return null;
   if (value.length === 0) {
@@ -126,6 +175,7 @@ export async function loadCatalog(client: PoolClient): Promise<{
             d.stream_total_timeout_ms, d.stream_backpressure_timeout_ms,
             d.downstream_providers, d.data_collection, d.allow_fallbacks,
             d.require_serving_provider, d.max_concurrency,
+            d.validation_status, d.context_limit,
             p.id AS policy_id, p.policy_version, p.retries_enabled, p.max_attempts,
             p.connection_deadline_ms, p.attempt_deadline_ms, p.total_deadline_ms,
             p.initial_backoff_ms, p.max_backoff_ms
@@ -135,8 +185,17 @@ export async function loadCatalog(client: PoolClient): Promise<{
      LEFT JOIN execution_policies p
        ON p.tenant_id = d.tenant_id AND p.id = d.execution_policy_id`,
   );
-  const aliases = await client.query<{ alias: string; deployment_id: string }>(
-    'SELECT alias, deployment_id FROM model_aliases',
+  const aliases = await client.query<AliasRow>(
+    `SELECT a.alias, a.deployment_id, a.fallback_policy_id,
+            f.policy_version AS fb_version, f.enabled AS fb_enabled, f.max_attempts AS fb_max_attempts,
+            f.allowed_failures AS fb_failures, f.required_capabilities AS fb_capabilities,
+            f.allowed_providers AS fb_providers, f.allowed_regions AS fb_regions,
+            f.data_collection AS fb_data_collection,
+            f.min_remaining_deadline_ms AS fb_min_remaining_deadline_ms,
+            f.deployment_ids AS fb_deployment_ids
+     FROM model_aliases a
+     LEFT JOIN fallback_policies f
+       ON f.tenant_id = a.tenant_id AND f.id = a.fallback_policy_id`,
   );
   return {
     deployments: deployments.rows.map((row) => ({
@@ -171,8 +230,14 @@ export async function loadCatalog(client: PoolClient): Promise<{
       requireServingProvider: row.require_serving_provider,
       maxConcurrency: row.max_concurrency,
       executionPolicy: readPolicy(row),
+      validationStatus: row.validation_status,
+      contextLimit: row.context_limit,
     })),
-    aliases: aliases.rows.map((row) => ({ alias: row.alias, deploymentId: row.deployment_id })),
+    aliases: aliases.rows.map((row) => ({
+      alias: row.alias,
+      deploymentId: row.deployment_id,
+      fallbackPolicy: readFallback(row),
+    })),
     streamingEnabled: tenant.rows[0]?.streaming_enabled ?? false,
   };
 }
@@ -225,8 +290,9 @@ export async function insertPending(
   const attempt = await client.query<{ id: string }>(
     `INSERT INTO model_attempts (
        tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status,
-       attempt_ordinal, policy_id, policy_version
-     ) VALUES ($1, $2, $3, $4, $5, 'pending', 1, $6, $7)
+       attempt_ordinal, policy_id, policy_version,
+       trigger_reason, fallback_policy_id, fallback_policy_version
+     ) VALUES ($1, $2, $3, $4, $5, 'pending', 1, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       tenantId,
@@ -236,10 +302,22 @@ export async function insertPending(
       route.upstreamModel,
       route.executionPolicy?.id ?? null,
       route.executionPolicy?.version ?? 1,
+      'primary',
+      route.fallbackPolicy?.id ?? null,
+      route.fallbackPolicy?.version ?? null,
     ],
   );
   const attemptId = attempt.rows[0]?.id;
   if (attemptId === undefined) throw new Error('attempt was not created');
+  const protectedCredential = await openRouteCredential(client, tenantId, route.connectionId);
+  return { requestId, attemptId, protectedCredential };
+}
+
+export async function openRouteCredential(
+  client: PoolClient,
+  tenantId: string,
+  connectionId: string,
+): Promise<string | null> {
   const credential = await client.query<{
     auth_mode: string;
     enabled: boolean;
@@ -249,14 +327,14 @@ export async function insertPending(
             load_provider_credential($1::uuid, $2::uuid) AS protected_credential
      FROM provider_connections c
      WHERE c.id = $2 AND c.tenant_id = $1`,
-    [tenantId, route.connectionId],
+    [tenantId, connectionId],
   );
   const row = credential.rows[0];
   const secretless = row?.auth_mode === 'adc' || row?.auth_mode === 'workload_identity' || row?.auth_mode === 'impersonation';
   if (row === undefined || !row.enabled || (row.protected_credential === null && !secretless)) {
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
-  return { requestId, attemptId, protectedCredential: row.protected_credential };
+  return row.protected_credential;
 }
 
 export async function insertAttempt(
@@ -265,12 +343,14 @@ export async function insertAttempt(
   requestId: string,
   route: ResolvedRoute,
   ordinal: number,
+  facts?: { triggerReason: string },
 ): Promise<string> {
   const attempt = await client.query<{ id: string }>(
     `INSERT INTO model_attempts (
        tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status,
-       attempt_ordinal, policy_id, policy_version
-     ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)
+       attempt_ordinal, policy_id, policy_version,
+       trigger_reason, fallback_policy_id, fallback_policy_version
+     ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)
      RETURNING id`,
     [
       tenantId,
@@ -281,6 +361,9 @@ export async function insertAttempt(
       ordinal,
       route.executionPolicy?.id ?? null,
       route.executionPolicy?.version ?? 1,
+      facts?.triggerReason ?? 'retry',
+      route.fallbackPolicy?.id ?? null,
+      route.fallbackPolicy?.version ?? null,
     ],
   );
   const attemptId = attempt.rows[0]?.id;
@@ -434,6 +517,9 @@ export type AttemptHistoryItem = {
   createdAt: string;
   costStatus: string | null;
   costAmount: string | null;
+  triggerReason: string | null;
+  fallbackPolicyVersion: number | null;
+  reservedAmount: string | null;
 };
 
 export async function listAttemptHistory(
@@ -458,16 +544,21 @@ export async function listAttemptHistory(
     created_at: Date;
     cost_status: string | null;
     cost_amount: string | null;
+    trigger_reason: string | null;
+    fallback_policy_version: number | null;
+    reserved_amount: string | null;
   }>(
     `SELECT a.id AS attempt_id, a.request_id, a.attempt_ordinal AS ordinal,
             c.provider, d.name AS deployment, a.upstream_model AS model,
             a.status, a.failure_class, a.duration_ms, a.expense_certainty, a.dispatched,
-            a.error_code, a.created_at, ac.cost_status, ac.amount::text AS cost_amount
+            a.error_code, a.created_at, ac.cost_status, ac.amount::text AS cost_amount,
+            a.trigger_reason, a.fallback_policy_version, br.reserved_amount::text AS reserved_amount
      FROM model_attempts a
      JOIN proxy_requests r ON r.tenant_id = a.tenant_id AND r.id = a.request_id
      JOIN model_deployments d ON d.tenant_id = a.tenant_id AND d.id = a.deployment_id
-     JOIN provider_connections c ON c.tenant_id = d.tenant_id AND c.id = r.connection_id
+     JOIN provider_connections c ON c.tenant_id = d.tenant_id AND c.id = d.connection_id
      LEFT JOIN attempt_costs ac ON ac.tenant_id = a.tenant_id AND ac.attempt_id = a.id
+     LEFT JOIN budget_reservations br ON br.tenant_id = a.tenant_id AND br.attempt_id = a.id
      WHERE r.created_at >= $1 AND r.created_at < $2
        AND ($3::text IS NULL OR c.provider = $3)
        AND ($4::text IS NULL OR d.name = $4)
@@ -491,6 +582,9 @@ export async function listAttemptHistory(
     createdAt: row.created_at.toISOString(),
     costStatus: row.cost_status,
     costAmount: row.cost_amount,
+    triggerReason: row.trigger_reason,
+    fallbackPolicyVersion: row.fallback_policy_version,
+    reservedAmount: row.reserved_amount,
   }));
 }
 

@@ -39,6 +39,12 @@ import {
 } from './db/admission.js';
 import { resetDeploymentBreaker, setDeploymentBreaker } from './db/breaker.js';
 import { setDeploymentExecutionPolicy } from './db/execution-policy.js';
+import {
+  setDeploymentContextLimit,
+  setDeploymentDataCollection,
+  setFallbackPolicy,
+  showFallbackPolicy,
+} from './db/fallback-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger } from './logger.js';
@@ -137,6 +143,13 @@ type Flags = {
   'lease-ms'?: string;
   'share-group'?: string;
   'monthly-amount'?: string;
+  deployments?: string;
+  failures?: string;
+  'max-attempts'?: string;
+  providers?: string;
+  regions?: string;
+  'min-remaining-deadline-ms'?: string;
+  'context-limit'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -148,6 +161,13 @@ function parseEnabled(value: string | undefined): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function parseCsv(value: string | undefined, allowEmpty: boolean): string[] | undefined {
+  if (value === undefined || value.trim() === '') return allowEmpty ? [] : undefined;
+  const items = value.split(',').map((item) => item.trim());
+  if (items.some((item) => item.length === 0)) return undefined;
+  return items;
 }
 
 function parseBounded(value: string | undefined, minimum: number, maximum: number): number | undefined {
@@ -419,6 +439,13 @@ async function main(): Promise<void> {
         'lease-ms': { type: 'string' },
         'share-group': { type: 'string' },
         'monthly-amount': { type: 'string' },
+        deployments: { type: 'string' },
+        failures: { type: 'string' },
+        'max-attempts': { type: 'string' },
+        providers: { type: 'string' },
+        regions: { type: 'string' },
+        'min-remaining-deadline-ms': { type: 'string' },
+        'context-limit': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -500,6 +527,13 @@ async function main(): Promise<void> {
     || (values['failure-threshold'] !== undefined && command !== 'set-deployment-breaker')
     || (values['cooldown-ms'] !== undefined && command !== 'set-deployment-breaker')
     || (values['max-probes'] !== undefined && command !== 'set-deployment-breaker')
+    || (values.deployments !== undefined && command !== 'set-fallback-policy')
+    || (values.failures !== undefined && command !== 'set-fallback-policy')
+    || (values['max-attempts'] !== undefined && command !== 'set-fallback-policy')
+    || (values.providers !== undefined && command !== 'set-fallback-policy')
+    || (values.regions !== undefined && command !== 'set-fallback-policy')
+    || (values['min-remaining-deadline-ms'] !== undefined && command !== 'set-fallback-policy')
+    || (values['context-limit'] !== undefined && command !== 'set-deployment-context-limit')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');
@@ -1137,6 +1171,101 @@ async function main(): Promise<void> {
         maxBackoffMs,
       );
       process.stdout.write(`${JSON.stringify({ policyId, retriesEnabled })}\n`);
+      return;
+    }
+
+    if (command === 'set-fallback-policy') {
+      const tenantId = requireTenant(values);
+      const alias = values.alias ?? '';
+      const enabled = parseEnabled(values.enabled);
+      const deployments = parseCsv(values.deployments, true);
+      const failures = parseCsv(values.failures, false);
+      const maxAttempts = parseBounded(values['max-attempts'], 1, 8);
+      const capabilities = parseCsv(values.capabilities, true);
+      const providers = parseCsv(values.providers, true);
+      const regions = parseCsv(values.regions, true);
+      const dataCollection = values['data-collection']?.trim() ?? '';
+      const minRemainingDeadlineMs = parseBounded(values['min-remaining-deadline-ms'], 0, 600_000);
+      if (
+        tenantId === undefined
+        || alias !== 'auto'
+        || enabled === undefined
+        || deployments === undefined
+        || failures === undefined
+        || maxAttempts === undefined
+        || capabilities === undefined
+        || providers === undefined
+        || regions === undefined
+        || (dataCollection !== 'allow' && dataCollection !== 'deny')
+        || minRemainingDeadlineMs === undefined
+        || (enabled && deployments.length < 1)
+        || (enabled && providers.length < 1)
+      ) {
+        logger.error('fallback arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const stored = await setFallbackPolicy(
+        pool,
+        tenantId,
+        alias,
+        enabled,
+        deployments,
+        failures,
+        maxAttempts,
+        capabilities,
+        providers,
+        regions,
+        dataCollection,
+        minRemainingDeadlineMs,
+      );
+      process.stdout.write(`${JSON.stringify(stored)}\n`);
+      return;
+    }
+
+    if (command === 'show-fallback-policy') {
+      const tenantId = requireTenant(values);
+      const alias = values.alias ?? '';
+      if (tenantId === undefined || alias !== 'auto') {
+        logger.error('fallback arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const stored = await showFallbackPolicy(pool, tenantId, alias);
+      process.stdout.write(`${JSON.stringify(stored ?? { attached: false })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-context-limit') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const limit = parseBounded(values['context-limit'], 1, 10_000_000);
+      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || limit === undefined) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const configVersion = await setDeploymentContextLimit(pool, tenantId, name, limit);
+      process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
+      return;
+    }
+
+    if (command === 'set-deployment-data-collection') {
+      const tenantId = requireTenant(values);
+      const name = values.deployment?.trim() ?? '';
+      const value = values['data-collection']?.trim() ?? '';
+      if (
+        tenantId === undefined
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+        || name === 'auto'
+        || (value !== 'allow' && value !== 'deny')
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      const configVersion = await setDeploymentDataCollection(pool, tenantId, name, value);
+      process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
       return;
     }
 

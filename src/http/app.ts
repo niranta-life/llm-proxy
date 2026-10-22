@@ -56,6 +56,9 @@ function streamReply(reply: FastifyReply): StreamHttp {
     hijack(): void {
       reply.hijack();
     },
+    header(name: string, value: string): void {
+      reply.header(name, value);
+    },
     writeHead(status: number, headers: Record<string, string>): void {
       reply.raw.writeHead(status, headers);
     },

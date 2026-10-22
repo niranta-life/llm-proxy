@@ -1,0 +1,36 @@
+Streaming failure tests.
+
+A stream request whose primary mock returns HTTP 503 falls back before any downstream byte.
+The secondary mock returns a complete SSE body.
+The response status is 200.
+The body contains from-secondary.
+The body contains data: [DONE].
+The upstream calls are fb-primary and fb-secondary.
+The header x-deployment is fb-secondary.
+The header x-attempt-count is 2.
+The header x-fallback is true.
+
+A later stream request receives a partial SSE body from the primary.
+That body has no data: [DONE].
+The secondary is not called.
+The downstream body does not contain data: [DONE].
+The downstream body does not contain from-secondary.
+The stored failure class is stream_started.
+
+A caller abort during a hang does not call fb-secondary.
+The stored error code is request_cancelled.
+The primary upstream call count is 1.
+
+A timeout after dispatch falls back only when that category is allowed.
+HTTP 429 falls back only when that category is allowed.
+HTTP 500 does not fall back when the allowed category is unavailable.
+A total deadline of 200 ms does not start the secondary.
+The stored failure class is total_deadline.
+A minimum remaining deadline of 600000 ms does not start the secondary.
+A stored maximum of 5 still stops at 2 attempts when the secondary fails.
+A stored maximum of 1 makes one attempt.
+
+Command: ./node_modules/.bin/vitest run test/fallback-policy.test.ts
+Run 2 exit: 0
+The stream test passed in that run.
+The cancel test passed in that run.

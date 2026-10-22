@@ -1,0 +1,50 @@
+Full regression results.
+
+Command from /Users/nitin/Work/Y/llm-proxy with Node v24.22.0.
+Live flags VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+.env.live was not sourced.
+The type check was ./node_modules/.bin/tsc --noEmit.
+The runner was ./node_modules/.bin/vitest run --reporter=verbose.
+This file does not claim a readiness HTTP status.
+
+TSC 2026-10-22T06:41:46Z.
+TSC_EXIT=0.
+The type check printed no diagnostics.
+
+FULL SUITE.
+Start at 23:41:48.
+Test Files 42 passed | 2 skipped (44).
+Tests 294 passed | 3 skipped (297).
+Duration 510.59s.
+VITEST_EXIT=0.
+
+test/fallback-policy.test.ts passed inside this suite.
+That file has 26 tests.
+The hard request cap test passed in this run.
+The hard stream cap test passed in this run.
+The slow-consumer test passed in this run.
+The assertion text was not changed.
+The vertex cancel test was not changed.
+
+The overlap observation case reported recognized 1 and provisional 0.4.
+The log line is BUDGET_CASE overlap recognized 1 provisional 0.4 remaining 0 costStatus provisional hits 2 results 200 and 200.
+
+The skipped tests are the xAI live call, the OpenRouter live call, and the Vertex live call.
+The new fallback tests were not skipped.
+
+FALLBACK FILE RUN 1.
+Start at 23:39:45.
+Test Files 1 passed.
+Tests 26 passed.
+Duration 51.84s.
+VITEST_EXIT=0.
+The permitted response content is from-fb-secondary.
+
+FALLBACK FILE RUN 2.
+Start at 23:40:47.
+Node v24.22.0.
+Test Files 1 passed.
+Tests 26 passed.
+Duration 49.32s.
+VITEST_EXIT=0.
+The permitted response content is from-fb-secondary.

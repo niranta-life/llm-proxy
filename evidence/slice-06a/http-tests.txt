@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/request-features-http.test.ts > request features over HTTP > records hinted and inferred tasks and hides them from the other tenant 935ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > keeps the same structure across stream, provider, and model choice 622ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > stores size only for a long prompt and rejects tools and structured output 281ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > pages without repeating ids, filters, and keeps concurrent chats apart 1128ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > still succeeds when the extractor throws 416ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > returns the other row from the same millisecond on the next page 1559ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > records the finished attempt when fallback credential open throws 3131ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > keeps migration 016 readable after the additive file 6ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  12:05:31
+   Duration  23.79s (transform 315ms, setup 3ms, collect 714ms, tests 14.08s, environment 0ms, prepare 78ms)
+

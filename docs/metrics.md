@@ -46,6 +46,20 @@ A fallback shows both attempts, with the trigger reason, the duration, the reser
 
 `GET /internal/v1/metrics/breakers` can filter with `deployment`. Each item has the state, the reason, the time, the health sample count, the failure count, the rate-limit count, and the probe count. The rate-limit count is separate from the failure count. A deployment with no breaker is closed and disabled. See [Circuit breaker](breaker.md).
 
+## Request features
+
+`GET /internal/v1/request-features` lists characteristics of completed chats for the caller. `GET /internal/v1/request-features/{requestId}` returns one row. Both use the same tenant headers as chat. Another tenant's row is not returned.
+
+The list accepts `limit` from 1 to 50, `category`, and `cursor`. A bad value is rejected. The next page does not repeat ids from the page before it.
+
+Each row has the task category, how that category was chosen, a local input-token estimate, and provider usage when the provider sent it. A missing usage count stays null. The row also has message count, whether a system instruction was present, whether streaming was requested, conversation depth, input size, a complexity estimate, the requested model, the selected deployment, the execution status, the latency, a cost reference, and the extractor version.
+
+The cost reference is the attempt id and the stored cost status. It is not a new charge. A missing cost row leaves those fields empty.
+
+Categories are `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, and `unknown`. A caller may send `task` with one of those values. Any other `task` value is rejected and is not stored. When `task` is absent, local rules choose the category, or the category stays `unknown`. The proxy does not call a model to classify the request.
+
+A successful chat records structured output and tool use as false. `tools` and a non-text `response_format` are still rejected before a provider call. The feature row does not contain the prompt, the completion, or a credential.
+
 ## Limits and budgets
 
 `GET /internal/v1/limits` and `GET /internal/v1/budgets/usage` use the same tenant headers. Use them before you turn observation mode into a hard limit. See [Limits and budgets](limits.md).

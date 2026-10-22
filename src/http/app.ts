@@ -10,6 +10,14 @@ import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
 import { readTenantCapacity } from '../db/admission.js';
 import { listBreakers } from '../db/breaker.js';
+import {
+  listRequestFeatures,
+  parseFeatureListQuery,
+  parseFeatureRequestId,
+  readRequestFeature,
+  type ExtractedFeatures,
+  type FeatureExtractInput,
+} from '../inference/request-features.js';
 import { listAttemptHistory, listVisibleModels, summarizeMetrics } from '../inference/store.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
@@ -31,6 +39,7 @@ export type AppDeps = {
   now?: () => number;
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
+  extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -216,6 +225,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         nowMs,
         afterAdmit: deps.afterAdmit,
         beforeSettle: deps.beforeSettle,
+        extractFeatures: deps.extractFeatures,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -354,6 +364,45 @@ export function buildApp(deps: AppDeps): ProxyApp {
 
   app.get('/internal/v1/limits', capacity);
   app.get('/internal/v1/budgets/usage', capacity);
+
+  app.get<{ Querystring: { limit?: string; cursor?: string; category?: string } }>(
+    '/internal/v1/request-features',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const query = parseFeatureListQuery(request.query);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => listRequestFeatures(client, query));
+      } catch (error) {
+        if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+        deps.logger.error('request features read failed', { message: errorMessage(error) });
+        return reply
+          .code(500)
+          .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      }
+    },
+  );
+
+  app.get<{ Params: { requestId: string } }>('/internal/v1/request-features/:requestId', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const requestId = parseFeatureRequestId(request.params.requestId);
+      const row = await withTenant(deps.runtimePool, auth.tenantId, (client) => readRequestFeature(client, requestId));
+      if (row === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The request was not found.').body());
+      }
+      return row;
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('request feature read failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });

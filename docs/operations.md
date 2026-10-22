@@ -100,7 +100,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `016` and adds no later file. It drops nothing.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `017`. It drops nothing.
 
 | File | What it adds |
 | --- | --- |
@@ -120,8 +120,9 @@ SQL files in `migrations/` apply in lexical order, once, before the proxy listen
 | `014_provider_breaker.sql` | A breaker for one deployment. |
 | `015_tenant_limits.sql` | Tenant limits, concurrency leases, monthly budgets, and a cost ledger. |
 | `016_fallback_policy.sql` | A versioned fallback policy for the alias `auto`. |
+| `017_request_features.sql` | Characteristics of a completed chat. No prompt or completion text. |
 
-Readiness for this tree checks for `016_fallback_policy.sql`. The image `fb62fa7` is the earlier image that stays ready on this database. Its latest migration file is the same one.
+Readiness for this tree checks for `017_request_features.sql`. The image `fb62fa7` stays ready on this database because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
 
 An older image can start on this database when `schema_migrations` still contains the latest file that image knows. Later rows can stay. Do not delete migration rows. Do not delete provider, price, policy, or breaker rows to roll back a behavior. Turn the behavior off with the CLI.
 
@@ -142,7 +143,7 @@ A hard check that cannot reach the database returns HTTP 503 `admission_unavaila
 
 During a chat, the request stays `pending` until a terminal status is stored. A completed response stores `succeeded`. A rejected response stores `failed`. A stream stores one stream status. Shutdown stores `interrupted` when the row write succeeds. A priced success stores cost status `estimated`. Missing usage stays `unknown`, with a null amount. One request uses at most two upstream attempts, and that request does not both retry and fall back.
 
-Read counts on `GET /internal/v1/metrics/summary`, attempt history on `GET /internal/v1/metrics/attempts`, the budget on `GET /internal/v1/budgets/usage`, the limits on `GET /internal/v1/limits`, and breaker state on `GET /internal/v1/metrics/breakers`. See [Metrics](metrics.md).
+Read counts on `GET /internal/v1/metrics/summary`, attempt history on `GET /internal/v1/metrics/attempts`, the budget on `GET /internal/v1/budgets/usage`, the limits on `GET /internal/v1/limits`, breaker state on `GET /internal/v1/metrics/breakers`, and request characteristics on `GET /internal/v1/request-features`. See [Metrics](metrics.md).
 
 ## Tests
 

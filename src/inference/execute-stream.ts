@@ -14,6 +14,12 @@ import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
+import {
+  featureInputFromChat,
+  recordChatFeatures,
+  type ExtractedFeatures,
+  type FeatureExtractInput,
+} from './request-features.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
 import {
   deadlineKindOf,
@@ -106,6 +112,7 @@ export async function runChatStream(input: {
   nowMs?: () => number;
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
+  extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -682,7 +689,13 @@ async function noteStreamBreaker(
 }
 
 async function closeStreamRequest(
-  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  input: {
+    runtimePool: Pool;
+    logger: Logger;
+    tenantId: string;
+    request: Parameters<typeof featureInputFromChat>[0];
+    extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
+  },
   requestId: string,
 ): Promise<void> {
   try {
@@ -693,7 +706,16 @@ async function closeStreamRequest(
       requestId,
       message: errorMessage(error),
     });
+    return;
   }
+  await recordChatFeatures({
+    pool: input.runtimePool,
+    logger: input.logger,
+    tenantId: input.tenantId,
+    requestId,
+    request: featureInputFromChat(input.request),
+    extract: input.extractFeatures,
+  });
 }
 
 function httpError(status: TerminalStreamStatus, failure: unknown): ProxyError {
@@ -721,6 +743,8 @@ async function recordStream(
     tenantId: string;
     nowMs?: () => number;
     beforeSettle?: () => Promise<void> | void;
+    request: Parameters<typeof featureInputFromChat>[0];
+    extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
   },
   result: {
     requestId: string;
@@ -776,6 +800,16 @@ async function recordStream(
       });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
+    if (result.closeRequest !== false) {
+      await recordChatFeatures({
+        pool: input.runtimePool,
+        logger: input.logger,
+        tenantId: input.tenantId,
+        requestId: result.requestId,
+        request: featureInputFromChat(input.request),
+        extract: input.extractFeatures,
+      });
+    }
     if (input.beforeSettle) await input.beforeSettle();
     await settleChatAttempt(
       input.runtimePool,

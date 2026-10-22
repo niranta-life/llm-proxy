@@ -45,6 +45,7 @@ Fallback is allowed only before the proxy sends a response header or a response 
 | `GET /v1/models` | Enabled deployments and aliases for the tenant. |
 | `GET /internal/v1/metrics/summary`, `/attempts`, `/breakers`, `/costs` | Per-tenant metrics. See [Metrics](metrics.md). |
 | `GET /internal/v1/limits`, `GET /internal/v1/budgets/usage` | Per-tenant limit and budget state. See [Limits](limits.md). |
+| `GET /internal/v1/request-features`, `GET /internal/v1/request-features/{requestId}` | Characteristics of completed chats. No prompt or completion text. See [Metrics](metrics.md). |
 
 ## Data model
 
@@ -54,7 +55,7 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 | --- | --- |
 | Tenants | `tenants`, `tenant_api_keys` |
 | Providers and routing | `provider_connections`, `model_deployments`, `model_aliases`, `private_endpoint_allowlist` |
-| Requests | `proxy_requests`, `model_attempts` |
+| Requests | `proxy_requests`, `model_attempts`, `request_features` |
 | Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations` |
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |

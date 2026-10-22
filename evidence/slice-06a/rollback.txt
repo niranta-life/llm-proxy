@@ -1,0 +1,19 @@
+Rollback proof.
+
+git diff for migrations 001_schema.sql through 016_fallback_policy.sql is empty.
+The only new migration file is migrations/017_request_features.sql.
+A search of that file found no DROP TABLE and no DROP COLUMN.
+
+The test database applied 017_request_features.sql.
+A runtime-role select for 016_fallback_policy.sql returned 1 row.
+A runtime-role select for 017_request_features.sql returned 1 row.
+Readiness for 016_fallback_policy.sql still finds that version row after 017 is applied.
+This file does not claim an HTTP status for the running Compose app.
+
+The new image checks readiness for 017_request_features.sql.
+An older image that checks for 016_fallback_policy.sql still finds that row.
+Do not delete the migration row.
+
+Colima was not stopped for this check.
+The volume llm-proxy_pgdata was not deleted.
+The container llm-proxy-app-1 was not stopped.

@@ -33,6 +33,12 @@ import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutP
 import { resolveModel, type ResolvedRoute } from './resolve.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
+import {
+  featureInputFromChat,
+  recordChatFeatures,
+  type ExtractedFeatures,
+  type FeatureExtractInput,
+} from './request-features.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, loadCatalog } from './store.js';
 import type { StreamGate } from './stream.js';
 import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './validate.js';
@@ -123,8 +129,10 @@ export async function executeChat(input: {
   nowMs?: () => number;
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
+  extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
+  const session = { ...input, featureRequest: featureInputFromChat(request) };
   if (!input.inferenceEnabled || input.store === null) {
     throw proxyError(503, 'server_error', 'inference_disabled', null, 'Inference is not enabled.');
   }
@@ -163,6 +171,7 @@ export async function executeChat(input: {
       nowMs: input.nowMs,
       afterAdmit: input.afterAdmit,
       beforeSettle: input.beforeSettle,
+      extractFeatures: input.extractFeatures,
     });
     return undefined;
   }
@@ -211,7 +220,7 @@ export async function executeChat(input: {
       const elapsed = elapsedMs(requestStarted);
       if (deadlinesActive && elapsed >= policy.totalDeadlineMs) {
         const timeout = timeoutProxy('total');
-        await recordResult(input, {
+        await recordResult(session, {
           requestId,
           attemptId,
           status: 'failed',
@@ -269,7 +278,7 @@ export async function executeChat(input: {
           attemptTrace: trace,
           onHeaders: () => window.noteHeaders(),
         });
-        await recordResult(input, {
+        await recordResult(session, {
           requestId,
           attemptId,
           status: 'succeeded',
@@ -298,7 +307,7 @@ export async function executeChat(input: {
           if (isAdmissionCode(error.code) && gate.track) {
             await noteBreaker(input, route.deploymentId, observedAt, gate.probe, 'ignore');
           }
-          await recordResult(input, {
+          await recordResult(session, {
             requestId,
             attemptId,
             status: 'failed',
@@ -374,7 +383,7 @@ export async function executeChat(input: {
           : null;
         const retry = next === null && !permitted && decision.retry && !suppressRetry && ordinal < policyAttempts(policy);
         const attemptFacts = normalized.attempt;
-        await recordResult(input, {
+        await recordResult(session, {
           requestId,
           attemptId,
           status: 'failed',
@@ -425,7 +434,7 @@ export async function executeChat(input: {
             ordinal += 1;
             continue;
           } catch (switchError) {
-            await closePending(input, requestId);
+            await closePending(session, requestId);
             if (switchError instanceof ProxyError) throw switchError;
             input.logger.error('request persistence failed', { message: errorMessage(switchError) });
             throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
@@ -435,7 +444,7 @@ export async function executeChat(input: {
         const signals = total.signal === null ? [input.signal] : [input.signal, total.signal];
         const slept = await waitForRetry(decision.waitMs, signals);
         if (slept !== 'ok') {
-          await closePending(input, requestId);
+          await closePending(session, requestId);
           if (isCallerAbort(input.signal)) {
             throw proxyError(408, 'server_error', 'request_cancelled', null, 'The request was cancelled.', 'request_cancelled');
           }
@@ -494,7 +503,13 @@ async function noteBreaker(
 }
 
 async function closePending(
-  input: { runtimePool: Pool; logger: Logger; tenantId: string },
+  input: {
+    runtimePool: Pool;
+    logger: Logger;
+    tenantId: string;
+    featureRequest: FeatureExtractInput;
+    extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
+  },
   requestId: string,
 ): Promise<void> {
   try {
@@ -505,7 +520,16 @@ async function closePending(
       requestId,
       message: errorMessage(error),
     });
+    return;
   }
+  await recordChatFeatures({
+    pool: input.runtimePool,
+    logger: input.logger,
+    tenantId: input.tenantId,
+    requestId,
+    request: input.featureRequest,
+    extract: input.extractFeatures,
+  });
 }
 
 async function recordResult(
@@ -515,6 +539,8 @@ async function recordResult(
     tenantId: string;
     nowMs?: () => number;
     beforeSettle?: () => Promise<void> | void;
+    featureRequest: FeatureExtractInput;
+    extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
   },
   result: {
     requestId: string;
@@ -542,6 +568,16 @@ async function recordResult(
       await finishAttempt(client, { tenantId: input.tenantId, ...result });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
+    if (result.closeRequest !== false) {
+      await recordChatFeatures({
+        pool: input.runtimePool,
+        logger: input.logger,
+        tenantId: input.tenantId,
+        requestId: result.requestId,
+        request: input.featureRequest,
+        extract: input.extractFeatures,
+      });
+    }
     if (input.beforeSettle) await input.beforeSettle();
     await settleChatAttempt(
       input.runtimePool,

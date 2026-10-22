@@ -1,4 +1,5 @@
 import { ProxyError, invalidRequest } from './errors.js';
+import { isTaskCategory } from './task-categories.js';
 
 const UNSUPPORTED = new Set([
   'tools',
@@ -45,6 +46,7 @@ export type ChatRequest = {
   messages: ChatMessage[];
   stream: boolean;
   includeUsage: boolean;
+  taskHint: string | null;
   optional: Record<string, unknown>;
 };
 
@@ -71,8 +73,16 @@ export function validateChatRequest(body: unknown): ChatRequest {
   }
   const includeUsage = parseStreamOptions(body, stream);
 
+  let taskHint: string | null = null;
+  if ('task' in body) {
+    if (typeof body.task !== 'string' || !isTaskCategory(body.task)) {
+      throw invalidRequest('task', 'invalid_parameter', 'task must be a supported category.');
+    }
+    taskHint = body.task;
+  }
+
   for (const key of Object.keys(body)) {
-    if (key === 'model' || key === 'messages' || key === 'stream' || key === 'stream_options') continue;
+    if (key === 'model' || key === 'messages' || key === 'stream' || key === 'stream_options' || key === 'task') continue;
     if (UNSUPPORTED.has(key)) {
       throw invalidRequest(key, 'unsupported_parameter', `${key} is not supported.`);
     }
@@ -95,7 +105,7 @@ export function validateChatRequest(body: unknown): ChatRequest {
     optional[key] = parseOptional(key, body[key]);
   }
 
-  return { model: body.model, messages, stream, includeUsage, optional };
+  return { model: body.model, messages, stream, includeUsage, taskHint, optional };
 }
 
 function parseStreamOptions(body: Record<string, unknown>, stream: boolean): boolean {

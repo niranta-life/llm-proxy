@@ -1,0 +1,17 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/request-features-extractor.test.ts > request feature extractor > uses a validated hint before the rules 1ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > accepts an extraction hint 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > infers reasoning when no hint is present 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > infers each remaining rule category 1ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > leaves an unmatched request unknown and ignores an invalid hint 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > keeps structure for a long prompt, streaming, and a multi-turn instruction 1ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > rejects an invalid task on the chat body and does not forward a valid one as a provider field 1ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  12:05:19
+   Duration  9.96s (transform 153ms, setup 3ms, collect 228ms, tests 5ms, environment 0ms, prepare 133ms)
+

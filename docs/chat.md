@@ -18,6 +18,8 @@ You can omit `stream`, or set it to `false`. `stream: true` works only when stre
 
 `stream_options` may be `{"include_usage":true}` or `{"include_usage":false}`. No other field is accepted there.
 
+`task` may be `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, or `unknown`. It labels the request for later comparison. The proxy does not send it to the provider, and it does not call a model to classify the text. Any other value is rejected. See [Metrics](metrics.md).
+
 Any other field is sent only when the deployment lists that capability:
 
 - `temperature`

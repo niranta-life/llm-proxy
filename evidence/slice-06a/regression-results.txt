@@ -1,0 +1,10 @@
+Node.js 24.22.0
+VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+npm test exit 0
+Duration 774.44s
+
+Test Files  46 passed | 2 skipped (48)
+Tests  383 passed | 3 skipped (386)
+
+The skipped tests are the Vertex, xAI, and OpenRouter live calls.
+The new extractor tests and the HTTP feature tests are in the passed count.

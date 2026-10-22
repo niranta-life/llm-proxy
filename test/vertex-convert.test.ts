@@ -7,6 +7,7 @@ function request(partial: Partial<ChatRequest> & Pick<ChatRequest, 'messages'>):
     model: 'alias',
     stream: false,
     includeUsage: false,
+    taskHint: null,
     optional: {},
     ...partial,
   };

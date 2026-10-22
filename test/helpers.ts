@@ -105,6 +105,7 @@ export async function createTestApp(
     now?: () => number;
     afterAdmit?: () => Promise<void> | void;
     beforeSettle?: () => Promise<void> | void;
+    extractFeatures?: import('../src/http/app.js').AppDeps['extractFeatures'];
   } = {},
 ) {
   const config = configFor(db);
@@ -127,6 +128,7 @@ export async function createTestApp(
     now: options.now,
     afterAdmit: options.afterAdmit,
     beforeSettle: options.beforeSettle,
+    extractFeatures: options.extractFeatures,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

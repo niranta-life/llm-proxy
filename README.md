@@ -40,6 +40,7 @@ Use these words for these things:
 - The upstream model is the model name at the provider.
 - The alias is the name `auto`.
 - The alias selects 1 deployment.
+- An enabled fallback policy can select one more approved deployment after an allowed failure.
 - Inference is a chat request that the proxy sends to a provider.
 - HTTP, JSON, API, URL, CLI, SQL, and TLS are technical names.
 
@@ -56,7 +57,7 @@ You can revoke a tenant key.
 
 The proxy accepts 1 text chat completion for 1 tenant.
 The proxy returns that completion in 1 response.
-The proxy sends the request 1 time to the OpenAI model for that tenant when retry is off.
+The proxy sends the request 1 time to the OpenAI model for that tenant when retry is off and fallback is not enabled.
 The proxy records the attempt, the duration, and the token counts from the provider.
 A failure after the request was sent can be an uncertain expense.
 A missing usage count is not stored as zero.
@@ -80,8 +81,14 @@ The proxy can stream a text chat for an enabled Vertex deployment.
 The same caller can use each of those deployments.
 The caller changes only the model.
 Streaming stays off until that tenant and that deployment both have streaming enabled.
-One accepted stream makes one upstream attempt when retry is off.
+One accepted stream makes one upstream attempt when retry is off and fallback is not enabled.
 A stream that has sent output does not start another attempt.
+
+The alias `auto` can use one approved deployment when the primary fails before any output.
+That behavior stays off until you store an enabled policy for that alias.
+A request that names a deployment stays on that deployment.
+The proxy uses at most 2 attempts for that request.
+A hard concurrency cap of one still allows the next deployment for the same request.
 
 The metric totals for a time window include the stream request count.
 Those totals include the completed, cancelled, failed, and truncated stream counts.
@@ -1899,6 +1906,12 @@ That bound is `max_tokens` or `max_completion_tokens` or 1.
 The bound is not the character length.
 The circuit breaker must permit the call.
 The rate and concurrency limits must permit the call.
+The failed attempt still holds its concurrency lease until settlement.
+The fallback check does not count that lease.
+A hard cap of one still allows the next deployment for this request.
+A different request that holds the only permit still blocks the candidate.
+The primary budget reservation stays active during the check.
+A hard budget must fit the secondary while that reservation is active.
 The budget reservation must succeed.
 The remaining deadline must meet the stored minimum.
 
@@ -1914,9 +1927,12 @@ A caller cancellation does not start a fallback.
 
 A successful fallback returns the secondary completion.
 The response headers name the request id, the actual deployment, the attempt count, and whether fallback occurred.
+Those headers are `x-request-id`, `x-deployment`, `x-attempt-count`, and `x-fallback`.
+`x-fallback` is `true` or `false`.
 The headers do not include a credential.
 The headers do not include the approved list.
 `GET /internal/v1/metrics/attempts` shows both attempts.
+Each row includes the trigger reason, the duration, the reservation, and the fallback policy version.
 Each attempt keeps its own reservation.
 
 ```bash
@@ -2125,6 +2141,9 @@ Refer to [Check a started proxy](#check-a-started-proxy).
 - An exhausted total deadline does not use that retry.
 - An ambiguous network failure after the request is sent does not use that retry.
 - An enabled fallback policy can use another approved deployment for an allowed failure before output starts.
+- A hard concurrency cap of one still allows that next deployment for the same request.
+- The fallback check does not count the failed attempt.
+- A different request that holds the only permit still blocks the candidate.
 - A response header ends the connection deadline.
 - The response body can still finish inside the attempt deadline.
 - A valid Retry-After is used only when the wait fits the remaining deadlines.

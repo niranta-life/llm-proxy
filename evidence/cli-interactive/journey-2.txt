@@ -1,0 +1,10 @@
+status: 0
+
+stdout
+{"tenantId":"f630228c-8a81-4517-95ac-28c05031338c","keyId":"e34a0a8f-7691-40ed-964e-c46259159341","secret":"yck_vnbPgy2Whlqjoyjl9Pbt1I544L4_OoX5YvL5T9i7uho","name":"journey-two"}
+{"connectionId":"28707cab-2968-46f6-a418-67d85d2f5feb","credentialVersion":1,"tenantId":"f630228c-8a81-4517-95ac-28c05031338c","provider":"openai","enabled":true}
+{"tenantId":"f630228c-8a81-4517-95ac-28c05031338c","credentialVersion":2}
+{"aliases":[],"connections":[{"id":"28707cab-2968-46f6-a418-67d85d2f5feb","enabled":true,"authMode":"api_key","endpoint":null,"location":null,"provider":"openai","createdAt":"2026-10-22T17:25:05.038727+00:00","projectId":null,"apiVersion":"v1","workspaceId":null,"configVersion":2,"credentialVersion":2,"serviceAccountIdentity":null}],"deployments":[],"privateEndpoints":[],"streamingEnabled":false}
+
+stderr
+action: command: name: label: action: command: tenant-id: api-key: action: command: tenant-id: api-key: action: command: tenant-id: action: 

@@ -1,0 +1,69 @@
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/cli-interactive.test.ts > interactive CLI > lists every current command in one action group 4ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > keeps the HTTP server free of configuration routes 0ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects --interactive mixed with another argument 518ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects a stray flag on the existing flag path 278ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects an unknown interactive action and leaves tenants unchanged 380ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects a blank tenant name the same way as the flag command 511ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create provision-tenant (tenant name and label) 579ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create add-key (tenant api key label) 1163ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-openai-connection (openai api key connection) 1214ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-anthropic-connection (anthropic endpoint and workspace) 1235ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex service_account project and location) 1267ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex adc without an api key) 1047ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex workload_identity without an api key) 1402ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex impersonation service account) 1003ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-xai-connection (xai api key connection) 1408ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-openrouter-connection (openrouter api key connection) 1019ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-dgx-connection (dgx private endpoint connection) 1087ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openai deployment) 1630ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (anthropic deployment with default max output tokens) 1974ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (vertex deployment) 2469ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (xai deployment) 1805ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openrouter downstream providers and data collection) 1513ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (dgx deployment) 1891ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-price (price version rates region tier and serving provider) 576ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create approve-private-endpoint (private host port addresses tls and health endpoint) 1203ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update revoke-key (revoke a tenant api key) 1584ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-openai-credential (replace openai api key) 1647ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-anthropic-credential (replace anthropic api key) 1915ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable openai connection) 1473ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable anthropic connection) 1560ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-enabled (disable a deployment) 2052ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-alias (alias auto to a deployment) 1923ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-streaming (enable tenant streaming) 1334ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-streaming (deployment streaming timeouts) 2378ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-concurrency (dgx deployment max concurrency) 2153ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-health (deployment health status) 2550ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-service-tier (deployment service tier) 2405ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update reconcile-attempt-cost (reconcile an estimated attempt cost) 2249ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-execution-policy (retries and deadlines) 2158ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-breaker (enabled breaker window samples threshold cooldown and probes) 2744ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update reset-deployment-breaker (reset breaker to closed) 2149ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-fallback-policy (fallback alias deployments failures capabilities and providers) 2943ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-context-limit (deployment context limit) 2291ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-data-collection (deployment data collection) 2092ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-limits (tenant request concurrency stream token and lease limits) 1270ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-api-key-limits (api key limits) 1268ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-limit (connection concurrency and share group) 1484ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-limit (deployment admission concurrency) 2412ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-budget (tenant monthly budget) 1057ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update recover-budget (close open budget reservations) 1066ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-deployment (deployment validation status) 2011ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-credential (stored vertex credential that fails before the network) 2019ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-access (stored vertex access that fails before the network) 1749ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate test-vertex-inference (stored vertex deployment that fails before the network) 2083ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate list-private-models (stored dgx route that fails before a live provider) 2693ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate probe-private-health (stored dgx health route that fails before a live provider) 2647ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate show-fallback-policy (stored fallback policy) 3061ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate list-inference (tenant connections deployments and aliases) 2407ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > runs a scripted create update and validate journey twice 1137ms
+
+ Test Files  1 passed (1)
+      Tests  59 passed (59)
+   Start at  10:23:13
+   Duration  111.95s (transform 551ms, setup 8ms, collect 1.14s, tests 95.17s, environment 0ms, prepare 195ms)
+

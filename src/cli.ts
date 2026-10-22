@@ -1,5 +1,7 @@
+import type { Pool } from 'pg';
 import { parseArgs } from 'node:util';
-import { ConfigError, loadConfig } from './config.js';
+import { openInteractiveInput, runInteractiveSession } from './cli-interactive.js';
+import { ConfigError, loadConfig, type Config } from './config.js';
 import { createCredentialStore } from './credentials.js';
 import {
   listTenantInference,
@@ -47,7 +49,7 @@ import {
 } from './db/fallback-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
-import { createLogger } from './logger.js';
+import { createLogger, type Logger } from './logger.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
@@ -352,6 +354,890 @@ function parsePrice(values: Flags): {
   };
 }
 
+async function runCommand(pool: Pool, config: Config, logger: Logger, command: string, values: Flags): Promise<void> {
+  if (command === 'provision-tenant') {
+    const name = values.name?.trim() ?? '';
+    if (name.length === 0) {
+      logger.error('name is required');
+      process.exitCode = 1;
+      return;
+    }
+    const created = await provisionTenant(pool, { name, label: values.label });
+    process.stdout.write(`${JSON.stringify(created)}\n`);
+    return;
+  }
+
+  if (command === 'add-key') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const created = await addTenantKey(pool, { tenantId, label: values.label });
+    process.stdout.write(`${JSON.stringify(created)}\n`);
+    return;
+  }
+
+  if (command === 'revoke-key') {
+    const tenantId = requireTenant(values);
+    const keyId = values['key-id'] ?? '';
+    if (tenantId === undefined || !UUID.test(keyId)) {
+      logger.error('tenant-id and key-id are required');
+      process.exitCode = 1;
+      return;
+    }
+    const revoked = await revokeTenantKey(pool, { tenantId, keyId });
+    if (!revoked) {
+      logger.error('key was not revoked');
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(`${JSON.stringify({ tenantId, keyId, revoked: true })}\n`);
+    return;
+  }
+
+  if (command === 'register-anthropic-connection' || command === 'set-anthropic-credential') {
+    const tenantId = requireTenant(values);
+    const apiKey = values['api-key'] ?? '';
+    const endpoint = values.endpoint?.trim() ?? '';
+    const workspaceId = values['workspace-id']?.trim() ?? '';
+    if (tenantId === undefined || apiKey.length === 0 || (command === 'register-anthropic-connection' && endpoint.length === 0)) {
+      logger.error('tenant-id, api-key, and endpoint are required');
+      process.exitCode = 1;
+      return;
+    }
+    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+    if (command === 'register-anthropic-connection') {
+      const created = await registerAnthropicConnection(
+        pool,
+        tenantId,
+        protectedCredential,
+        endpoint,
+        workspaceId.length === 0 ? null : workspaceId,
+      );
+      process.stdout.write(
+        `${JSON.stringify({ ...created, tenantId, provider: 'anthropic', enabled: true })}\n`,
+      );
+      return;
+    }
+    const credentialVersion = await replaceAnthropicCredential(pool, tenantId, protectedCredential);
+    process.stdout.write(`${JSON.stringify({ tenantId, provider: 'anthropic', credentialVersion })}\n`);
+    return;
+  }
+
+  if (command === 'register-vertex-connection') {
+    const tenantId = requireTenant(values);
+    const authMode = values['auth-mode']?.trim() || 'service_account';
+    const apiKey = values['api-key'] ?? '';
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    if (authMode === 'service_account' && apiKey.length === 0) {
+      logger.error('tenant-id and api-key are required');
+      process.exitCode = 1;
+      return;
+    }
+    const prepared = prepareRegistryConnection({
+      provider: 'vertex',
+      authMode,
+      endpoint: values.endpoint,
+      projectId: values.project,
+      location: values.location,
+      credential: apiKey,
+      serviceAccountIdentity: values['service-account'],
+      apiVersion: values['api-version'],
+    });
+    const protectedCredential =
+      prepared.authMode === 'service_account'
+        ? credentialStore(config.providerCredentialKey).protect(apiKey, 'service_account')
+        : null;
+    const created = await registerRegistryConnection(pool, {
+      tenantId,
+      provider: prepared.provider,
+      protectedCredential,
+      authMode: prepared.authMode,
+      endpoint: prepared.endpoint,
+      projectId: prepared.projectId,
+      location: prepared.location,
+      serviceAccountIdentity: prepared.serviceAccountIdentity,
+      apiVersion: prepared.apiVersion,
+    });
+    process.stdout.write(
+      `${JSON.stringify({
+        ...created,
+        tenantId,
+        provider: prepared.provider,
+        authMode: prepared.authMode,
+        enabled: true,
+        endpoint: prepared.endpoint,
+        projectId: prepared.projectId,
+        location: prepared.location,
+        serviceAccountIdentity: prepared.serviceAccountIdentity,
+        apiVersion: prepared.apiVersion,
+      })}\n`,
+    );
+    return;
+  }
+
+  if (
+    command === 'register-xai-connection' ||
+    command === 'register-openrouter-connection' ||
+    command === 'register-dgx-connection'
+  ) {
+    const tenantId = requireTenant(values);
+    const apiKey = values['api-key'] ?? '';
+    const provider = command.slice('register-'.length, command.indexOf('-connection'));
+    if (tenantId === undefined || apiKey.length === 0) {
+      logger.error('tenant-id and api-key are required');
+      process.exitCode = 1;
+      return;
+    }
+    const prepared = prepareRegistryConnection({
+      provider,
+      authMode: values['auth-mode'],
+      endpoint: values.endpoint,
+      projectId: values.project,
+      location: values.location,
+      credential: apiKey,
+      serviceAccountIdentity: values['service-account'],
+      apiVersion: values['api-version'],
+    });
+    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, 'api_key');
+    const created = await registerRegistryConnection(pool, {
+      tenantId,
+      provider: prepared.provider,
+      protectedCredential,
+      authMode: prepared.authMode,
+      endpoint: prepared.endpoint,
+      projectId: prepared.projectId,
+      location: prepared.location,
+      serviceAccountIdentity: prepared.serviceAccountIdentity,
+      apiVersion: prepared.apiVersion,
+    });
+    process.stdout.write(
+      `${JSON.stringify({
+        ...created,
+        tenantId,
+        provider: prepared.provider,
+        authMode: prepared.authMode,
+        enabled: true,
+        endpoint: prepared.endpoint,
+        projectId: prepared.projectId,
+        location: prepared.location,
+      })}\n`,
+    );
+    return;
+  }
+
+  if (command === 'register-openai-connection' || command === 'set-openai-credential') {
+    const tenantId = requireTenant(values);
+    const apiKey = values['api-key'] ?? '';
+    if (tenantId === undefined || apiKey.length === 0) {
+      logger.error('tenant-id and api-key are required');
+      process.exitCode = 1;
+      return;
+    }
+    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+    if (command === 'register-openai-connection') {
+      const created = await registerOpenAiConnection(pool, tenantId, protectedCredential);
+      process.stdout.write(
+        `${JSON.stringify({ ...created, tenantId, provider: 'openai', enabled: true })}\n`,
+      );
+      return;
+    }
+    const credentialVersion = await replaceOpenAiCredential(pool, tenantId, protectedCredential);
+    process.stdout.write(`${JSON.stringify({ tenantId, credentialVersion })}\n`);
+    return;
+  }
+
+  if (command === 'set-connection-enabled') {
+    const tenantId = requireTenant(values);
+    const enabled = parseEnabled(values.enabled);
+    if (tenantId === undefined || enabled === undefined) {
+      logger.error('tenant-id and enabled are required');
+      process.exitCode = 1;
+      return;
+    }
+    const provider = values.provider ?? 'openai';
+    const credentialVersion = provider === 'openai'
+      ? await setOpenAiConnectionEnabled(pool, tenantId, enabled)
+      : await setProviderConnectionEnabled(pool, tenantId, provider, enabled);
+    process.stdout.write(`${JSON.stringify({ tenantId, provider, enabled, credentialVersion })}\n`);
+    return;
+  }
+
+  if (command === 'register-deployment') {
+    const tenantId = requireTenant(values);
+    const name = values.name?.trim() ?? '';
+    const upstreamModel = values['upstream-model']?.trim() ?? '';
+    const timeoutMs = Number(values['timeout-ms']);
+    const capabilities = parseCapabilities(values.capabilities);
+    const enabled = parseEnabled(values.enabled) ?? false;
+    const provider = values.provider ?? 'openai';
+    const routing = parseOpenRouterRouting(provider, values);
+    const defaultMaxText = values['default-max-output-tokens'];
+    const defaultMaxOutputTokens = defaultMaxText === undefined ? null : Number(defaultMaxText);
+    const deploymentProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
+    if (
+      tenantId === undefined ||
+      name.length === 0 ||
+      upstreamModel.length === 0 ||
+      !Number.isInteger(timeoutMs) ||
+      capabilities === undefined ||
+      !deploymentProviders.has(provider) ||
+      routing === 'invalid' ||
+      (values.enabled !== undefined && parseEnabled(values.enabled) === undefined) ||
+      (defaultMaxOutputTokens !== null && !Number.isInteger(defaultMaxOutputTokens)) ||
+      (provider !== 'anthropic' && defaultMaxText !== undefined)
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    if (provider === 'openrouter') {
+      const created = await registerOpenRouterDeployment(pool, {
+        tenantId,
+        name,
+        upstreamModel,
+        timeoutMs,
+        capabilities,
+        enabled,
+        downstreamProviders: routing?.downstreamProviders ?? null,
+        dataCollection: routing?.dataCollection ?? null,
+        allowFallbacks: routing?.allowFallbacks ?? null,
+        requireServingProvider: routing?.requireServingProvider ?? false,
+      });
+      process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
+      return;
+    }
+    if (provider !== 'openai') {
+      const created = await registerProviderDeployment(pool, {
+        tenantId,
+        provider,
+        name,
+        upstreamModel,
+        timeoutMs,
+        capabilities,
+        enabled,
+        defaultMaxOutputTokens,
+      });
+      process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
+      return;
+    }
+    const created = await registerModelDeployment(pool, {
+      tenantId,
+      name,
+      upstreamModel,
+      timeoutMs,
+      capabilities,
+      enabled,
+    });
+    process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, ...created })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-enabled') {
+    const tenantId = requireTenant(values);
+    const name = values.name?.trim() ?? '';
+    const enabled = parseEnabled(values.enabled);
+    if (tenantId === undefined || name.length === 0 || enabled === undefined) {
+      logger.error('tenant-id, name, and enabled are required');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setModelDeploymentEnabled(pool, tenantId, name, enabled);
+    process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'validate-deployment' || command === 'set-deployment-health') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const status = values.status?.trim() ?? '';
+    if (tenantId === undefined || name.length === 0 || status.length === 0) {
+      logger.error('tenant-id, deployment, and status are required');
+      process.exitCode = 1;
+      return;
+    }
+    const updated = command === 'validate-deployment'
+      ? await setDeploymentValidation(pool, tenantId, name, status)
+      : await setDeploymentHealth(pool, tenantId, name, status);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...updated })}\n`);
+    return;
+  }
+
+  if (command === 'set-alias') {
+    const tenantId = requireTenant(values);
+    const alias = values.alias ?? '';
+    const deployment = values.deployment?.trim() ?? '';
+    if (tenantId === undefined || alias !== 'auto' || deployment.length === 0) {
+      logger.error('tenant-id, alias auto, and deployment are required');
+      process.exitCode = 1;
+      return;
+    }
+    const aliasId = await setModelAlias(pool, tenantId, alias, deployment);
+    process.stdout.write(`${JSON.stringify({ tenantId, alias, deployment, aliasId })}\n`);
+    return;
+  }
+
+  if (command === 'set-tenant-streaming') {
+    const tenantId = requireTenant(values);
+    const enabled = parseEnabled(values.enabled);
+    if (tenantId === undefined || enabled === undefined) {
+      logger.error('tenant-id and enabled are required');
+      process.exitCode = 1;
+      return;
+    }
+    const streamingEnabled = await setTenantStreamingEnabled(pool, tenantId, enabled);
+    process.stdout.write(`${JSON.stringify({ tenantId, streamingEnabled })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-streaming') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const enabled = parseEnabled(values.enabled);
+    const connectTimeoutMs = parseTimeout(values['connect-timeout-ms']);
+    const idleTimeoutMs = parseTimeout(values['idle-timeout-ms']);
+    const totalTimeoutMs = parseTimeout(values['total-timeout-ms']);
+    const backpressureTimeoutMs = parseTimeout(values['backpressure-timeout-ms']);
+    if (
+      tenantId === undefined ||
+      name.length === 0 ||
+      enabled === undefined ||
+      connectTimeoutMs === undefined ||
+      idleTimeoutMs === undefined ||
+      totalTimeoutMs === undefined ||
+      backpressureTimeoutMs === undefined
+    ) {
+      logger.error('deployment streaming arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentStreaming(pool, {
+      tenantId,
+      name,
+      enabled,
+      connectTimeoutMs,
+      idleTimeoutMs,
+      totalTimeoutMs,
+      backpressureTimeoutMs,
+    });
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, streamingEnabled: enabled, configVersion })}\n`);
+    return;
+  }
+
+  if (
+    command === 'validate-vertex-credential' ||
+    command === 'validate-vertex-access' ||
+    command === 'test-vertex-inference'
+  ) {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const loaded = await loadVertexOperatorConnection(pool, tenantId);
+    if (loaded === null || !isVertexAuth(loaded.authMode) || !isVertexApi(loaded.apiVersion)) {
+      logger.error('vertex connection was not found');
+      process.exitCode = 1;
+      return;
+    }
+    let upstreamModel = '';
+    if (command === 'test-vertex-inference') {
+      const deploymentName = values.deployment?.trim() ?? '';
+      if (deploymentName.length === 0) {
+        logger.error('deployment is required');
+        process.exitCode = 1;
+        return;
+      }
+      const listing = await listTenantInference(pool, tenantId);
+      const deployment = listing.deployments.find((item) => item.name === deploymentName);
+      if (deployment === undefined || deployment.connectionId !== loaded.connectionId) {
+        logger.error('deployment was not found');
+        process.exitCode = 1;
+        return;
+      }
+      upstreamModel = deployment.upstreamModel;
+    }
+    let credentialJson: string | null = null;
+    if (loaded.protectedCredential !== null) {
+      credentialJson = credentialStore(config.providerCredentialKey).open(loaded.protectedCredential);
+    }
+    const spec: VertexClientSpec = {
+      tenantId,
+      connectionId: loaded.connectionId,
+      connectionConfigVersion: loaded.configVersion,
+      credentialVersion: loaded.credentialVersion,
+      projectId: loaded.projectId,
+      location: loaded.location,
+      apiVersion: loaded.apiVersion,
+      authMode: loaded.authMode,
+      serviceAccountIdentity: loaded.serviceAccountIdentity,
+      credentialJson,
+    };
+    const result =
+      command === 'validate-vertex-credential'
+        ? await validateVertexCredential(spec)
+        : command === 'validate-vertex-access'
+          ? await validateVertexAccess(await defaultVertexClientFactory(spec), spec)
+          : await testVertexInference(await defaultVertexClientFactory(spec), upstreamModel);
+    credentialJson = '';
+    spec.credentialJson = null;
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
+
+  if (command === 'approve-private-endpoint') {
+    const tenantId = requireTenant(values);
+    const host = values.host?.trim() ?? '';
+    const port = Number(values.port);
+    const addresses = (values.addresses ?? '').split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+    const tlsVerify = values['tls-verify'] === undefined ? true : parseEnabled(values['tls-verify']);
+    const healthText = values['health-endpoint']?.trim() ?? '';
+    if (tenantId === undefined || host.length === 0 || !Number.isInteger(port) || addresses.length === 0 || tlsVerify === undefined) {
+      logger.error('endpoint is invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const approval = normalizeApproval({
+      host,
+      port,
+      addresses,
+      tlsVerify,
+      healthEndpoint: healthText.length === 0 ? null : healthText,
+    });
+    const approvalId = await approvePrivateEndpoint(pool, { tenantId, ...approval });
+    process.stdout.write(`${JSON.stringify({ tenantId, approvalId, ...approval })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-concurrency') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const raw = values['max-concurrency']?.trim() ?? '';
+    const limit = raw === 'none' ? null : Number(raw);
+    if (tenantId === undefined || name.length === 0 || (limit !== null && !Number.isInteger(limit))) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentConcurrency(pool, tenantId, name, limit);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, maxConcurrency: limit, configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'list-private-models' || command === 'probe-private-health') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    if (tenantId === undefined || name.length === 0) {
+      logger.error('tenant-id and deployment are required');
+      process.exitCode = 1;
+      return;
+    }
+    const runtimePool = createPool(config, 'runtime', logger, 1);
+    const store = credentialStore(config.providerCredentialKey);
+    try {
+      const result = command === 'list-private-models'
+        ? await listPrivateModels({ runtimePool, store, tenantId, deployment: name })
+        : await probePrivateHealth({ runtimePool, store, tenantId, deployment: name });
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...result })}\n`);
+    } finally {
+      await runtimePool.end();
+    }
+    return;
+  }
+
+  if (command === 'register-price') {
+    const parsed = parsePrice(values);
+    if (parsed === undefined) {
+      logger.error('price arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const registered = await registerPrice(pool, parsed);
+    process.stdout.write(`${JSON.stringify(registered)}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-service-tier') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const tier = parseServiceTier(values['service-tier'], true);
+    if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || tier === undefined) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const serviceTier = await setDeploymentServiceTier(pool, tenantId, name, tier);
+    process.stdout.write(`${JSON.stringify({ serviceTier })}\n`);
+    return;
+  }
+
+  if (command === 'reconcile-attempt-cost') {
+    const tenantId = requireTenant(values);
+    const attemptId = values['attempt-id'] ?? '';
+    if (tenantId === undefined || !UUID.test(attemptId)) {
+      logger.error('attempt-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const reconciled = await reconcileAttemptCost(pool, tenantId, attemptId);
+    process.stdout.write(`${JSON.stringify(reconciled)}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-breaker') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const enabled = parseEnabled(values.enabled);
+    const windowMs = parseBounded(values['window-ms'], 100, 3_600_000);
+    const minSamples = parseBounded(values['min-samples'], 1, 10_000);
+    const failureThreshold = parseBounded(values['failure-threshold'], 1, 10_000);
+    const cooldownMs = parseBounded(values['cooldown-ms'], 0, 3_600_000);
+    const maxProbes = parseBounded(values['max-probes'], 1, 8);
+    const settingsInvalid = enabled === true && (
+      windowMs === undefined
+      || minSamples === undefined
+      || failureThreshold === undefined
+      || cooldownMs === undefined
+      || maxProbes === undefined
+      || failureThreshold > minSamples
+    );
+    if (
+      tenantId === undefined
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+      || name === 'auto'
+      || enabled === undefined
+      || settingsInvalid
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const deploymentId = await setDeploymentBreaker(
+      pool,
+      tenantId,
+      name,
+      enabled,
+      enabled ? windowMs ?? null : null,
+      enabled ? minSamples ?? null : null,
+      enabled ? failureThreshold ?? null : null,
+      enabled ? cooldownMs ?? null : null,
+      enabled ? maxProbes ?? null : null,
+    );
+    process.stdout.write(`${JSON.stringify({ deploymentId, enabled })}\n`);
+    return;
+  }
+
+  if (command === 'reset-deployment-breaker') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto') {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const deploymentId = await resetDeploymentBreaker(pool, tenantId, name);
+    process.stdout.write(`${JSON.stringify({ deploymentId, state: 'closed' })}\n`);
+    return;
+  }
+
+  if (command === 'set-execution-policy') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const retriesEnabled = parseEnabled(values.retries);
+    const connectionDeadlineMs = parsePolicyMs(values['connection-deadline-ms'], 100);
+    const attemptDeadlineMs = parsePolicyMs(values['attempt-deadline-ms'], 100);
+    const totalDeadlineMs = parsePolicyMs(values['total-deadline-ms'], 100);
+    const initialBackoffMs = parsePolicyMs(values['initial-backoff-ms'], 0);
+    const maxBackoffMs = parsePolicyMs(values['max-backoff-ms'], 0);
+    if (
+      tenantId === undefined
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+      || name === 'auto'
+      || retriesEnabled === undefined
+      || connectionDeadlineMs === undefined
+      || attemptDeadlineMs === undefined
+      || totalDeadlineMs === undefined
+      || initialBackoffMs === undefined
+      || maxBackoffMs === undefined
+      || initialBackoffMs > maxBackoffMs
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const policyId = await setDeploymentExecutionPolicy(
+      pool,
+      tenantId,
+      name,
+      retriesEnabled,
+      connectionDeadlineMs,
+      attemptDeadlineMs,
+      totalDeadlineMs,
+      initialBackoffMs,
+      maxBackoffMs,
+    );
+    process.stdout.write(`${JSON.stringify({ policyId, retriesEnabled })}\n`);
+    return;
+  }
+
+  if (command === 'set-fallback-policy') {
+    const tenantId = requireTenant(values);
+    const alias = values.alias ?? '';
+    const enabled = parseEnabled(values.enabled);
+    const deployments = parseCsv(values.deployments, true);
+    const failures = parseCsv(values.failures, false);
+    const maxAttempts = parseBounded(values['max-attempts'], 1, 8);
+    const capabilities = parseCsv(values.capabilities, true);
+    const providers = parseCsv(values.providers, true);
+    const regions = parseCsv(values.regions, true);
+    const dataCollection = values['data-collection']?.trim() ?? '';
+    const minRemainingDeadlineMs = parseBounded(values['min-remaining-deadline-ms'], 0, 600_000);
+    if (
+      tenantId === undefined
+      || alias !== 'auto'
+      || enabled === undefined
+      || deployments === undefined
+      || failures === undefined
+      || maxAttempts === undefined
+      || capabilities === undefined
+      || providers === undefined
+      || regions === undefined
+      || (dataCollection !== 'allow' && dataCollection !== 'deny')
+      || minRemainingDeadlineMs === undefined
+      || (enabled && deployments.length < 1)
+      || (enabled && providers.length < 1)
+    ) {
+      logger.error('fallback arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const stored = await setFallbackPolicy(
+      pool,
+      tenantId,
+      alias,
+      enabled,
+      deployments,
+      failures,
+      maxAttempts,
+      capabilities,
+      providers,
+      regions,
+      dataCollection,
+      minRemainingDeadlineMs,
+    );
+    process.stdout.write(`${JSON.stringify(stored)}\n`);
+    return;
+  }
+
+  if (command === 'show-fallback-policy') {
+    const tenantId = requireTenant(values);
+    const alias = values.alias ?? '';
+    if (tenantId === undefined || alias !== 'auto') {
+      logger.error('fallback arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const stored = await showFallbackPolicy(pool, tenantId, alias);
+    process.stdout.write(`${JSON.stringify(stored ?? { attached: false })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-context-limit') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const limit = parseBounded(values['context-limit'], 1, 10_000_000);
+    if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || limit === undefined) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentContextLimit(pool, tenantId, name, limit);
+    process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-data-collection') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const value = values['data-collection']?.trim() ?? '';
+    if (
+      tenantId === undefined
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+      || name === 'auto'
+      || (value !== 'allow' && value !== 'deny')
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentDataCollection(pool, tenantId, name, value);
+    process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'set-tenant-limits') {
+    const tenantId = requireTenant(values);
+    const mode = parseMode(values.mode, ['observe', 'hard']);
+    const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
+    const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
+    const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
+    const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
+    const leaseMs = parseLimitValue(values['lease-ms'], 100, 600_000);
+    if (
+      tenantId === undefined
+      || mode === undefined
+      || requestsPerMinute === undefined
+      || concurrentRequests === undefined
+      || concurrentStreams === undefined
+      || tokenRate === undefined
+      || leaseMs === undefined
+    ) {
+      logger.error('limit arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    await setTenantLimits(
+      pool,
+      tenantId,
+      mode,
+      requestsPerMinute,
+      concurrentRequests,
+      concurrentStreams,
+      tokenRate,
+      leaseMs,
+    );
+    process.stdout.write(`${JSON.stringify({ tenantId, mode })}\n`);
+    return;
+  }
+
+  if (command === 'set-api-key-limits') {
+    const tenantId = requireTenant(values);
+    const keyId = values['key-id'] ?? '';
+    const mode = values.mode === 'none' ? null : parseMode(values.mode, ['observe', 'hard']);
+    const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
+    const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
+    const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
+    const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
+    if (
+      tenantId === undefined
+      || !UUID.test(keyId)
+      || (values.mode !== undefined && values.mode !== 'none' && mode === undefined)
+      || requestsPerMinute === undefined
+      || concurrentRequests === undefined
+      || concurrentStreams === undefined
+      || tokenRate === undefined
+    ) {
+      logger.error('limit arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    await setApiKeyLimits(
+      pool,
+      tenantId,
+      keyId,
+      mode ?? null,
+      requestsPerMinute,
+      concurrentRequests,
+      concurrentStreams,
+      tokenRate,
+    );
+    process.stdout.write(`${JSON.stringify({ tenantId, keyId, mode })}\n`);
+    return;
+  }
+
+  if (command === 'set-connection-limit') {
+    const tenantId = requireTenant(values);
+    const provider = values.provider ?? '';
+    const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
+    const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
+    const shareGroup = values['share-group'] === 'none' ? null : values['share-group'] ?? null;
+    const shareValid = shareGroup === null || /^[a-z0-9][a-z0-9-]{0,63}$/.test(shareGroup);
+    if (
+      tenantId === undefined
+      || !['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx'].includes(provider)
+      || maxConcurrency === undefined
+      || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
+      || !shareValid
+    ) {
+      logger.error('connection arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    await setConnectionLimit(pool, tenantId, provider, mode, maxConcurrency, shareGroup);
+    process.stdout.write(`${JSON.stringify({ tenantId, provider, mode, maxConcurrency, shareGroup })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-limit') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
+    const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
+    if (
+      tenantId === undefined
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+      || name === 'auto'
+      || maxConcurrency === undefined
+      || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    await setDeploymentLimit(pool, tenantId, name, mode, maxConcurrency);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, mode, maxConcurrency })}\n`);
+    return;
+  }
+
+  if (command === 'set-tenant-budget') {
+    const tenantId = requireTenant(values);
+    const mode = parseMode(values.mode, ['observe', 'hard', 'disabled']);
+    const amount = values['monthly-amount'] ?? '';
+    if (tenantId === undefined || mode === undefined || !/^(0|[1-9][0-9]*)(\.[0-9]{1,12})?$/.test(amount)) {
+      logger.error('budget arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    await setTenantBudget(pool, tenantId, mode, amount);
+    process.stdout.write(`${JSON.stringify({ tenantId, mode, monthlyAmount: amount })}\n`);
+    return;
+  }
+
+  if (command === 'recover-budget') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const closed = await recoverTenantBudget(pool, tenantId, new Date());
+    process.stdout.write(`${JSON.stringify({ tenantId, closed })}\n`);
+    return;
+  }
+
+  if (command === 'list-inference') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const listing = await listTenantInference(pool, tenantId);
+    process.stdout.write(`${JSON.stringify(listing)}\n`);
+    return;
+  }
+
+  logger.error('unknown command');
+  process.exitCode = 1;
+}
+
 async function main(): Promise<void> {
   let config;
   try {
@@ -367,6 +1253,33 @@ async function main(): Promise<void> {
   }
 
   const logger = createLogger(config.logLevel, process.stderr);
+  const argv = process.argv.slice(2);
+  if (argv.includes('--interactive')) {
+    if (argv.length !== 1 || argv[0] !== '--interactive') {
+      logger.error('invalid command arguments');
+      process.exit(1);
+    }
+    const pool = createPool(config, 'migrator', logger, 1);
+    const input = openInteractiveInput();
+    try {
+      await runInteractiveSession({
+        ask: (prompt) => input.ask(prompt),
+        run: (nextCommand, nextValues) => runCommand(pool, config, logger, nextCommand, nextValues as Flags),
+        failed: () => process.exitCode === 1,
+        reject(message) {
+          logger.error(message);
+          process.exitCode = 1;
+        },
+      });
+    } catch (error) {
+      logger.error('command failed', { message: errorMessage(error) });
+      process.exitCode = 1;
+    } finally {
+      input.close();
+      await pool.end();
+    }
+    return;
+  }
   let command = '';
   let values: Flags;
   try {
@@ -542,887 +1455,7 @@ async function main(): Promise<void> {
 
   const pool = createPool(config, 'migrator', logger, 1);
   try {
-    if (command === 'provision-tenant') {
-      const name = values.name?.trim() ?? '';
-      if (name.length === 0) {
-        logger.error('name is required');
-        process.exitCode = 1;
-        return;
-      }
-      const created = await provisionTenant(pool, { name, label: values.label });
-      process.stdout.write(`${JSON.stringify(created)}\n`);
-      return;
-    }
-
-    if (command === 'add-key') {
-      const tenantId = requireTenant(values);
-      if (tenantId === undefined) {
-        logger.error('tenant-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      const created = await addTenantKey(pool, { tenantId, label: values.label });
-      process.stdout.write(`${JSON.stringify(created)}\n`);
-      return;
-    }
-
-    if (command === 'revoke-key') {
-      const tenantId = requireTenant(values);
-      const keyId = values['key-id'] ?? '';
-      if (tenantId === undefined || !UUID.test(keyId)) {
-        logger.error('tenant-id and key-id are required');
-        process.exitCode = 1;
-        return;
-      }
-      const revoked = await revokeTenantKey(pool, { tenantId, keyId });
-      if (!revoked) {
-        logger.error('key was not revoked');
-        process.exitCode = 1;
-        return;
-      }
-      process.stdout.write(`${JSON.stringify({ tenantId, keyId, revoked: true })}\n`);
-      return;
-    }
-
-    if (command === 'register-anthropic-connection' || command === 'set-anthropic-credential') {
-      const tenantId = requireTenant(values);
-      const apiKey = values['api-key'] ?? '';
-      const endpoint = values.endpoint?.trim() ?? '';
-      const workspaceId = values['workspace-id']?.trim() ?? '';
-      if (tenantId === undefined || apiKey.length === 0 || (command === 'register-anthropic-connection' && endpoint.length === 0)) {
-        logger.error('tenant-id, api-key, and endpoint are required');
-        process.exitCode = 1;
-        return;
-      }
-      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
-      if (command === 'register-anthropic-connection') {
-        const created = await registerAnthropicConnection(
-          pool,
-          tenantId,
-          protectedCredential,
-          endpoint,
-          workspaceId.length === 0 ? null : workspaceId,
-        );
-        process.stdout.write(
-          `${JSON.stringify({ ...created, tenantId, provider: 'anthropic', enabled: true })}\n`,
-        );
-        return;
-      }
-      const credentialVersion = await replaceAnthropicCredential(pool, tenantId, protectedCredential);
-      process.stdout.write(`${JSON.stringify({ tenantId, provider: 'anthropic', credentialVersion })}\n`);
-      return;
-    }
-
-    if (command === 'register-vertex-connection') {
-      const tenantId = requireTenant(values);
-      const authMode = values['auth-mode']?.trim() || 'service_account';
-      const apiKey = values['api-key'] ?? '';
-      if (tenantId === undefined) {
-        logger.error('tenant-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      if (authMode === 'service_account' && apiKey.length === 0) {
-        logger.error('tenant-id and api-key are required');
-        process.exitCode = 1;
-        return;
-      }
-      const prepared = prepareRegistryConnection({
-        provider: 'vertex',
-        authMode,
-        endpoint: values.endpoint,
-        projectId: values.project,
-        location: values.location,
-        credential: apiKey,
-        serviceAccountIdentity: values['service-account'],
-        apiVersion: values['api-version'],
-      });
-      const protectedCredential =
-        prepared.authMode === 'service_account'
-          ? credentialStore(config.providerCredentialKey).protect(apiKey, 'service_account')
-          : null;
-      const created = await registerRegistryConnection(pool, {
-        tenantId,
-        provider: prepared.provider,
-        protectedCredential,
-        authMode: prepared.authMode,
-        endpoint: prepared.endpoint,
-        projectId: prepared.projectId,
-        location: prepared.location,
-        serviceAccountIdentity: prepared.serviceAccountIdentity,
-        apiVersion: prepared.apiVersion,
-      });
-      process.stdout.write(
-        `${JSON.stringify({
-          ...created,
-          tenantId,
-          provider: prepared.provider,
-          authMode: prepared.authMode,
-          enabled: true,
-          endpoint: prepared.endpoint,
-          projectId: prepared.projectId,
-          location: prepared.location,
-          serviceAccountIdentity: prepared.serviceAccountIdentity,
-          apiVersion: prepared.apiVersion,
-        })}\n`,
-      );
-      return;
-    }
-
-    if (
-      command === 'register-xai-connection' ||
-      command === 'register-openrouter-connection' ||
-      command === 'register-dgx-connection'
-    ) {
-      const tenantId = requireTenant(values);
-      const apiKey = values['api-key'] ?? '';
-      const provider = command.slice('register-'.length, command.indexOf('-connection'));
-      if (tenantId === undefined || apiKey.length === 0) {
-        logger.error('tenant-id and api-key are required');
-        process.exitCode = 1;
-        return;
-      }
-      const prepared = prepareRegistryConnection({
-        provider,
-        authMode: values['auth-mode'],
-        endpoint: values.endpoint,
-        projectId: values.project,
-        location: values.location,
-        credential: apiKey,
-        serviceAccountIdentity: values['service-account'],
-        apiVersion: values['api-version'],
-      });
-      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, 'api_key');
-      const created = await registerRegistryConnection(pool, {
-        tenantId,
-        provider: prepared.provider,
-        protectedCredential,
-        authMode: prepared.authMode,
-        endpoint: prepared.endpoint,
-        projectId: prepared.projectId,
-        location: prepared.location,
-        serviceAccountIdentity: prepared.serviceAccountIdentity,
-        apiVersion: prepared.apiVersion,
-      });
-      process.stdout.write(
-        `${JSON.stringify({
-          ...created,
-          tenantId,
-          provider: prepared.provider,
-          authMode: prepared.authMode,
-          enabled: true,
-          endpoint: prepared.endpoint,
-          projectId: prepared.projectId,
-          location: prepared.location,
-        })}\n`,
-      );
-      return;
-    }
-
-    if (command === 'register-openai-connection' || command === 'set-openai-credential') {
-      const tenantId = requireTenant(values);
-      const apiKey = values['api-key'] ?? '';
-      if (tenantId === undefined || apiKey.length === 0) {
-        logger.error('tenant-id and api-key are required');
-        process.exitCode = 1;
-        return;
-      }
-      const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
-      if (command === 'register-openai-connection') {
-        const created = await registerOpenAiConnection(pool, tenantId, protectedCredential);
-        process.stdout.write(
-          `${JSON.stringify({ ...created, tenantId, provider: 'openai', enabled: true })}\n`,
-        );
-        return;
-      }
-      const credentialVersion = await replaceOpenAiCredential(pool, tenantId, protectedCredential);
-      process.stdout.write(`${JSON.stringify({ tenantId, credentialVersion })}\n`);
-      return;
-    }
-
-    if (command === 'set-connection-enabled') {
-      const tenantId = requireTenant(values);
-      const enabled = parseEnabled(values.enabled);
-      if (tenantId === undefined || enabled === undefined) {
-        logger.error('tenant-id and enabled are required');
-        process.exitCode = 1;
-        return;
-      }
-      const provider = values.provider ?? 'openai';
-      const credentialVersion = provider === 'openai'
-        ? await setOpenAiConnectionEnabled(pool, tenantId, enabled)
-        : await setProviderConnectionEnabled(pool, tenantId, provider, enabled);
-      process.stdout.write(`${JSON.stringify({ tenantId, provider, enabled, credentialVersion })}\n`);
-      return;
-    }
-
-    if (command === 'register-deployment') {
-      const tenantId = requireTenant(values);
-      const name = values.name?.trim() ?? '';
-      const upstreamModel = values['upstream-model']?.trim() ?? '';
-      const timeoutMs = Number(values['timeout-ms']);
-      const capabilities = parseCapabilities(values.capabilities);
-      const enabled = parseEnabled(values.enabled) ?? false;
-      const provider = values.provider ?? 'openai';
-      const routing = parseOpenRouterRouting(provider, values);
-      const defaultMaxText = values['default-max-output-tokens'];
-      const defaultMaxOutputTokens = defaultMaxText === undefined ? null : Number(defaultMaxText);
-      const deploymentProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
-      if (
-        tenantId === undefined ||
-        name.length === 0 ||
-        upstreamModel.length === 0 ||
-        !Number.isInteger(timeoutMs) ||
-        capabilities === undefined ||
-        !deploymentProviders.has(provider) ||
-        routing === 'invalid' ||
-        (values.enabled !== undefined && parseEnabled(values.enabled) === undefined) ||
-        (defaultMaxOutputTokens !== null && !Number.isInteger(defaultMaxOutputTokens)) ||
-        (provider !== 'anthropic' && defaultMaxText !== undefined)
-      ) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      if (provider === 'openrouter') {
-        const created = await registerOpenRouterDeployment(pool, {
-          tenantId,
-          name,
-          upstreamModel,
-          timeoutMs,
-          capabilities,
-          enabled,
-          downstreamProviders: routing?.downstreamProviders ?? null,
-          dataCollection: routing?.dataCollection ?? null,
-          allowFallbacks: routing?.allowFallbacks ?? null,
-          requireServingProvider: routing?.requireServingProvider ?? false,
-        });
-        process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
-        return;
-      }
-      if (provider !== 'openai') {
-        const created = await registerProviderDeployment(pool, {
-          tenantId,
-          provider,
-          name,
-          upstreamModel,
-          timeoutMs,
-          capabilities,
-          enabled,
-          defaultMaxOutputTokens,
-        });
-        process.stdout.write(`${JSON.stringify({ tenantId, provider, name, enabled, ...created })}\n`);
-        return;
-      }
-      const created = await registerModelDeployment(pool, {
-        tenantId,
-        name,
-        upstreamModel,
-        timeoutMs,
-        capabilities,
-        enabled,
-      });
-      process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, ...created })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-enabled') {
-      const tenantId = requireTenant(values);
-      const name = values.name?.trim() ?? '';
-      const enabled = parseEnabled(values.enabled);
-      if (tenantId === undefined || name.length === 0 || enabled === undefined) {
-        logger.error('tenant-id, name, and enabled are required');
-        process.exitCode = 1;
-        return;
-      }
-      const configVersion = await setModelDeploymentEnabled(pool, tenantId, name, enabled);
-      process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, configVersion })}\n`);
-      return;
-    }
-
-    if (command === 'validate-deployment' || command === 'set-deployment-health') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const status = values.status?.trim() ?? '';
-      if (tenantId === undefined || name.length === 0 || status.length === 0) {
-        logger.error('tenant-id, deployment, and status are required');
-        process.exitCode = 1;
-        return;
-      }
-      const updated = command === 'validate-deployment'
-        ? await setDeploymentValidation(pool, tenantId, name, status)
-        : await setDeploymentHealth(pool, tenantId, name, status);
-      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...updated })}\n`);
-      return;
-    }
-
-    if (command === 'set-alias') {
-      const tenantId = requireTenant(values);
-      const alias = values.alias ?? '';
-      const deployment = values.deployment?.trim() ?? '';
-      if (tenantId === undefined || alias !== 'auto' || deployment.length === 0) {
-        logger.error('tenant-id, alias auto, and deployment are required');
-        process.exitCode = 1;
-        return;
-      }
-      const aliasId = await setModelAlias(pool, tenantId, alias, deployment);
-      process.stdout.write(`${JSON.stringify({ tenantId, alias, deployment, aliasId })}\n`);
-      return;
-    }
-
-    if (command === 'set-tenant-streaming') {
-      const tenantId = requireTenant(values);
-      const enabled = parseEnabled(values.enabled);
-      if (tenantId === undefined || enabled === undefined) {
-        logger.error('tenant-id and enabled are required');
-        process.exitCode = 1;
-        return;
-      }
-      const streamingEnabled = await setTenantStreamingEnabled(pool, tenantId, enabled);
-      process.stdout.write(`${JSON.stringify({ tenantId, streamingEnabled })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-streaming') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const enabled = parseEnabled(values.enabled);
-      const connectTimeoutMs = parseTimeout(values['connect-timeout-ms']);
-      const idleTimeoutMs = parseTimeout(values['idle-timeout-ms']);
-      const totalTimeoutMs = parseTimeout(values['total-timeout-ms']);
-      const backpressureTimeoutMs = parseTimeout(values['backpressure-timeout-ms']);
-      if (
-        tenantId === undefined ||
-        name.length === 0 ||
-        enabled === undefined ||
-        connectTimeoutMs === undefined ||
-        idleTimeoutMs === undefined ||
-        totalTimeoutMs === undefined ||
-        backpressureTimeoutMs === undefined
-      ) {
-        logger.error('deployment streaming arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const configVersion = await setDeploymentStreaming(pool, {
-        tenantId,
-        name,
-        enabled,
-        connectTimeoutMs,
-        idleTimeoutMs,
-        totalTimeoutMs,
-        backpressureTimeoutMs,
-      });
-      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, streamingEnabled: enabled, configVersion })}\n`);
-      return;
-    }
-
-    if (
-      command === 'validate-vertex-credential' ||
-      command === 'validate-vertex-access' ||
-      command === 'test-vertex-inference'
-    ) {
-      const tenantId = requireTenant(values);
-      if (tenantId === undefined) {
-        logger.error('tenant-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      const loaded = await loadVertexOperatorConnection(pool, tenantId);
-      if (loaded === null || !isVertexAuth(loaded.authMode) || !isVertexApi(loaded.apiVersion)) {
-        logger.error('vertex connection was not found');
-        process.exitCode = 1;
-        return;
-      }
-      let upstreamModel = '';
-      if (command === 'test-vertex-inference') {
-        const deploymentName = values.deployment?.trim() ?? '';
-        if (deploymentName.length === 0) {
-          logger.error('deployment is required');
-          process.exitCode = 1;
-          return;
-        }
-        const listing = await listTenantInference(pool, tenantId);
-        const deployment = listing.deployments.find((item) => item.name === deploymentName);
-        if (deployment === undefined || deployment.connectionId !== loaded.connectionId) {
-          logger.error('deployment was not found');
-          process.exitCode = 1;
-          return;
-        }
-        upstreamModel = deployment.upstreamModel;
-      }
-      let credentialJson: string | null = null;
-      if (loaded.protectedCredential !== null) {
-        credentialJson = credentialStore(config.providerCredentialKey).open(loaded.protectedCredential);
-      }
-      const spec: VertexClientSpec = {
-        tenantId,
-        connectionId: loaded.connectionId,
-        connectionConfigVersion: loaded.configVersion,
-        credentialVersion: loaded.credentialVersion,
-        projectId: loaded.projectId,
-        location: loaded.location,
-        apiVersion: loaded.apiVersion,
-        authMode: loaded.authMode,
-        serviceAccountIdentity: loaded.serviceAccountIdentity,
-        credentialJson,
-      };
-      const result =
-        command === 'validate-vertex-credential'
-          ? await validateVertexCredential(spec)
-          : command === 'validate-vertex-access'
-            ? await validateVertexAccess(await defaultVertexClientFactory(spec), spec)
-            : await testVertexInference(await defaultVertexClientFactory(spec), upstreamModel);
-      credentialJson = '';
-      spec.credentialJson = null;
-      process.stdout.write(`${JSON.stringify(result)}\n`);
-      return;
-    }
-
-    if (command === 'approve-private-endpoint') {
-      const tenantId = requireTenant(values);
-      const host = values.host?.trim() ?? '';
-      const port = Number(values.port);
-      const addresses = (values.addresses ?? '').split(',').map((item) => item.trim()).filter((item) => item.length > 0);
-      const tlsVerify = values['tls-verify'] === undefined ? true : parseEnabled(values['tls-verify']);
-      const healthText = values['health-endpoint']?.trim() ?? '';
-      if (tenantId === undefined || host.length === 0 || !Number.isInteger(port) || addresses.length === 0 || tlsVerify === undefined) {
-        logger.error('endpoint is invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const approval = normalizeApproval({
-        host,
-        port,
-        addresses,
-        tlsVerify,
-        healthEndpoint: healthText.length === 0 ? null : healthText,
-      });
-      const approvalId = await approvePrivateEndpoint(pool, { tenantId, ...approval });
-      process.stdout.write(`${JSON.stringify({ tenantId, approvalId, ...approval })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-concurrency') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const raw = values['max-concurrency']?.trim() ?? '';
-      const limit = raw === 'none' ? null : Number(raw);
-      if (tenantId === undefined || name.length === 0 || (limit !== null && !Number.isInteger(limit))) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const configVersion = await setDeploymentConcurrency(pool, tenantId, name, limit);
-      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, maxConcurrency: limit, configVersion })}\n`);
-      return;
-    }
-
-    if (command === 'list-private-models' || command === 'probe-private-health') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      if (tenantId === undefined || name.length === 0) {
-        logger.error('tenant-id and deployment are required');
-        process.exitCode = 1;
-        return;
-      }
-      const runtimePool = createPool(config, 'runtime', logger, 1);
-      const store = credentialStore(config.providerCredentialKey);
-      try {
-        const result = command === 'list-private-models'
-          ? await listPrivateModels({ runtimePool, store, tenantId, deployment: name })
-          : await probePrivateHealth({ runtimePool, store, tenantId, deployment: name });
-        process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...result })}\n`);
-      } finally {
-        await runtimePool.end();
-      }
-      return;
-    }
-
-    if (command === 'register-price') {
-      const parsed = parsePrice(values);
-      if (parsed === undefined) {
-        logger.error('price arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const registered = await registerPrice(pool, parsed);
-      process.stdout.write(`${JSON.stringify(registered)}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-service-tier') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const tier = parseServiceTier(values['service-tier'], true);
-      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || tier === undefined) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const serviceTier = await setDeploymentServiceTier(pool, tenantId, name, tier);
-      process.stdout.write(`${JSON.stringify({ serviceTier })}\n`);
-      return;
-    }
-
-    if (command === 'reconcile-attempt-cost') {
-      const tenantId = requireTenant(values);
-      const attemptId = values['attempt-id'] ?? '';
-      if (tenantId === undefined || !UUID.test(attemptId)) {
-        logger.error('attempt-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      const reconciled = await reconcileAttemptCost(pool, tenantId, attemptId);
-      process.stdout.write(`${JSON.stringify(reconciled)}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-breaker') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const enabled = parseEnabled(values.enabled);
-      const windowMs = parseBounded(values['window-ms'], 100, 3_600_000);
-      const minSamples = parseBounded(values['min-samples'], 1, 10_000);
-      const failureThreshold = parseBounded(values['failure-threshold'], 1, 10_000);
-      const cooldownMs = parseBounded(values['cooldown-ms'], 0, 3_600_000);
-      const maxProbes = parseBounded(values['max-probes'], 1, 8);
-      const settingsInvalid = enabled === true && (
-        windowMs === undefined
-        || minSamples === undefined
-        || failureThreshold === undefined
-        || cooldownMs === undefined
-        || maxProbes === undefined
-        || failureThreshold > minSamples
-      );
-      if (
-        tenantId === undefined
-        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
-        || name === 'auto'
-        || enabled === undefined
-        || settingsInvalid
-      ) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const deploymentId = await setDeploymentBreaker(
-        pool,
-        tenantId,
-        name,
-        enabled,
-        enabled ? windowMs ?? null : null,
-        enabled ? minSamples ?? null : null,
-        enabled ? failureThreshold ?? null : null,
-        enabled ? cooldownMs ?? null : null,
-        enabled ? maxProbes ?? null : null,
-      );
-      process.stdout.write(`${JSON.stringify({ deploymentId, enabled })}\n`);
-      return;
-    }
-
-    if (command === 'reset-deployment-breaker') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto') {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const deploymentId = await resetDeploymentBreaker(pool, tenantId, name);
-      process.stdout.write(`${JSON.stringify({ deploymentId, state: 'closed' })}\n`);
-      return;
-    }
-
-    if (command === 'set-execution-policy') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const retriesEnabled = parseEnabled(values.retries);
-      const connectionDeadlineMs = parsePolicyMs(values['connection-deadline-ms'], 100);
-      const attemptDeadlineMs = parsePolicyMs(values['attempt-deadline-ms'], 100);
-      const totalDeadlineMs = parsePolicyMs(values['total-deadline-ms'], 100);
-      const initialBackoffMs = parsePolicyMs(values['initial-backoff-ms'], 0);
-      const maxBackoffMs = parsePolicyMs(values['max-backoff-ms'], 0);
-      if (
-        tenantId === undefined
-        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
-        || name === 'auto'
-        || retriesEnabled === undefined
-        || connectionDeadlineMs === undefined
-        || attemptDeadlineMs === undefined
-        || totalDeadlineMs === undefined
-        || initialBackoffMs === undefined
-        || maxBackoffMs === undefined
-        || initialBackoffMs > maxBackoffMs
-      ) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const policyId = await setDeploymentExecutionPolicy(
-        pool,
-        tenantId,
-        name,
-        retriesEnabled,
-        connectionDeadlineMs,
-        attemptDeadlineMs,
-        totalDeadlineMs,
-        initialBackoffMs,
-        maxBackoffMs,
-      );
-      process.stdout.write(`${JSON.stringify({ policyId, retriesEnabled })}\n`);
-      return;
-    }
-
-    if (command === 'set-fallback-policy') {
-      const tenantId = requireTenant(values);
-      const alias = values.alias ?? '';
-      const enabled = parseEnabled(values.enabled);
-      const deployments = parseCsv(values.deployments, true);
-      const failures = parseCsv(values.failures, false);
-      const maxAttempts = parseBounded(values['max-attempts'], 1, 8);
-      const capabilities = parseCsv(values.capabilities, true);
-      const providers = parseCsv(values.providers, true);
-      const regions = parseCsv(values.regions, true);
-      const dataCollection = values['data-collection']?.trim() ?? '';
-      const minRemainingDeadlineMs = parseBounded(values['min-remaining-deadline-ms'], 0, 600_000);
-      if (
-        tenantId === undefined
-        || alias !== 'auto'
-        || enabled === undefined
-        || deployments === undefined
-        || failures === undefined
-        || maxAttempts === undefined
-        || capabilities === undefined
-        || providers === undefined
-        || regions === undefined
-        || (dataCollection !== 'allow' && dataCollection !== 'deny')
-        || minRemainingDeadlineMs === undefined
-        || (enabled && deployments.length < 1)
-        || (enabled && providers.length < 1)
-      ) {
-        logger.error('fallback arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const stored = await setFallbackPolicy(
-        pool,
-        tenantId,
-        alias,
-        enabled,
-        deployments,
-        failures,
-        maxAttempts,
-        capabilities,
-        providers,
-        regions,
-        dataCollection,
-        minRemainingDeadlineMs,
-      );
-      process.stdout.write(`${JSON.stringify(stored)}\n`);
-      return;
-    }
-
-    if (command === 'show-fallback-policy') {
-      const tenantId = requireTenant(values);
-      const alias = values.alias ?? '';
-      if (tenantId === undefined || alias !== 'auto') {
-        logger.error('fallback arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const stored = await showFallbackPolicy(pool, tenantId, alias);
-      process.stdout.write(`${JSON.stringify(stored ?? { attached: false })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-context-limit') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const limit = parseBounded(values['context-limit'], 1, 10_000_000);
-      if (tenantId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name === 'auto' || limit === undefined) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const configVersion = await setDeploymentContextLimit(pool, tenantId, name, limit);
-      process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-data-collection') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const value = values['data-collection']?.trim() ?? '';
-      if (
-        tenantId === undefined
-        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
-        || name === 'auto'
-        || (value !== 'allow' && value !== 'deny')
-      ) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      const configVersion = await setDeploymentDataCollection(pool, tenantId, name, value);
-      process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
-      return;
-    }
-
-    if (command === 'set-tenant-limits') {
-      const tenantId = requireTenant(values);
-      const mode = parseMode(values.mode, ['observe', 'hard']);
-      const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
-      const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
-      const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
-      const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
-      const leaseMs = parseLimitValue(values['lease-ms'], 100, 600_000);
-      if (
-        tenantId === undefined
-        || mode === undefined
-        || requestsPerMinute === undefined
-        || concurrentRequests === undefined
-        || concurrentStreams === undefined
-        || tokenRate === undefined
-        || leaseMs === undefined
-      ) {
-        logger.error('limit arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      await setTenantLimits(
-        pool,
-        tenantId,
-        mode,
-        requestsPerMinute,
-        concurrentRequests,
-        concurrentStreams,
-        tokenRate,
-        leaseMs,
-      );
-      process.stdout.write(`${JSON.stringify({ tenantId, mode })}\n`);
-      return;
-    }
-
-    if (command === 'set-api-key-limits') {
-      const tenantId = requireTenant(values);
-      const keyId = values['key-id'] ?? '';
-      const mode = values.mode === 'none' ? null : parseMode(values.mode, ['observe', 'hard']);
-      const requestsPerMinute = parseLimitValue(values['requests-per-minute'], 1, 1_000_000);
-      const concurrentRequests = parseLimitValue(values['concurrent-requests'], 1, 100_000);
-      const concurrentStreams = parseLimitValue(values['concurrent-streams'], 1, 100_000);
-      const tokenRate = parseLimitValue(values['token-rate'], 1, 1_000_000_000);
-      if (
-        tenantId === undefined
-        || !UUID.test(keyId)
-        || (values.mode !== undefined && values.mode !== 'none' && mode === undefined)
-        || requestsPerMinute === undefined
-        || concurrentRequests === undefined
-        || concurrentStreams === undefined
-        || tokenRate === undefined
-      ) {
-        logger.error('limit arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      await setApiKeyLimits(
-        pool,
-        tenantId,
-        keyId,
-        mode ?? null,
-        requestsPerMinute,
-        concurrentRequests,
-        concurrentStreams,
-        tokenRate,
-      );
-      process.stdout.write(`${JSON.stringify({ tenantId, keyId, mode })}\n`);
-      return;
-    }
-
-    if (command === 'set-connection-limit') {
-      const tenantId = requireTenant(values);
-      const provider = values.provider ?? '';
-      const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
-      const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
-      const shareGroup = values['share-group'] === 'none' ? null : values['share-group'] ?? null;
-      const shareValid = shareGroup === null || /^[a-z0-9][a-z0-9-]{0,63}$/.test(shareGroup);
-      if (
-        tenantId === undefined
-        || !['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx'].includes(provider)
-        || maxConcurrency === undefined
-        || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
-        || !shareValid
-      ) {
-        logger.error('connection arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      await setConnectionLimit(pool, tenantId, provider, mode, maxConcurrency, shareGroup);
-      process.stdout.write(`${JSON.stringify({ tenantId, provider, mode, maxConcurrency, shareGroup })}\n`);
-      return;
-    }
-
-    if (command === 'set-deployment-limit') {
-      const tenantId = requireTenant(values);
-      const name = values.deployment?.trim() ?? '';
-      const mode = parseMode(values.mode, ['observe', 'hard']) ?? 'observe';
-      const maxConcurrency = parseLimitValue(values['max-concurrency'], 1, 100_000);
-      if (
-        tenantId === undefined
-        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
-        || name === 'auto'
-        || maxConcurrency === undefined
-        || (maxConcurrency !== null && parseMode(values.mode, ['observe', 'hard']) === undefined)
-      ) {
-        logger.error('deployment arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      await setDeploymentLimit(pool, tenantId, name, mode, maxConcurrency);
-      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, mode, maxConcurrency })}\n`);
-      return;
-    }
-
-    if (command === 'set-tenant-budget') {
-      const tenantId = requireTenant(values);
-      const mode = parseMode(values.mode, ['observe', 'hard', 'disabled']);
-      const amount = values['monthly-amount'] ?? '';
-      if (tenantId === undefined || mode === undefined || !/^(0|[1-9][0-9]*)(\.[0-9]{1,12})?$/.test(amount)) {
-        logger.error('budget arguments are invalid');
-        process.exitCode = 1;
-        return;
-      }
-      await setTenantBudget(pool, tenantId, mode, amount);
-      process.stdout.write(`${JSON.stringify({ tenantId, mode, monthlyAmount: amount })}\n`);
-      return;
-    }
-
-    if (command === 'recover-budget') {
-      const tenantId = requireTenant(values);
-      if (tenantId === undefined) {
-        logger.error('tenant-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      const closed = await recoverTenantBudget(pool, tenantId, new Date());
-      process.stdout.write(`${JSON.stringify({ tenantId, closed })}\n`);
-      return;
-    }
-
-    if (command === 'list-inference') {
-      const tenantId = requireTenant(values);
-      if (tenantId === undefined) {
-        logger.error('tenant-id is required');
-        process.exitCode = 1;
-        return;
-      }
-      const listing = await listTenantInference(pool, tenantId);
-      process.stdout.write(`${JSON.stringify(listing)}\n`);
-      return;
-    }
-
-    logger.error('unknown command');
-    process.exitCode = 1;
+    await runCommand(pool, config, logger, command, values);
   } catch (error) {
     logger.error('command failed', { message: errorMessage(error) });
     process.exitCode = 1;

@@ -1,0 +1,356 @@
+catalog
+create provision-tenant: name, label
+create add-key: tenant-id, label
+create register-openai-connection: tenant-id, api-key
+create register-anthropic-connection: tenant-id, api-key, endpoint, workspace-id
+create register-vertex-connection: tenant-id, api-key, auth-mode, project, location, endpoint, service-account, api-version
+create register-xai-connection: tenant-id, api-key, endpoint, auth-mode, project, location, service-account, api-version
+create register-openrouter-connection: tenant-id, api-key, endpoint, auth-mode, project, location, service-account, api-version
+create register-dgx-connection: tenant-id, api-key, endpoint, auth-mode, project, location, service-account, api-version
+create register-deployment: tenant-id, name, upstream-model, timeout-ms, capabilities, enabled, provider, default-max-output-tokens, downstream-providers, data-collection, allow-fallbacks, require-serving-provider
+create register-price: provider, upstream-model, effective-at, source, status, location, service-tier, serving-provider, input-rate, output-rate, cache-read-rate, cache-write-rate, thinking-rate, request-fee, allocated-rate
+create approve-private-endpoint: tenant-id, host, port, addresses, tls-verify, health-endpoint
+update revoke-key: tenant-id, key-id
+update set-openai-credential: tenant-id, api-key
+update set-anthropic-credential: tenant-id, api-key
+update set-connection-enabled: tenant-id, enabled, provider
+update set-deployment-enabled: tenant-id, name, enabled
+update set-alias: tenant-id, alias, deployment
+update set-tenant-streaming: tenant-id, enabled
+update set-deployment-streaming: tenant-id, deployment, enabled, connect-timeout-ms, idle-timeout-ms, total-timeout-ms, backpressure-timeout-ms
+update set-deployment-concurrency: tenant-id, deployment, max-concurrency
+update set-deployment-health: tenant-id, deployment, status
+update set-deployment-service-tier: tenant-id, deployment, service-tier
+update reconcile-attempt-cost: tenant-id, attempt-id
+update set-execution-policy: tenant-id, deployment, retries, connection-deadline-ms, attempt-deadline-ms, total-deadline-ms, initial-backoff-ms, max-backoff-ms
+update set-deployment-breaker: tenant-id, deployment, enabled, window-ms, min-samples, failure-threshold, cooldown-ms, max-probes
+update reset-deployment-breaker: tenant-id, deployment
+update set-fallback-policy: tenant-id, alias, enabled, deployments, failures, max-attempts, capabilities, providers, data-collection, regions, min-remaining-deadline-ms
+update set-deployment-context-limit: tenant-id, deployment, context-limit
+update set-deployment-data-collection: tenant-id, deployment, data-collection
+update set-tenant-limits: tenant-id, mode, requests-per-minute, concurrent-requests, concurrent-streams, token-rate, lease-ms
+update set-api-key-limits: tenant-id, key-id, mode, requests-per-minute, concurrent-requests, concurrent-streams, token-rate
+update set-connection-limit: tenant-id, provider, mode, max-concurrency, share-group
+update set-deployment-limit: tenant-id, deployment, mode, max-concurrency
+update set-tenant-budget: tenant-id, mode, monthly-amount
+update recover-budget: tenant-id
+validate validate-deployment: tenant-id, deployment, status
+validate validate-vertex-credential: tenant-id
+validate validate-vertex-access: tenant-id
+validate test-vertex-inference: tenant-id, deployment
+validate list-private-models: tenant-id, deployment
+validate probe-private-health: tenant-id, deployment
+validate show-fallback-policy: tenant-id, alias
+validate list-inference: tenant-id
+
+command: provision-tenant
+action: create
+configuration: tenant name and label
+status: 0
+result: {"name":"cli-tenant"}
+
+command: add-key
+action: create
+configuration: tenant api key label
+status: 0
+result: {}
+
+command: register-openai-connection
+action: create
+configuration: openai api key connection
+status: 0
+result: {"credentialVersion":1,"provider":"openai","enabled":true}
+
+command: register-anthropic-connection
+action: create
+configuration: anthropic endpoint and workspace
+status: 0
+result: {"credentialVersion":1,"provider":"anthropic","enabled":true}
+
+command: register-vertex-connection
+action: create
+configuration: vertex service_account project and location
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"vertex","authMode":"service_account","enabled":true,"endpoint":null,"location":"us-central1","serviceAccountIdentity":null,"apiVersion":"v1"}
+
+command: register-vertex-connection
+action: create
+configuration: vertex adc without an api key
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"vertex","authMode":"adc","enabled":true,"endpoint":null,"location":"us-central1","serviceAccountIdentity":null,"apiVersion":"v1"}
+
+command: register-vertex-connection
+action: create
+configuration: vertex workload_identity without an api key
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"vertex","authMode":"workload_identity","enabled":true,"endpoint":null,"location":"us-central1","serviceAccountIdentity":null,"apiVersion":"v1"}
+
+command: register-vertex-connection
+action: create
+configuration: vertex impersonation service account
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"vertex","authMode":"impersonation","enabled":true,"endpoint":null,"location":"us-central1","serviceAccountIdentity":"vertex-bot@example.iam.gserviceaccount.com","apiVersion":"v1"}
+
+command: register-xai-connection
+action: create
+configuration: xai api key connection
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"xai","authMode":"api_key","enabled":true,"endpoint":null,"location":null}
+
+command: register-openrouter-connection
+action: create
+configuration: openrouter api key connection
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"openrouter","authMode":"api_key","enabled":true,"endpoint":null,"location":null}
+
+command: register-dgx-connection
+action: create
+configuration: dgx private endpoint connection
+status: 0
+result: {"credentialVersion":1,"configVersion":1,"provider":"dgx","authMode":"api_key","enabled":true,"endpoint":"https://dgx.invalid:443/v1","location":null}
+
+command: register-deployment
+action: create
+configuration: openai deployment
+status: 0
+result: {"name":"chat","enabled":true,"configVersion":1}
+
+command: register-deployment
+action: create
+configuration: anthropic deployment with default max output tokens
+status: 0
+result: {"provider":"anthropic","name":"chat","enabled":false,"configVersion":1}
+
+command: register-deployment
+action: create
+configuration: vertex deployment
+status: 0
+result: {"provider":"vertex","name":"chat","enabled":false,"configVersion":1}
+
+command: register-deployment
+action: create
+configuration: xai deployment
+status: 0
+result: {"provider":"xai","name":"chat","enabled":false,"configVersion":1}
+
+command: register-deployment
+action: create
+configuration: openrouter downstream providers and data collection
+status: 0
+result: {"provider":"openrouter","name":"chat","enabled":false,"configVersion":1}
+
+command: register-deployment
+action: create
+configuration: dgx deployment
+status: 0
+result: {"provider":"dgx","name":"chat","enabled":false,"configVersion":1}
+
+command: register-price
+action: create
+configuration: price version rates region tier and serving provider
+status: 0
+result: {"verificationStatus":"verified","effectiveAt":"2026-01-15T00:00:00.000Z"}
+
+command: approve-private-endpoint
+action: create
+configuration: private host port addresses tls and health endpoint
+status: 0
+result: {"host":"dgx.lab.internal","port":8443,"addresses":["10.0.0.8"],"tlsVerify":true,"healthEndpoint":"https://dgx.lab.internal:8443/health"}
+
+command: revoke-key
+action: update
+configuration: revoke a tenant api key
+status: 0
+result: {"revoked":true}
+
+command: set-openai-credential
+action: update
+configuration: replace openai api key
+status: 0
+result: {"credentialVersion":2}
+
+command: set-anthropic-credential
+action: update
+configuration: replace anthropic api key
+status: 0
+result: {"provider":"anthropic","credentialVersion":2}
+
+command: set-connection-enabled
+action: update
+configuration: disable openai connection
+status: 0
+result: {"provider":"openai","enabled":false,"credentialVersion":2}
+
+command: set-connection-enabled
+action: update
+configuration: disable anthropic connection
+status: 0
+result: {"provider":"anthropic","enabled":false,"credentialVersion":2}
+
+command: set-deployment-enabled
+action: update
+configuration: disable a deployment
+status: 0
+result: {"name":"chat","enabled":false,"configVersion":2}
+
+command: set-alias
+action: update
+configuration: alias auto to a deployment
+status: 0
+result: {"alias":"auto","deployment":"chat"}
+
+command: set-tenant-streaming
+action: update
+configuration: enable tenant streaming
+status: 0
+result: {"streamingEnabled":true}
+
+command: set-deployment-streaming
+action: update
+configuration: deployment streaming timeouts
+status: 0
+result: {"deployment":"chat","streamingEnabled":true,"configVersion":2}
+
+command: set-deployment-concurrency
+action: update
+configuration: dgx deployment max concurrency
+status: 0
+result: {"deployment":"chat","maxConcurrency":2,"configVersion":2}
+
+command: set-deployment-health
+action: update
+configuration: deployment health status
+status: 0
+result: {"deployment":"chat","configVersion":1,"validationStatus":"unvalidated","healthStatus":"healthy"}
+
+command: set-deployment-service-tier
+action: update
+configuration: deployment service tier
+status: 0
+result: {"serviceTier":"batch"}
+
+command: reconcile-attempt-cost
+action: update
+configuration: reconcile an estimated attempt cost
+status: 0
+result: {"costStatus":"reconciled","amount":"1.25","allocatedStatus":null,"allocatedAmount":null}
+
+command: set-execution-policy
+action: update
+configuration: retries and deadlines
+status: 0
+result: {"retriesEnabled":true}
+
+command: set-deployment-breaker
+action: update
+configuration: enabled breaker window samples threshold cooldown and probes
+status: 0
+result: {"enabled":true}
+
+command: reset-deployment-breaker
+action: update
+configuration: reset breaker to closed
+status: 0
+result: {"state":"closed"}
+
+command: set-fallback-policy
+action: update
+configuration: fallback alias deployments failures capabilities and providers
+status: 0
+result: {"policyVersion":1}
+
+command: set-deployment-context-limit
+action: update
+configuration: deployment context limit
+status: 0
+result: {"configVersion":2}
+
+command: set-deployment-data-collection
+action: update
+configuration: deployment data collection
+status: 0
+result: {"configVersion":2}
+
+command: set-tenant-limits
+action: update
+configuration: tenant request concurrency stream token and lease limits
+status: 0
+result: {"mode":"hard"}
+
+command: set-api-key-limits
+action: update
+configuration: api key limits
+status: 0
+result: {"mode":"observe"}
+
+command: set-connection-limit
+action: update
+configuration: connection concurrency and share group
+status: 0
+result: {"provider":"openai","mode":"hard","maxConcurrency":4,"shareGroup":"team-a"}
+
+command: set-deployment-limit
+action: update
+configuration: deployment admission concurrency
+status: 0
+result: {"deployment":"chat","mode":"hard","maxConcurrency":3}
+
+command: set-tenant-budget
+action: update
+configuration: tenant monthly budget
+status: 0
+result: {"mode":"hard","monthlyAmount":"25.5"}
+
+command: recover-budget
+action: update
+configuration: close open budget reservations
+status: 0
+result: {"closed":0}
+
+command: validate-deployment
+action: validate
+configuration: deployment validation status
+status: 0
+result: {"deployment":"chat","configVersion":2,"validationStatus":"valid","healthStatus":"unknown"}
+
+command: validate-vertex-credential
+action: validate
+configuration: stored vertex credential that fails before the network
+status: 1
+error: {"msg":"command failed","message":"The service is unavailable."}
+
+command: validate-vertex-access
+action: validate
+configuration: stored vertex access that fails before the network
+status: 1
+error: {"msg":"command failed","message":"The service is unavailable."}
+
+command: test-vertex-inference
+action: validate
+configuration: stored vertex deployment that fails before the network
+status: 1
+error: {"msg":"command failed","message":"The service is unavailable."}
+
+command: list-private-models
+action: validate
+configuration: stored dgx route that fails before a live provider
+status: 1
+error: {"msg":"command failed","message":"The service is unavailable."}
+
+command: probe-private-health
+action: validate
+configuration: stored dgx health route that fails before a live provider
+status: 1
+error: {"msg":"command failed","message":"The service is unavailable."}
+
+command: show-fallback-policy
+action: validate
+configuration: stored fallback policy
+status: 0
+result: {"enabled":true,"deployments":["chat"],"maxAttempts":2,"policyVersion":1,"allowedRegions":[],"dataCollection":"allow","allowedFailures":["unavailable"],"allowedProviders":["openai"],"requiredCapabilities":["temperature"],"minRemainingDeadlineMs":0}
+
+command: list-inference
+action: validate
+configuration: tenant connections deployments and aliases
+status: 0
+result: {"aliases":[],"connections":[{"enabled":true,"authMode":"api_key","endpoint":null,"location":null,"provider":"openai","apiVersion":"v1","configVersion":1,"credentialVersion":1,"serviceAccountIdentity":null}],"deployments":[{"name":"chat","enabled":true,"timeoutMs":5000,"capabilities":["temperature"],"healthStatus":"unknown","configVersion":1,"upstreamModel":"gpt-test","allowFallbacks":null,"dataCollection":null,"maxConcurrency":null,"streamingEnabled":false,"validationStatus":"unvalidated","downstreamProviders":null,"streamIdleTimeoutMs":null,"streamTotalTimeoutMs":null,"defaultMaxOutputTokens":null,"requireServingProvider":false,"streamConnectTimeoutMs":null,"streamBackpressureTimeoutMs":null}],"privateEndpoints":[],"streamingEnabled":false}

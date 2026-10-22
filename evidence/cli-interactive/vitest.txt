@@ -1,0 +1,843 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose
+
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+stdout | test/reliability.test.ts > reliability controls > records a normal response, a slow response, and a missing usage count
+RELIABILITY_FAULT {"case":"normal","status":200,"hits":1,"failureClass":null,"amount":"0.07","costStatus":"estimated","reservation":"settled","elapsedMs":168}
+
+stdout | test/reliability.test.ts > reliability controls > records a normal response, a slow response, and a missing usage count
+RELIABILITY_FAULT {"case":"slow","status":200,"hits":1,"elapsedMs":220,"mockDelayMs":83,"overheadMs":137,"amount":"0.07","costStatus":"estimated"}
+
+stdout | test/reliability.test.ts > reliability controls > records a normal response, a slow response, and a missing usage count
+RELIABILITY_FAULT {"case":"missing-usage","status":200,"hits":1,"promptTokens":null,"amount":null,"costStatus":"unknown","reservation":"provisional"}
+
+ ✓ test/reliability.test.ts > reliability controls > records a normal response, a slow response, and a missing usage count 6599ms
+stdout | test/reliability.test.ts > reliability controls > retries a refused connection and stops on each timeout bound
+RELIABILITY_FAULT {"case":"connection-refused","status":502,"code":"upstream_error","hits":0,"attempts":2,"failureClass":"connection_failure","amount":null,"elapsedMs":424}
+
+stdout | test/reliability.test.ts > reliability controls > retries a refused connection and stops on each timeout bound
+RELIABILITY_FAULT {"case":"timeout-before-send","status":504,"hits":1,"failureClass":"timeout_before_dispatch","amount":null,"expense":"none","elapsedMs":281}
+
+stdout | test/reliability.test.ts > reliability controls > retries a refused connection and stops on each timeout bound
+RELIABILITY_FAULT {"case":"timeout-after-send","status":504,"hits":1,"failureClass":"timeout_after_dispatch","costStatus":"unknown","amount":null,"expense":"uncertain","elapsedMs":302}
+
+ ✓ test/reliability.test.ts > reliability controls > retries a refused connection and stops on each timeout bound 4804ms
+stdout | test/reliability.test.ts > reliability controls > caps retryable HTTP failures and stores overload as an existing class
+RELIABILITY_FAULT {"case":"http-429","status":200,"hits":2,"failureClasses":["rate_limit",null],"elapsedMs":149}
+
+stdout | test/reliability.test.ts > reliability controls > caps retryable HTTP failures and stores overload as an existing class
+RELIABILITY_FAULT {"case":"http-429-cap","status":429,"hits":2,"attempts":2,"failureClass":"rate_limit"}
+
+stdout | test/reliability.test.ts > reliability controls > caps retryable HTTP failures and stores overload as an existing class
+RELIABILITY_FAULT {"case":"http-503","status":502,"code":"upstream_error","hits":2,"failureClass":"unavailable","elapsedMs":107}
+
+stdout | test/reliability.test.ts > reliability controls > caps retryable HTTP failures and stores overload as an existing class
+RELIABILITY_FAULT {"case":"provider-overload","injectedStatus":529,"status":502,"hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+
+ ✓ test/reliability.test.ts > reliability controls > caps retryable HTTP failures and stores overload as an existing class 1808ms
+stdout | test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream
+RELIABILITY_FAULT {"case":"malformed","status":502,"code":"upstream_error","hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+
+stdout | test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream
+RELIABILITY_FAULT {"case":"connection-close","status":502,"code":"upstream_error","hits":1,"attempts":1,"failureClass":"ambiguous_network","amount":null,"costStatus":"unknown","expense":"uncertain"}
+
+stdout | test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream
+RELIABILITY_FAULT {"case":"partial-sse-nonstream","status":502,"code":"invalid_upstream_response","hits":1,"failureClass":"upstream_error","amount":null,"costStatus":"unknown"}
+
+stdout | test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream
+RELIABILITY_FAULT {"case":"partial-sse","status":200,"hits":1,"failureClass":"stream_started","streamStatus":"stream_truncated","amount":null,"done":false}
+
+stdout | test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream
+RELIABILITY_FAULT {"case":"unexpected-close-stream","status":502,"hits":1,"failureClass":"ambiguous_network","streamStatus":"provider_failed","amount":null,"model":"rel-partial","done":false}
+
+ ✓ test/reliability.test.ts > reliability controls > stores a malformed body, a closed socket, and a partial stream 7065ms
+stdout | test/reliability.test.ts > reliability controls > stops retry at a hard budget and at the total deadline
+RELIABILITY_COMBINED {"case":"retry-budget","status":429,"code":"budget_exceeded","hits":1,"attempts":2,"failureClass":"rate_limit","secondDispatched":false,"reservation":"provisional","reserved":"12.000000000000"}
+
+stdout | test/reliability.test.ts > reliability controls > stops retry at a hard budget and at the total deadline
+RELIABILITY_COMBINED {"case":"retry-total-deadline","status":429,"hits":1,"attempts":1,"failureClass":"rate_limit","elapsedMs":160}
+
+ ✓ test/reliability.test.ts > reliability controls > stops retry at a hard budget and at the total deadline 3745ms
+stdout | test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback
+RELIABILITY_COMBINED {"case":"breaker-fallback","status":503,"code":"circuit_open","hits":0,"attempts":1,"models":[]}
+
+stdout | test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback
+RELIABILITY_COMBINED {"case":"candidate-breaker","status":502,"hits":1,"models":["rel-skip-primary"]}
+
+stdout | test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback
+RELIABILITY_COMBINED {"case":"fallback-hard-budget","status":502,"hits":1,"models":["rel-cheap-primary"]}
+
+stdout | test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback
+RELIABILITY_COMBINED {"case":"fallback-region","status":502,"hits":1,"models":["rel-region-primary"],"vertexCalls":0,"connectionLocation":"europe-west4","policyRegion":"us-central1"}
+
+stdout | test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback
+RELIABILITY_COMBINED {"case":"concurrency-cap-one","status":200,"hits":2,"models":["rel-cap-primary","rel-cap-secondary"],"fallback":"true"}
+
+ ✓ test/reliability.test.ts > reliability controls > applies breaker, budget, region, and concurrency bounds to fallback 14730ms
+stdout | test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output
+RELIABILITY_COMBINED {"case":"stream-forced-model","status":502,"hits":1,"models":["rel-named-stream"],"failureClass":"ambiguous_network","streamStatus":"provider_failed","done":false}
+
+stdout | test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output
+RELIABILITY_COMBINED {"case":"fallback-before-output","status":200,"hits":2,"models":["rel-early-primary","rel-early-secondary"],"fallback":"true","done":true}
+
+stdout | test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output
+RELIABILITY_COMBINED {"case":"no-fallback-after-output","status":200,"hits":1,"failureClass":"stream_started","done":false}
+
+stdout | test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output
+RELIABILITY_COMBINED {"case":"fallback-off","status":502,"hits":1,"fallback":"false"}
+
+stdout | test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output
+RELIABILITY_COMBINED {"case":"retry-and-fallback-cap","status":502,"hits":2,"models":["rel-both-primary","rel-both-secondary"]}
+
+ ✓ test/reliability.test.ts > reliability controls > keeps a named stream on that deployment and falls back only before output 12527ms
+stdout | test/reliability.test.ts > reliability controls > recognizes overlapping observation closes at the allocation
+RELIABILITY_COMBINED {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+
+ ✓ test/reliability.test.ts > reliability controls > recognizes overlapping observation closes at the allocation 3402ms
+stdout | test/reliability.test.ts > reliability controls > rejects an unknown price, a locked admission, and a disabled deployment
+RELIABILITY_COMBINED {"case":"missing-provider-cost","status":429,"code":"budget_unknown","hits":0,"dispatched":false}
+
+stdout | test/reliability.test.ts > reliability controls > rejects an unknown price, a locked admission, and a disabled deployment
+RELIABILITY_COMBINED {"case":"database-unavailable","status":503,"code":"admission_unavailable","hits":0,"elapsedMs":10227}
+
+stdout | test/reliability.test.ts > reliability controls > rejects an unknown price, a locked admission, and a disabled deployment
+RELIABILITY_COMBINED {"case":"deployment-disabled","before":{"status":200,"hits":1},"after":{"status":404,"code":"model_not_found","hits":0}}
+
+ ✓ test/reliability.test.ts > reliability controls > rejects an unknown price, a locked admission, and a disabled deployment 16738ms
+stdout | test/reliability.test.ts > reliability controls > keeps credentials, models, budgets, rate limits, and telemetry on each tenant
+RELIABILITY_TENANT {"case":"isolation","alphaKey":"Bearer sk-rel-alpha","betaKey":"Bearer sk-rel-beta","alphaRemaining":"0.9","betaRemaining":"3","alphaRate":"tenant_rate_limited","betaStatus":200,"alphaRequests":["02db5677-9a73-4171-8d89-d0ece8af90ee","61dcf55f-144c-4fe9-a24c-9a428207e79b"],"betaRequests":["e5025e3e-81ac-440f-aef8-07e1e1e6973c","932ace4f-9ec5-4392-b430-710c24179718"],"foreignStatus":404,"overlap":[429,200]}
+
+ ✓ test/reliability.test.ts > reliability controls > keeps credentials, models, budgets, rate limits, and telemetry on each tenant 5446ms
+stdout | test/reliability.test.ts > reliability controls > shares budget, rate, lease, and breaker state across two processes
+RELIABILITY_INSTANCE {"case":"atomic-budget","results":[{"status":200,"code":null},{"status":429,"code":"budget_exceeded"}],"hits":1,"winner":"aaaaaaaaaa"}
+
+stdout | test/reliability.test.ts > reliability controls > shares budget, rate, lease, and breaker state across two processes
+RELIABILITY_INSTANCE {"case":"rate-limit","results":[{"status":200,"code":null},{"status":429,"code":"tenant_rate_limited"}],"hits":1}
+
+stdout | test/reliability.test.ts > reliability controls > shares budget, rate, lease, and breaker state across two processes
+RELIABILITY_INSTANCE {"case":"concurrency-lease","results":[{"status":429,"code":"concurrency_limited"},{"status":200,"code":null}],"hits":1}
+
+stdout | test/reliability.test.ts > reliability controls > shares budget, rate, lease, and breaker state across two processes
+RELIABILITY_INSTANCE {"case":"breaker","before":{"state":"closed","state_reason":"enabled"},"after":{"state":"open","state_reason":"failure_threshold"},"transitions":1,"blocked":[{"status":503,"code":"circuit_open"},{"status":503,"code":"circuit_open"}],"extraHits":0}
+
+ ✓ test/reliability.test.ts > reliability controls > shares budget, rate, lease, and breaker state across two processes 9228ms
+stdout | test/reliability.test.ts > reliability controls > settles a crashed attempt once and lets a later request proceed
+RELIABILITY_INSTANCE {"case":"crash-settlement","exit":86,"backlogBefore":"1","backlogAfter":"0","recognized":"0.03","settlesAfterRecover":"1","settlesAfterLater":"2","crashHits":1,"laterStatus":200}
+
+stdout | test/reliability.test.ts > reliability controls > settles a crashed attempt once and lets a later request proceed
+RELIABILITY_INSTANCE {"case":"crash-lease","earlyExit":86,"earlyHits":0,"laterStatus":200,"laterHits":1}
+
+ ✓ test/reliability.test.ts > reliability controls > settles a crashed attempt once and lets a later request proceed 6286ms
+stdout | test/reliability.test.ts > reliability controls > measures the captured workload
+RELIABILITY_MEASURE {"case":"workload","requests":21,"succeeded":20,"successRate":0.9523809523809523,"upstreamAttempts":21,"retryAmplification":1,"fallbacks":0,"fallbackRate":0,"providerFailures":1,"providerFailureRate":0.047619047619047616,"budgetDenials":0,"rateDenials":0,"reservationBacklog":0,"capturedDurationsMs":[100,113,128,128,130,131,132,135,135,192,201,248,309,381,386],"capturedP50Ms":135,"capturedP95Ms":386,"capturedP99Ms":386,"streamDurationsMs":[92,116,123,159],"streamP50Ms":116,"streamP95Ms":159,"streamP99Ms":159,"routeLatency":{"samples":21,"sumMs":853,"maxMs":115},"routeStreamDuration":{"samples":4,"p50":26,"p95":50},"slowElapsedMs":194,"mockDelayMs":100,"overheadMs":94,"contentionMs":387,"contentionResults":[{"status":200,"elapsedMs":192},{"status":200,"elapsedMs":309},{"status":200,"elapsedMs":381},{"status":200,"elapsedMs":386}],"concurrentStreams":0,"memoryRssBefore":65617920,"memoryRssAfter":129089536,"memoryHeapBefore":41446072,"memoryHeapAfter":39332048}
+
+ ✓ test/reliability.test.ts > reliability controls > measures the captured workload 4770ms
+stdout | test/reliability.test.ts > reliability controls > turns retry and fallback off for one tenant and records an interrupted stream
+RELIABILITY_DEPLOY {"case":"disablement","retryEnabledHits":2,"retryDisabledHits":1,"otherRetryHits":2,"namedModels":["rel-disable-primary"],"fallbackEnabledModels":["rel-disable-primary","rel-disable-secondary"],"fallbackDisabledModels":["rel-disable-primary"],"otherFallbackModels":["rel-disable-other","rel-other-secondary"],"inferenceDisabled":"inference_disabled","streamEnabledStatus":200,"streamDisabledStatus":400,"namedFallback":"false","fellStatus":200,"fellOffStatus":502,"otherFellStatus":200}
+
+ ✓ test/reliability.test.ts > reliability controls > turns retry and fallback off for one tenant and records an interrupted stream 10739ms
+stdout | test/reliability.test.ts > reliability controls > records an interrupted stream when shutdown writes the row
+RELIABILITY_DEPLOY {"case":"shutdown","activeBefore":1,"activeAfter":0,"interrupted":1,"streamStatuses":["interrupted"],"rejected":"shutting_down"}
+
+ ✓ test/reliability.test.ts > reliability controls > records an interrupted stream when shutdown writes the row 3776ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > lists every current command in one action group 1ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > keeps the HTTP server free of configuration routes 1ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects --interactive mixed with another argument 483ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects a stray flag on the existing flag path 203ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects an unknown interactive action and leaves tenants unchanged 223ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > rejects a blank tenant name the same way as the flag command 377ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create provision-tenant (tenant name and label) 629ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create add-key (tenant api key label) 1227ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-openai-connection (openai api key connection) 1126ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-anthropic-connection (anthropic endpoint and workspace) 1369ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex service_account project and location) 1858ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex adc without an api key) 1265ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex workload_identity without an api key) 1413ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex impersonation service account) 1236ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-xai-connection (xai api key connection) 1128ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-openrouter-connection (openrouter api key connection) 1150ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-dgx-connection (dgx private endpoint connection) 1134ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openai deployment) 1591ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (anthropic deployment with default max output tokens) 1877ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (vertex deployment) 1487ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (xai deployment) 1596ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openrouter downstream providers and data collection) 1940ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (dgx deployment) 1724ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create register-price (price version rates region tier and serving provider) 463ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > create approve-private-endpoint (private host port addresses tls and health endpoint) 1108ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update revoke-key (revoke a tenant api key) 1620ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-openai-credential (replace openai api key) 1660ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-anthropic-credential (replace anthropic api key) 1633ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable openai connection) 1548ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable anthropic connection) 1550ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-enabled (disable a deployment) 2511ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-alias (alias auto to a deployment) 2160ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-streaming (enable tenant streaming) 968ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-streaming (deployment streaming timeouts) 2341ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-concurrency (dgx deployment max concurrency) 1955ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-health (deployment health status) 1986ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-service-tier (deployment service tier) 2649ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update reconcile-attempt-cost (reconcile an estimated attempt cost) 2125ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-execution-policy (retries and deadlines) 2035ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-breaker (enabled breaker window samples threshold cooldown and probes) 2017ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update reset-deployment-breaker (reset breaker to closed) 2071ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-fallback-policy (fallback alias deployments failures capabilities and providers) 2505ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-context-limit (deployment context limit) 2109ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-data-collection (deployment data collection) 2164ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-limits (tenant request concurrency stream token and lease limits) 1049ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-api-key-limits (api key limits) 1534ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-connection-limit (connection concurrency and share group) 1651ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-limit (deployment admission concurrency) 1953ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-budget (tenant monthly budget) 1182ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > update recover-budget (close open budget reservations) 995ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-deployment (deployment validation status) 2156ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-credential (stored vertex credential that fails before the network) 1335ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-access (stored vertex access that fails before the network) 1944ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate test-vertex-inference (stored vertex deployment that fails before the network) 2825ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate list-private-models (stored dgx route that fails before a live provider) 2462ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate probe-private-health (stored dgx health route that fails before a live provider) 2512ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate show-fallback-policy (stored fallback policy) 3488ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > validate list-inference (tenant connections deployments and aliases) 1862ms
+ ✓ test/cli-interactive.test.ts > interactive CLI > runs a scripted create update and validate journey twice 1038ms
+stdout | test/budgets.test.ts > tenant budgets > keeps observe, hard, and disabled distinct and rejects unknown or unbounded cost before upstream
+BUDGET_CASE {"case":"modes","watch":{"remaining":"0","recognized":"0.01","provisional":"0.02","costStatus":"provisional","reserved":"0.020000000000","estimate":"0.04"},"empty":{"remaining":"0","recognized":"0","provisional":"0.03","costStatus":"provisional","reserved":"0.030000000000"},"tight":"budget_exceeded","missing":"budget_unknown","unbounded":"budget_unbounded","disabled":"tenant_rate_limited","hits":4}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps observe, hard, and disabled distinct and rejects unknown or unbounded cost before upstream 13696ms
+stdout | test/budgets.test.ts > tenant budgets > reserves a finite cache split and rejects a price that has no external rate
+BUDGET_CASE {"case":"bounds","cache":"0.100000000000","high":"budget_exceeded","allocated":"budget_unknown","empty":"budget_unknown","hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > reserves a finite cache split and rejects a price that has no external rate 7071ms
+stdout | test/budgets.test.ts > tenant budgets > settles fixed-precision expense, caps recognized at the reservation, and ignores a second settlement
+BUDGET_CASE {"case":"reconcile","exact":{"recognized":"0.03","remaining":"0.97","again":"settled"},"clamp":{"recognized":"1","remaining":"1"}}
+
+ ✓ test/budgets.test.ts > tenant budgets > settles fixed-precision expense, caps recognized at the reservation, and ignores a second settlement 3997ms
+stdout | test/budgets.test.ts > tenant budgets > gives the next UTC month its own capacity
+BUDGET_CASE {"case":"rollover","january":"0.97","february":"1"}
+
+ ✓ test/budgets.test.ts > tenant budgets > gives the next UTC month its own capacity 1956ms
+stdout | test/budgets.test.ts > tenant budgets > admits only the available capacity when two processes reserve together
+BUDGET_CASE {"case":"race","during":"0","after":"0.01","results":[{"status":200,"code":null},{"status":429,"code":"budget_exceeded"}],"hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > admits only the available capacity when two processes reserve together 2559ms
+stdout | test/budgets.test.ts > tenant budgets > recognizes overlapping observe closes against settled expense only
+BUDGET_CASE {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+
+ ✓ test/budgets.test.ts > tenant budgets > recognizes overlapping observe closes against settled expense only 2594ms
+stdout | test/budgets.test.ts > tenant budgets > reserves a retry on its own and does not settle that attempt twice
+BUDGET_CASE {"case":"retry","recognized":"0.03","provisional":"0.08","settles":"1"}
+
+ ✓ test/budgets.test.ts > tenant budgets > reserves a retry on its own and does not settle that attempt twice 2737ms
+stdout | test/budgets.test.ts > tenant budgets > keeps a timeout reservation provisional and does not store a zero charge
+BUDGET_CASE {"case":"timeout","status":504,"reserved":"0.120000000000","remaining":"4.88","hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps a timeout reservation provisional and does not store a zero charge 2772ms
+stdout | test/budgets.test.ts > tenant budgets > keeps a reservation after a crash and settles a finished attempt once
+BUDGET_CASE {"case":"crash","early":{"exit":86,"status":"active","hits":1},"late":{"exit":86,"recognized":"0.03","remaining":"4.97"}}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps a reservation after a crash and settles a finished attempt once 5408ms
+stdout | test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant
+BUDGET_CASE {"case":"isolation","alpha":"0.92","beta":"3","visible":[]}
+
+ ✓ test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant 4138ms
+stdout | test/budgets.test.ts > tenant budgets > fails closed when a hard budget cannot reach PostgreSQL
+BUDGET_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":0}
+
+ ✓ test/budgets.test.ts > tenant budgets > fails closed when a hard budget cannot reach PostgreSQL 14794ms
+stdout | test/limits.test.ts > tenant limits > completes an in-limit request and rejects hard rate, concurrency, and stream caps before upstream
+LIMIT_CASE {"case":"rate","status":429,"code":"tenant_rate_limited","hits":1}
+
+stdout | test/limits.test.ts > tenant limits > completes an in-limit request and rejects hard rate, concurrency, and stream caps before upstream
+LIMIT_CASE {"case":"concurrency","status":429,"code":"concurrency_limited","hits":2}
+
+stdout | test/limits.test.ts > tenant limits > completes an in-limit request and rejects hard rate, concurrency, and stream caps before upstream
+LIMIT_CASE {"case":"stream","status":429,"code":"stream_limited","plain":200}
+
+ ✓ test/limits.test.ts > tenant limits > completes an in-limit request and rejects hard rate, concurrency, and stream caps before upstream 9613ms
+stdout | test/limits.test.ts > tenant limits > applies the tighter API key limit and keeps two tenants apart
+LIMIT_CASE {"case":"tenants","alpha":"api_key_rate_limited","betaHits":2}
+
+ ✓ test/limits.test.ts > tenant limits > applies the tighter API key limit and keeps two tenants apart 4832ms
+stdout | test/limits.test.ts > tenant limits > shares a provider connection cap across two proxy processes
+LIMIT_CASE {"case":"shared-connection","results":[{"status":429,"code":"connection_limited"},{"status":200,"code":null}],"hits":1}
+
+ ✓ test/limits.test.ts > tenant limits > shares a provider connection cap across two proxy processes 3717ms
+stdout | test/limits.test.ts > tenant limits > blocks only the capped deployment and rejects a known token bound
+LIMIT_CASE {"case":"deployment-token","deployment":"deployment_limited","token":"token_rate_limited","quiet":200}
+
+ ✓ test/limits.test.ts > tenant limits > blocks only the capped deployment and rejects a known token bound 4387ms
+stdout | test/limits.test.ts > tenant limits > records observation mode and fails closed when admission is unavailable
+LIMIT_CASE {"case":"observe","configuredLimits":{"mode":"observe","requestsPerMinute":1,"concurrentRequests":null,"concurrentStreams":null,"tokenRatePerMinute":null,"leaseMs":120000,"apiKeys":[],"connections":[],"deployments":[]},"observedUsage":{"requestsInWindow":"2","tokensInWindow":"0","concurrentRequests":"0","concurrentStreams":"0"},"reservedCapacity":{"concurrency":"0","activeReservations":"0","provisional":"0","unknownCharges":"0"},"remainingBudget":null,"costStatus":"none","budget":{"mode":null,"currency":null,"allocated":null,"recognized":"0","activeReservations":"0","provisional":"0","available":null,"unknownCharges":"0"}}
+
+stdout | test/limits.test.ts > tenant limits > records observation mode and fails closed when admission is unavailable
+LIMIT_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":2}
+
+ ✓ test/limits.test.ts > tenant limits > records observation mode and fails closed when admission is unavailable 12447ms
+stdout | test/limits.test.ts > tenant limits > reacquires an expired lease and recovers a permit after a crash
+LIMIT_CASE {"case":"lease-expiry","status":200,"hits":2}
+
+stdout | test/limits.test.ts > tenant limits > reacquires an expired lease and recovers a permit after a crash
+LIMIT_CASE {"case":"crash-permit","dead":86,"recovered":200,"hits":1}
+
+ ✓ test/limits.test.ts > tenant limits > reacquires an expired lease and recovers a permit after a crash 4555ms
+stdout | test/limits.test.ts > tenant limits > keeps the process-local stream cap and the private deployment cap when they are stricter
+LIMIT_CASE {"case":"local-stream","status":503,"code":"stream_capacity"}
+
+stdout | test/limits.test.ts > tenant limits > keeps the process-local stream cap and the private deployment cap when they are stricter
+LIMIT_CASE {"case":"private-cap","status":429,"hits":1}
+
+ ✓ test/limits.test.ts > tenant limits > keeps the process-local stream cap and the private deployment cap when they are stricter 5492ms
+stdout | test/limits.test.ts > tenant limits > shows capacity only to the authenticated tenant and does not mutate policy over HTTP
+LIMIT_CASE {"case":"inspect","limits":{"configuredLimits":{"mode":"observe","requestsPerMinute":9,"concurrentRequests":3,"concurrentStreams":null,"tokenRatePerMinute":null,"leaseMs":120000,"apiKeys":[],"connections":[],"deployments":[]},"observedUsage":{"requestsInWindow":"1","tokensInWindow":"0","concurrentRequests":"0","concurrentStreams":"0"},"reservedCapacity":{"concurrency":"0","activeReservations":"0","provisional":"0","unknownCharges":"1"},"remainingBudget":"12.5","costStatus":"unknown","budget":{"mode":"observe","currency":"USD","allocated":"12.5","recognized":"0","activeReservations":"0","provisional":"0","available":"12.5","unknownCharges":"1"}},"beta":{"configuredLimits":{"mode":null,"requestsPerMinute":null,"concurrentRequests":null,"concurrentStreams":null,"tokenRatePerMinute":null,"leaseMs":null,"apiKeys":[],"connections":[],"deployments":[]},"observedUsage":{"requestsInWindow":"0","tokensInWindow":"0","concurrentRequests":"0","concurrentStreams":"0"},"reservedCapacity":{"concurrency":"0","activeReservations":"0","provisional":"0","unknownCharges":"0"},"remainingBudget":null,"costStatus":"none","budget":{"mode":null,"currency":null,"allocated":null,"recognized":"0","activeReservations":"0","provisional":"0","available":null,"unknownCharges":"0"}},"wrong":401}
+
+ ✓ test/limits.test.ts > tenant limits > shows capacity only to the authenticated tenant and does not mutate policy over HTTP 2933ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > stores a versioned policy and falls back for one alias 1446ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not fall back when the policy is missing or disabled 697ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not change an explicit deployment 327ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > skips a secondary that is not enabled 467ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a deployment owned by another tenant 184ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > skips a secondary that lacks a required capability 385ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > skips a secondary whose stored context limit is below the token need 391ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > selects the first approved deployment and reverses with the stored list 791ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary marked validated_mock 590ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary marked valid 555ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary marked unvalidated 517ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary marked invalid 322ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary in a region outside the policy 580ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary with an unknown hard-budget price 4309ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary that does not fit the hard budget 3872ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > calls the secondary when the only hard request cap is one 2506ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > calls the secondary when the only hard stream cap is one 4178ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a secondary whose circuit breaker is open 1172ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > falls back after a dispatched timeout and after a 429 when those categories are allowed 1905ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not fall back for a category outside the approved set 305ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > stops at two attempts when the stored maximum is higher and the secondary fails 872ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > makes one attempt when the stored maximum is one 925ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not start a secondary when the remaining deadline is below the policy minimum 426ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not start a secondary after the end-to-end deadline 1046ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > falls back before any downstream byte and refuses a switch after output starts 944ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not fall back when the caller cancels 647ms
+stdout | test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security
+{"metricsSummary":{"window":{"from":"2026-10-22T17:30:20.478Z","to":"2026-10-22T17:34:20.478Z"},"requests":{"total":6,"succeeded":3,"failed":3,"pending":0},"usage":{"promptTokens":21,"completionTokens":19,"totalTokens":40,"responsesMissingUsage":0},"latency":{"samples":6,"sumMs":319,"maxMs":77},"streaming":{"requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"firstTextDeltaMs":{"samples":2,"p50":44,"p95":64},"durationMs":{"samples":5,"p50":58,"p95":77},"usage":{"promptTokens":18,"completionTokens":17,"totalTokens":35}},"byProvider":[{"provider":"anthropic","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"promptTokens":6,"completionTokens":4,"totalTokens":10}],"byDeployment":[{"provider":"anthropic","deployment":"metrics-claude","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","deployment":"metrics-openai","requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"promptTokens":6,"completionTokens":4,"totalTokens":10}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security 5817ms
+ ✓ test/stream-production.test.ts > streaming production controls > isolates tenant caps per process and releases a slow consumer slot 6167ms
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":1,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":2,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+ ✓ test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown 12996ms
+stdout | test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream
+{"restartExit":0,"interrupted":"interrupted","restarted":"completed","drainLogged":true,"poolsClosed":true}
+
+ ✓ test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream 4398ms
+stdout | test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot
+{"streamLoad":{"runs":[{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":88.17337499999849,"p95":196.4917079999941},"durationMs":{"p50":110.17912500000239,"p95":231.2593329999945},"forwardingOverheadMs":{"p50":12.08524999999645,"p95":44.52716700000019},"memoryRssBytes":{"1":107462656,"4":143917056,"8":164691968,"after":145063936}},{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":100.29041699999652,"p95":127.2534169999999},"durationMs":{"p50":126.57504199999676,"p95":167.75691599999845},"forwardingOverheadMs":{"p50":12.964874999997846,"p95":19.997000000003027},"memoryRssBytes":{"1":107462656,"4":143917056,"8":164691968,"after":145063936}}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot 5917ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 4384ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 3035ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 2308ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 2170ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 2550ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 2444ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 1760ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 2886ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 3133ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 4070ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 3623ms
+ ✓ test/breaker.test.ts > breaker decisions > keeps caller failures and rate limits out of the health count 1ms
+ ✓ test/breaker.test.ts > breaker decisions > admits a closed breaker and claims one probe after cooldown 0ms
+ ✓ test/breaker.test.ts > breaker decisions > opens only after the sample threshold and closes only a half-open probe 0ms
+stdout | test/breaker.test.ts > provider circuit breaker > keeps a healthy provider closed
+BREAKER_CASE {"case":"healthy-closed","deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:30.733Z","samples":3,"failures":0,"rateLimits":0,"probesInflight":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > keeps a healthy provider closed 1019ms
+stdout | test/breaker.test.ts > provider circuit breaker > does not open before the sample threshold
+BREAKER_CASE {"case":"below-threshold","deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:31.755Z","samples":2,"failures":2,"rateLimits":0,"probesInflight":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > does not open before the sample threshold 578ms
+stdout | test/breaker.test.ts > provider circuit breaker > opens after the configured sample threshold
+BREAKER_CASE {"case":"opened","state":"open","reason":"failure_threshold","changedAt":"2026-01-15T00:00:00.000Z","failures":3,"samples":3,"blocked":{"status":503,"code":"circuit_open","hits":0},"autoBlocked":{"status":503,"code":"circuit_open","hits":0},"stream":{"status":503,"code":"circuit_open","hits":0},"alias":"fdb09f56-bd30-448f-8e9e-b105a24f311a","health":"healthy","enabled":true,"configVersion":2}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > opens after the configured sample threshold 1254ms
+stdout | test/breaker.test.ts > provider circuit breaker > counts HTTP 429 apart from provider health
+BREAKER_CASE {"case":"rate-limit","deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:34.328Z","samples":0,"failures":0,"rateLimits":4,"probesInflight":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > counts HTTP 429 apart from provider health 2251ms
+stdout | test/breaker.test.ts > provider circuit breaker > ignores invalid caller input
+BREAKER_CASE {"case":"invalid-input","status":400,"hits":0,"failures":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > ignores invalid caller input 507ms
+stdout | test/breaker.test.ts > provider circuit breaker > ignores a rejected tenant secret
+BREAKER_CASE {"case":"auth-rejected","status":401,"failures":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > ignores a rejected tenant secret 433ms
+stdout | test/breaker.test.ts > provider circuit breaker > ignores caller cancellation
+BREAKER_CASE {"case":"cancelled","hits":1,"errorCode":"request_cancelled","failures":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > ignores caller cancellation 643ms
+stdout | test/breaker.test.ts > provider circuit breaker > counts a timeout and then opens on the sample threshold
+BREAKER_CASE {"case":"timeout-open","partial":{"deployment":"breaker-slow","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:37.813Z","samples":1,"failures":1,"rateLimits":0,"probesInflight":0},"opened":{"deployment":"breaker-slow","enabled":true,"state":"open","reason":"failure_threshold","changedAt":"2026-01-15T00:00:00.000Z","samples":3,"failures":3,"rateLimits":0,"probesInflight":0},"blocked":{"status":503,"code":"circuit_open","hits":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > counts a timeout and then opens on the sample threshold 1510ms
+stdout | test/breaker.test.ts > provider circuit breaker > lets one probe through after cooldown and closes on success
+BREAKER_CASE {"case":"probe-close","blocked":{"status":503,"code":"circuit_open","hits":0},"probe":{"status":200,"code":null,"hits":1},"closed":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"probe_succeeded","changedAt":"2026-01-15T00:00:10.000Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"next":{"status":200,"code":null,"hits":1}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > lets one probe through after cooldown and closes on success 946ms
+stdout | test/breaker.test.ts > provider circuit breaker > opens again when the recovery probe fails
+BREAKER_CASE {"case":"probe-reopen","probe":{"status":502,"code":"upstream_error","hits":1},"reopened":{"deployment":"breaker-chat","enabled":true,"state":"open","reason":"probe_failed","changedAt":"2026-01-15T00:00:10.000Z","samples":4,"failures":4,"rateLimits":0,"probesInflight":0},"next":{"status":503,"code":"circuit_open","hits":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > opens again when the recovery probe fails 1335ms
+stdout | test/breaker.test.ts > provider circuit breaker > reopens a streamed probe when the connection is refused
+BREAKER_CASE {"case":"stream-refused-probe","probe":{"status":502,"code":"invalid_upstream_response"},"attempt":{"failure_class":"connection_failure","error_code":"upstream_error"},"reopened":{"deployment":"breaker-chat","enabled":true,"state":"open","reason":"probe_failed","changedAt":"2026-01-15T00:00:10.000Z","samples":4,"failures":4,"rateLimits":0,"probesInflight":0},"blocked":{"status":503,"code":"circuit_open","hits":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > reopens a streamed probe when the connection is refused 1107ms
+stdout | test/breaker.test.ts > provider circuit breaker > opens a closed breaker from streamed connection failures
+BREAKER_CASE {"case":"stream-connection-open","partial":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:42.340Z","samples":2,"failures":2,"rateLimits":0,"probesInflight":0},"opening":{"status":502,"code":"invalid_upstream_response"},"attempt":{"failure_class":"connection_failure","error_code":"upstream_error"},"opened":{"deployment":"breaker-chat","enabled":true,"state":"open","reason":"failure_threshold","changedAt":"2026-01-15T00:00:00.000Z","samples":3,"failures":3,"rateLimits":0,"probesInflight":0},"blocked":{"status":503,"code":"circuit_open","hits":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > opens a closed breaker from streamed connection failures 2104ms
+stdout | test/breaker.test.ts > provider circuit breaker > reopens a streamed probe when the connect timer fires
+BREAKER_CASE {"case":"stream-timeout-probe","probe":{"status":504,"code":"timeout","hits":1},"attempt":{"failure_class":"timeout_after_dispatch","error_code":"timeout"},"reopened":{"deployment":"breaker-slow","enabled":true,"state":"open","reason":"probe_failed","changedAt":"2026-01-15T00:00:10.000Z","samples":4,"failures":4,"rateLimits":0,"probesInflight":0},"blocked":{"status":503,"code":"circuit_open","hits":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > reopens a streamed probe when the connect timer fires 2236ms
+stdout | test/breaker.test.ts > provider circuit breaker > releases a streamed probe when the caller aborts
+BREAKER_CASE {"case":"stream-cancel-probe","errorCode":"request_cancelled","released":{"deployment":"breaker-chat","enabled":true,"state":"half_open","reason":"cooldown_elapsed","changedAt":"2026-01-15T00:00:10.000Z","samples":3,"failures":3,"rateLimits":0,"probesInflight":0},"next":{"status":200,"code":null,"hits":1},"closed":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"probe_succeeded","changedAt":"2026-01-15T00:00:10.000Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > releases a streamed probe when the caller aborts 1506ms
+stdout | test/breaker.test.ts > provider circuit breaker > admits one shared probe from two processes
+BREAKER_CASE {"case":"replica-probes","hits":["/v1/chat/completions"],"results":[{"status":200,"code":null},{"status":503,"code":"circuit_open"}],"state":"closed","reason":"probe_succeeded"}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > admits one shared probe from two processes 1559ms
+stdout | test/breaker.test.ts > provider circuit breaker > keeps an open breaker closed to a new process
+BREAKER_CASE {"case":"restart","restarted":{"status":503,"code":"circuit_open"},"hits":3,"before":3,"state":"open","changedAt":"2026-01-15T00:00:00.000Z"}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > keeps an open breaker closed to a new process 1158ms
+stdout | test/breaker.test.ts > provider circuit breaker > does not serve a disabled deployment
+BREAKER_CASE {"case":"deployment-disabled","status":404,"code":"model_not_found","enabled":false}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > does not serve a disabled deployment 386ms
+stdout | test/breaker.test.ts > provider circuit breaker > does not change another tenant
+BREAKER_CASE {"case":"tenant-isolation","other":{"status":200,"code":null,"hits":1},"otherView":{"deployment":"other-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":null,"samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"mine":"open","alias":"fdb09f56-bd30-448f-8e9e-b105a24f311a"}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > does not change another tenant 1121ms
+stdout | test/breaker.test.ts > provider circuit breaker > leaves an unconfigured deployment disabled
+BREAKER_CASE {"case":"disabled-default","view":{"deployment":"breaker-plain","enabled":false,"state":"closed","reason":"disabled","changedAt":null,"samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"hits":4}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > leaves an unconfigured deployment disabled 979ms
+stdout | test/breaker.test.ts > provider circuit breaker > reaches upstream after an emergency disable
+BREAKER_CASE {"case":"cli-disable","view":{"deployment":"breaker-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":"2026-10-22T17:33:54.961Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"result":{"status":200,"code":null,"hits":1},"still":{"deployment":"breaker-chat","enabled":false,"state":"closed","reason":"disabled","changedAt":"2026-10-22T17:33:54.961Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"health":"healthy"}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > reaches upstream after an emergency disable 2169ms
+stdout | test/breaker.test.ts > provider circuit breaker > reaches upstream after a protected reset
+BREAKER_CASE {"case":"cli-reset","reset":{"deploymentId":"fdb09f56-bd30-448f-8e9e-b105a24f311a","state":"closed"},"view":{"deployment":"breaker-chat","enabled":true,"state":"closed","reason":"reset","changedAt":"2026-10-22T17:33:56.126Z","samples":0,"failures":0,"rateLimits":0,"probesInflight":0},"result":{"status":200,"code":null,"hits":1}}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > reaches upstream after a protected reset 1049ms
+stdout | test/breaker.test.ts > provider circuit breaker > shows breaker state on the tenant inspection route
+BREAKER_CASE {"case":"inspect","deployment":"breaker-chat","enabled":true,"state":"closed","reason":"enabled","changedAt":"2026-10-22T17:33:56.892Z","samples":1,"failures":1,"rateLimits":1,"probesInflight":0}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > shows breaker state on the tenant inspection route 1402ms
+stdout | test/breaker.test.ts > provider circuit breaker > does not reset the breaker from a caller route
+BREAKER_CASE {"case":"no-public-reset","status":404,"internal":404,"state":"open"}
+
+ ✓ test/breaker.test.ts > provider circuit breaker > does not reset the breaker from a caller route 1186ms
+ ✓ test/provider-matrix.test.ts > provider compatibility matrix > serves one JSON chat and one stream for each provider without a second call 2157ms
+ ✓ test/provider-matrix.test.ts > provider compatibility matrix > rejects an unsupported field before fetch and keeps auto on the stored alias 786ms
+ ✓ test/provider-matrix.test.ts > provider compatibility matrix > stores only integer usage and leaves a missing total unset 897ms
+ ✓ test/provider-matrix.test.ts > provider compatibility matrix > normalizes timeout, connection failure, HTTP 429, and HTTP 5xx with one upstream call 10926ms
+ ✓ test/provider-matrix.test.ts > provider compatibility matrix > omits DONE when the caller cancels a stream 1089ms
+stdout | test/provider-matrix.test.ts > provider compatibility matrix
+{"providerMatrix":[{"provider":"openai","json":200,"streamDone":1,"upstream":"gpt-matrix-actual"},{"provider":"anthropic","json":200,"streamDone":1,"upstream":"claude-matrix-actual"},{"provider":"vertex","json":200,"streamDone":1,"upstream":"gemini-matrix-actual"},{"provider":"xai","json":200,"streamDone":1,"upstream":"grok-matrix-actual"},{"provider":"openrouter","json":200,"streamDone":1,"upstream":"router-matrix-actual"},{"provider":"dgx","json":200,"streamDone":1,"upstream":"private-model"},{"auto":"openai","disabledDeploymentCalls":0,"capabilityRejected":6},{"missingUsage":"null","partialTotal":null},{"errors":"timeout,refuse,429,5xx","fallbackCalls":0},{"provider":"openai","cancelDone":0,"streamStatus":"client_aborted"},{"provider":"anthropic","cancelDone":0,"streamStatus":"client_aborted"},{"provider":"vertex","cancelDone":0,"streamStatus":"client_aborted"},{"provider":"xai","cancelDone":0,"streamStatus":"client_aborted"},{"provider":"openrouter","cancelDone":0,"streamStatus":"client_aborted"},{"provider":"dgx","cancelDone":0,"streamStatus":"client_aborted"}]}
+
+ ✓ test/stream-integration.test.ts > OpenAI streaming > streams a chat completion the official SDK can read 238ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > frames one done marker and keeps stream=false as JSON 394ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > rejects streaming until both the tenant and the deployment allow it 1415ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > cancels the upstream stream when the client disconnects 127ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > aborts a stalled downstream consumer 1737ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends a stalled downstream write on the total and idle deadlines 4187ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > returns a normal HTTP error when the provider fails before the first event 269ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps the HTTP status and omits done when the provider fails after partial output 114ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not complete a stream that never sends done 146ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > completes when the provider omits usage 122ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > reassembles unicode split across upstream bytes 138ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps parallel tenants on their own credentials 224ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not call upstream when persistence fails before the stream 62ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not retry when telemetry fails after bytes were sent 124ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends the stream on connect, idle, and total timeouts 7504ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > shows connecting and rejects one more stream at the active limit 5454ms
+stdout | test/provider-isolation.test.ts > provider tenant isolation > keeps credentials, cache, metrics, health, and aliases on one tenant
+{"isolation":{"alphaRequests":12,"betaRequests":6,"providers":[{"provider":"anthropic","requests":2,"completed":2},{"provider":"dgx","requests":2,"completed":2},{"provider":"openai","requests":2,"completed":2},{"provider":"openrouter","requests":2,"completed":2},{"provider":"vertex","requests":2,"completed":2},{"provider":"xai","requests":2,"completed":2}],"mints":3,"autoAlpha":"oa-a","validatedLive":"rejected","dgxValidation":"validated_mock"}}
+
+ ✓ test/provider-isolation.test.ts > provider tenant isolation > keeps credentials, cache, metrics, health, and aliases on one tenant 7234ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 1492ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 1501ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 1786ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 2391ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 1792ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 1896ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 2494ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 1456ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 1717ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 1985ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 2726ms
+stdout | test/cost-api.test.ts > model cost API > reports a chat cost without changing the chat
+COST_API {"window":{"from":"2026-10-22T17:32:46.644Z","to":"2026-10-22T17:38:46.644Z"},"external":{"estimated":{"attempts":2,"amount":"5"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":1,"amount":"0.7"},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-openai","model":"gpt-cost-test","external":{"estimated":{"attempts":2,"amount":"5"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":1,"amount":"0.7"},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}
+
+ ✓ test/cost-api.test.ts > model cost API > reports a chat cost without changing the chat 4712ms
+stdout | test/cost-api.test.ts > model cost API > costs provider attempts and keeps tenants on their own rows
+COST_API_PROVIDERS {"window":{"from":"2026-10-22T17:32:54.240Z","to":"2026-10-22T17:38:54.240Z"},"external":{"estimated":{"attempts":4,"amount":"2.2855"},"provisional":{"attempts":1,"amount":"0.406"},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":1,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":1,"amount":"9"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"byProvider":[{"provider":"anthropic","deployment":"cost-anthropic","model":"claude-cost-test","external":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":1,"amount":"0.406"},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"dgx","deployment":"cost-dgx","model":"dgx-cost-test","external":{"estimated":{"attempts":1,"amount":"0.18"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":1,"amount":"9"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"}},{"provider":"openai","deployment":"cost-empty","model":"gpt-failed-empty","external":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":1,"amount":null},"currency":null},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"openai","deployment":"cost-failed","model":"gpt-failed-cost","external":{"estimated":{"attempts":1,"amount":"0.0105"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"openrouter","deployment":"cost-openrouter","model":"route-cost-test","external":{"estimated":{"attempts":1,"amount":"1"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}},{"provider":"vertex","deployment":"cost-vertex","model":"gemini-cost-test","external":{"estimated":{"attempts":1,"amount":"1.095"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}
+
+ ✓ test/cost-api.test.ts > model cost API > costs provider attempts and keeps tenants on their own rows 7683ms
+stdout | test/cost-api.test.ts > model cost API > keeps concurrent tenant cost queries on their own rows
+COST_ISOLATION {"alpha":{"window":{"from":"2026-10-22T17:32:58.974Z","to":"2026-10-22T17:38:58.974Z"},"external":{"estimated":{"attempts":1,"amount":"0.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-alpha","model":"gpt-cost-alpha","external":{"estimated":{"attempts":1,"amount":"0.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]},"beta":{"window":{"from":"2026-10-22T17:32:58.974Z","to":"2026-10-22T17:38:58.974Z"},"external":{"estimated":{"attempts":1,"amount":"1.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null},"byProvider":[{"provider":"openai","deployment":"cost-beta","model":"gpt-cost-beta","external":{"estimated":{"attempts":1,"amount":"1.7"},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":"USD"},"dgxAllocated":{"estimated":{"attempts":0,"amount":null},"provisional":{"attempts":0,"amount":null},"reconciled":{"attempts":0,"amount":null},"unknown":{"attempts":0,"amount":null},"currency":null}}]}}
+
+ ✓ test/cost-api.test.ts > model cost API > keeps concurrent tenant cost queries on their own rows 4480ms
+stdout | test/cost-api.test.ts > model cost API > keeps price versions immutable and applies the additive migration
+COST_MIGRATION 012_cost_accounting.sql applied and price versions reject updates
+
+ ✓ test/cost-api.test.ts > model cost API > keeps price versions immutable and applies the additive migration 3490ms
+stdout | test/cost-api.test.ts > model cost API > does not change a chat when cost recording fails
+COST_API_FAILURE chat status 200 and the attempt stayed stored
+
+ ✓ test/cost-api.test.ts > model cost API > does not change a chat when cost recording fails 2664ms
+ ✓ test/private-security.test.ts > private endpoint security > rejects a caller endpoint before any upstream call 3708ms
+ ✓ test/private-security.test.ts > private endpoint security > does not resolve or contact a host that the tenant has not approved 4161ms
+ ✓ test/private-security.test.ts > private endpoint security > does not follow a DNS rebind or a redirect 2883ms
+ ✓ test/private-security.test.ts > private endpoint security > keeps TLS verification on and blocks management and health paths from chat 1899ms
+ ✓ test/private-security.test.ts > private endpoint security > rejects disabled TLS on a production host through the operator command 543ms
+ ✓ test/private-security.test.ts > private endpoint security > uses the stored health endpoint only for an operator probe and hides the credential 1760ms
+ ✓ test/private-security.test.ts > private endpoint security > isolates tenant endpoints and credentials 5661ms
+ ✓ test/private-security.test.ts > private endpoint security > stops an extra request at the concurrency limit before upstream work 2362ms
+ ✓ test/vertex-chat.test.ts > vertex chat > converts a text chat for the tenant project and records usage 225ms
+ ✓ test/vertex-chat.test.ts > vertex chat > keeps two tenants on their own project, model, and identity 113ms
+ ✓ test/vertex-chat.test.ts > vertex chat > serves OpenAI and Anthropic and refuses a disabled deployment 413ms
+ ✓ test/vertex-chat.test.ts > vertex chat > keeps provider failures on that tenant and refreshes an expired credential 539ms
+ ✓ test/vertex-chat.test.ts > vertex chat > rejects unsupported fields and records thinking tokens without showing them 531ms
+ ✓ test/vertex-chat.test.ts > vertex chat > streams text in order and records usage without a false done marker after failure 353ms
+ ✓ test/vertex-chat.test.ts > vertex chat > cancels, times out, and applies backpressure without writing done 3094ms
+ ✓ test/vertex-chat.test.ts > vertex chat > stops a live stream on the total timer while chunks reset idle 3030ms
+ ✓ test/vertex-chat.test.ts > vertex chat > registers secret-less auth and stops a probe before a network call 2425ms
+ ✓ test/registry.test.ts > provider registry > keeps migrations 001 through 007 and adds the registry columns 199ms
+ ✓ test/registry.test.ts > provider registry > serves OpenAI, Anthropic, and an enabled Vertex deployment on one tenant 3528ms
+ ✓ test/registry.test.ts > provider registry > registers each new provider and rejects invalid configuration before a write 6177ms
+ ✓ test/registry.test.ts > provider registry > separates validation status from health and increments configuration version 3914ms
+ ✓ test/registry.test.ts > provider registry > isolates tenant configuration, validation, and credential references 2553ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > serves enabled xAI text and a stream on the approved host with that tenant key 2522ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > rejects an unsupported xAI field before the upstream call and does not retry 2206ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > cancels an xAI call and keeps a stream failure from writing DONE 2761ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > sends stored OpenRouter restrictions and fails closed without a serving provider 3029ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > keeps two OpenRouter tenants on their own key, model, and routing rule 1959ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > accepts a long OpenRouter stream when the final chunk names the selected provider 1930ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > does not serve DGX and still serves OpenAI through its own base URL 2055ms
+stdout | test/provider-load.test.ts > provider load, failure, and shutdown > keeps concurrent chats on the selected provider
+{"load":{"requests":12,"ok":12,"elapsedMs":389,"maxMs":365,"perProvider":{"openai":{"requests":2,"maxMs":350},"anthropic":{"requests":2,"maxMs":360},"vertex":{"requests":2,"maxMs":363},"xai":{"requests":2,"maxMs":357},"openrouter":{"requests":2,"maxMs":354},"dgx":{"requests":2,"maxMs":365}}}}
+
+ ✓ test/provider-load.test.ts > provider load, failure, and shutdown > keeps concurrent chats on the selected provider 391ms
+stdout | test/provider-load.test.ts > provider load, failure, and shutdown > reports a connection failure without calling another provider
+{"connectionFailure":{"provider":"xai","status":502,"code":"upstream_error","ms":371}}
+
+ ✓ test/provider-load.test.ts > provider load, failure, and shutdown > reports a connection failure without calling another provider 371ms
+stdout | test/provider-load.test.ts > provider load, failure, and shutdown > ends a cancelled stream without DONE
+{"streamTermination":{"done":0,"provider":"openai"}}
+
+ ✓ test/provider-load.test.ts > provider load, failure, and shutdown > ends a cancelled stream without DONE 167ms
+stdout | test/provider-load.test.ts > provider load, failure, and shutdown > drains an open stream without a false DONE
+{"shutdown":{"activeAfter":0,"aborted":1,"finishDone":1,"holdDone":0,"interrupted":1}}
+
+ ✓ test/provider-load.test.ts > provider load, failure, and shutdown > drains an open stream without a false DONE 3929ms
+stdout | test/retry-policy.test.ts > controlled retries > sends one attempt when retry is off
+RETRY_CASE {"case":"retry-off","status":429,"hits":1,"elapsedMs":377,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":64,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > sends one attempt when retry is off 401ms
+stdout | test/retry-policy.test.ts > controlled retries > retries a rate limit once for model=auto and then succeeds
+RETRY_CASE {"case":"429-then-ok","status":200,"hits":2,"elapsedMs":214,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":20,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":15,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+
+stdout | test/retry-policy.test.ts > controlled retries > retries a rate limit once for model=auto and then succeeds
+RETRY_HISTORY {"listed":2,"sample":[{"ordinal":1,"failureClass":"rate_limit","durationMs":20,"amount":null},{"ordinal":2,"failureClass":null,"durationMs":15,"amount":null}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > retries a rate limit once for model=auto and then succeeds 560ms
+stdout | test/retry-policy.test.ts > controlled retries > stops at two attempts when the rate limit continues
+RETRY_CASE {"case":"429-cap","status":429,"hits":2,"elapsedMs":156,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":17,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"rate_limit","durationMs":15,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > stops at two attempts when the rate limit continues 469ms
+stdout | test/retry-policy.test.ts > controlled retries > retries HTTP 503 and keeps the public status
+RETRY_CASE {"case":"503","status":502,"hits":2,"elapsedMs":221,"attempts":[{"ordinal":1,"status":"failed","failureClass":"unavailable","durationMs":32,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"unavailable","durationMs":23,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > retries HTTP 503 and keeps the public status 456ms
+stdout | test/retry-policy.test.ts > controlled retries > waits for a valid Retry-After and ignores an invalid one
+RETRY_CASE {"case":"retry-after-valid","status":200,"hits":2,"elapsedMs":1146,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":10,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":25,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+RETRY_ELAPSED {"case":"retry-after-valid","gapMs":1052}
+
+stdout | test/retry-policy.test.ts > controlled retries > waits for a valid Retry-After and ignores an invalid one
+RETRY_CASE {"case":"retry-after-invalid","status":200,"hits":2,"elapsedMs":152,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":11,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":18,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+RETRY_ELAPSED {"case":"retry-after-invalid","gapMs":49}
+
+ ✓ test/retry-policy.test.ts > controlled retries > waits for a valid Retry-After and ignores an invalid one 1878ms
+stdout | test/retry-policy.test.ts > controlled retries > does not retry when a valid Retry-After exceeds the deadline
+RETRY_CASE {"case":"retry-after-exceeds","status":429,"hits":1,"elapsedMs":78,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":10,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > does not retry when a valid Retry-After exceeds the deadline 331ms
+stdout | test/retry-policy.test.ts > controlled retries > does not retry HTTP 400 or HTTP 401
+RETRY_CASE {"case":"http-400","status":502,"hits":1,"elapsedMs":181,"attempts":[{"ordinal":1,"status":"failed","failureClass":"client_error","durationMs":26,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+stdout | test/retry-policy.test.ts > controlled retries > does not retry HTTP 400 or HTTP 401
+RETRY_CASE {"case":"http-401","status":502,"hits":1,"elapsedMs":113,"attempts":[{"ordinal":1,"status":"failed","failureClass":"unauthorized","durationMs":17,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > does not retry HTTP 400 or HTTP 401 561ms
+stdout | test/retry-policy.test.ts > controlled retries > retries a connection failure before dispatch and records no expense
+RETRY_CASE {"case":"connection-on","status":502,"hits":0,"elapsedMs":254,"attempts":[{"ordinal":1,"status":"failed","failureClass":"connection_failure","durationMs":31,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"},{"ordinal":2,"status":"failed","failureClass":"connection_failure","durationMs":26,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+stdout | test/retry-policy.test.ts > controlled retries > retries a connection failure before dispatch and records no expense
+RETRY_CASE {"case":"connection-off","status":502,"hits":0,"elapsedMs":0,"attempts":[{"ordinal":1,"status":"failed","failureClass":"connection_failure","durationMs":31,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > retries a connection failure before dispatch and records no expense 731ms
+stdout | test/retry-policy.test.ts > controlled retries > stops on a timeout before dispatch, after dispatch, and on the total deadline
+RETRY_CASE {"case":"timeout-before","status":504,"hits":1,"elapsedMs":347,"attempts":[{"ordinal":1,"status":"failed","failureClass":"timeout_before_dispatch","durationMs":208,"expense":"none","costStatus":"unknown","amount":null,"dispatched":false,"requestStatus":"failed"}]}
+
+stdout | test/retry-policy.test.ts > controlled retries > stops on a timeout before dispatch, after dispatch, and on the total deadline
+RETRY_CASE {"case":"timeout-after","status":504,"hits":1,"elapsedMs":284,"attempts":[{"ordinal":1,"status":"failed","failureClass":"timeout_after_dispatch","durationMs":201,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+stdout | test/retry-policy.test.ts > controlled retries > stops on a timeout before dispatch, after dispatch, and on the total deadline
+RETRY_CASE {"case":"total-deadline","status":504,"hits":1,"elapsedMs":310,"attempts":[{"ordinal":1,"status":"failed","failureClass":"total_deadline","durationMs":200,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > stops on a timeout before dispatch, after dispatch, and on the total deadline 1839ms
+stdout | test/retry-policy.test.ts > controlled retries > does not start another attempt when the caller cancels during backoff
+RETRY_CASE {"case":"cancel-backoff","status":408,"hits":1,"elapsedMs":1249,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":615,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > does not start another attempt when the caller cancels during backoff 1623ms
+stdout | test/retry-policy.test.ts > controlled retries > does not retry a stream after output has started
+RETRY_CASE {"case":"stream-partial","status":200,"hits":1,"elapsedMs":285,"attempts":[{"ordinal":1,"status":"failed","failureClass":"stream_started","durationMs":64,"expense":"uncertain","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > does not retry a stream after output has started 653ms
+stdout | test/retry-policy.test.ts > controlled retries > keeps concurrent retries on separate attempts
+RETRY_CASE {"case":"concurrent","status":200,"hits":4,"elapsedMs":216,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":26,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":40,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":21,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"},{"ordinal":2,"status":"succeeded","failureClass":null,"durationMs":8,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"succeeded"}]}
+
+ ✓ test/retry-policy.test.ts > controlled retries > keeps concurrent retries on separate attempts 744ms
+stdout | test/retry-policy.test.ts > controlled retries > stops further attempts when retry is turned off
+RETRY_CASE {"case":"rollback-off","status":429,"hits":1,"elapsedMs":212,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","durationMs":39,"expense":"known","costStatus":"unknown","amount":null,"dispatched":true,"requestStatus":"failed"}]}
+RETRY_ROLLBACK {"enabledHits":2,"disabledHits":1,"disabledAttempts":1,"failureClass":"rate_limit"}
+
+ ✓ test/retry-policy.test.ts > controlled retries > stops further attempts when retry is turned off 893ms
+ ✓ test/private-chat.test.ts > private endpoint chat > keeps a new deployment disabled, then serves the stored model on the approved endpoint 1818ms
+ ✓ test/private-chat.test.ts > private endpoint chat > ends a stream and a delayed first token with one DONE marker 2263ms
+ ✓ test/private-chat.test.ts > private endpoint chat > normalizes malformed SSE, missing usage, timeout, refusal, 429, and 5xx without a second call 3455ms
+ ✓ test/private-chat.test.ts > private endpoint chat > omits DONE when the caller cancels or the consumer stalls 3460ms
+ ✓ test/private-chat.test.ts > private endpoint chat > records validated_mock and rejects validated_live 2343ms
+stdout | test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller
+{"openaiContentPresent":true,"openaiOrderHeld":true,"openaiFinish":"stop","anthropicContentPresent":true,"anthropicFinish":"stop","secondMatchesFirst":true,"anthropicModel":"claude-permitted","openaiModel":"gpt-stream-actual"}
+
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > streams Anthropic and OpenAI through the same caller 546ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps cumulative usage and cache categories on the attempt 181ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > maps length and refusal and omits ping and thinking text 688ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > fails tool use, fallback, a foreign model, malformed input, a missing stop, and an in-stream error 885ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps a tenant off another tenant configuration and credential 516ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > makes no upstream call when either streaming flag is off 2137ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > records client cancellation and a slow downstream consumer 2141ms
+ ✓ test/readiness-failure.test.ts > readiness failure > reports the database ready only while postgres is up, and SIGTERM closes the pools 15866ms
+stdout | test/vertex-deadline.test.ts > vertex deadlines on the shipped client > accepts a body that finishes inside the attempt deadline after headers
+VERTEX_DEADLINE {"case":"headers-inside-connection","status":200,"hits":1,"elapsedMs":1751,"headerMs":31,"bodyAfterHeaderMs":1103,"path":"/v1/projects/deadline-vertex-proj/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent","attempts":[{"ordinal":1,"status":"succeeded","failureClass":null,"dispatched":true,"expense":"known","durationMs":1360,"amount":null}]}
+
+ ✓ test/vertex-deadline.test.ts > vertex deadlines on the shipped client > accepts a body that finishes inside the attempt deadline after headers 2316ms
+stdout | test/vertex-deadline.test.ts > vertex deadlines on the shipped client > records a connection deadline before headers as not dispatched
+VERTEX_DEADLINE {"case":"headers-after-connection","status":504,"hits":1,"elapsedMs":418,"headerAt":null,"dispatched":false,"failureClass":"timeout_before_dispatch","expense":"none","amount":null,"durationMs":302}
+
+ ✓ test/vertex-deadline.test.ts > vertex deadlines on the shipped client > records a connection deadline before headers as not dispatched 664ms
+stdout | test/vertex-deadline.test.ts > vertex deadlines on the shipped client > waits for a Vertex 429 Retry-After before the second attempt
+VERTEX_RETRY_AFTER {"case":"429","status":200,"hits":2,"statuses":[429,200],"gapMs":1079,"elapsedMs":1171,"attempts":[{"ordinal":1,"status":"failed","failureClass":"rate_limit","dispatched":true,"expense":"known","amount":null,"durationMs":15},{"ordinal":2,"status":"succeeded","failureClass":null,"dispatched":true,"expense":"known","amount":null,"durationMs":16}]}
+
+ ✓ test/vertex-deadline.test.ts > vertex deadlines on the shipped client > waits for a Vertex 429 Retry-After before the second attempt 1398ms
+stdout | test/vertex-deadline.test.ts > vertex deadlines on the shipped client > waits for a Vertex 503 Retry-After before the second attempt
+VERTEX_RETRY_AFTER {"case":"503","status":200,"hits":2,"statuses":[503,200],"gapMs":1053,"elapsedMs":1157,"failureClass":"unavailable","amount":null}
+
+ ✓ test/vertex-deadline.test.ts > vertex deadlines on the shipped client > waits for a Vertex 503 Retry-After before the second attempt 1438ms
+stdout | test/vertex-deadline.test.ts > vertex deadlines on the shipped client > does not retry when a Vertex Retry-After does not fit the deadline
+VERTEX_RETRY_AFTER {"case":"retry-after-too-long","status":502,"hits":1,"elapsedMs":126,"failureClass":"rate_limit","dispatched":true,"expense":"known","amount":null}
+
+ ✓ test/vertex-deadline.test.ts > vertex deadlines on the shipped client > does not retry when a Vertex Retry-After does not fit the deadline 400ms
+ ✓ test/inference-isolation.test.ts > inference tenant isolation > keeps two tenants on different backends, aliases, metrics, and logs 3521ms
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 2615ms
+ ✓ test/inference-config.test.ts > configuration lookup > registers, enables, and lists a tenant configuration without credential material 2265ms
+ ✓ test/inference-config.test.ts > configuration lookup > requires a credential key when inference is enabled and does not echo it 1ms
+ ✓ test/anthropic-contract.test.ts > OpenAI SDK contract for both providers > calls OpenAI and Anthropic by changing only model 2107ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > prevents tenant A from reading or changing tenant B rows 1730ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > fails closed without tenant context and keeps the runtime role off RLS bypass 392ms
+ ✓ test/tenant-isolation.test.ts > tenant isolation > keeps existing tenant rows when migrations run again 517ms
+ ✓ test/key-rotation.test.ts > key rotation and revocation > keeps another active key working after one key is revoked 1782ms
+ ✓ test/authentication.test.ts > authentication > accepts a matching active tenant and secret 296ms
+ ✓ test/authentication.test.ts > authentication > rejects missing, malformed, unknown, and mismatched credentials with no tenant data 101ms
+ ✓ test/authentication.test.ts > authentication > stores only a protected verifier for the secret 107ms
+ ✓ test/authentication.test.ts > authentication > does not accept a model request or caller provider configuration 62ms
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 57ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 674ms
+ ✓ test/pool-leakage.test.ts > connection-pool context leakage > clears tenant context before a connection returns to the pool 969ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects incomplete configuration without echoing secrets 1ms
+ ✓ test/config-failure.test.ts > configuration failure > rejects an invalid log level 0ms
+ ✓ test/config-failure.test.ts > configuration failure > exits before listening when a required setting is missing 263ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > keeps one completion id, the assistant role, and ordered text deltas 2ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > maps finish reasons and omits usage that was not requested or not reported 0ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > rejects tools, a non-assistant role, and a bad finish reason 1ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > reassembles a UTF-8 character split across decoder writes 1ms
+ ✓ test/stream-unit.test.ts > stream state transitions > moves through connecting and streaming and completes only after finish and done 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > does not complete when the provider terminal event or done marker is missing 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > records each terminal status and each timeout 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > writes ordered frames and one done marker after a finish event 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > aborts a stalled consumer and removes the abort listener 31ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > settles a stalled write on a stream deadline before the backpressure timer 43ms
+ ✓ test/stream-unit.test.ts > stream admission > keeps a tenant cap beside the process cap and drains open streams 217ms
+ ✓ test/budget-split.test.ts > split_known_charge > returns the known-charge split and writes nothing 123ms
+ ✓ test/budget-split.test.ts > split_known_charge > rejects a null known charge 6ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > converts a text stream in block order 4ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > omits empty text, ping text, thinking text, and signature text 3ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > keeps the latest cumulative usage and the reported cache categories 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > maps max_tokens and refusal onto the OpenAI finish reasons 1ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects tool use, fallback, a foreign model, malformed input, and an in-stream error 3ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > does not complete when message_stop is missing 0ms
+ ✓ test/anthropic-stream-unit.test.ts > Anthropic stream conversion > rejects output-changing deltas and positive server tool counts 1ms
+stdout | test/execution-policy.test.ts > execution policy decisions > keeps jitter inside the remaining deadline
+RETRY_CLOCK {"case":"jitter-cap","waitMs":49,"retry":true}
+
+stdout | test/execution-policy.test.ts > execution policy decisions > uses bounded backoff when Retry-After is not a delay
+RETRY_CLOCK {"case":"invalid-retry-after","waitMs":20}
+
+stdout | test/execution-policy.test.ts > execution policy decisions > honors a valid Retry-After only when the wait fits
+RETRY_CLOCK {"case":"retry-after","deltaSeconds":2000,"httpDate":2000,"equalRemainingStops":false}
+
+stdout | test/execution-policy.test.ts > execution policy decisions > stops without another attempt for cancellation, output, client errors, and deadlines
+RETRY_CLOCK {"case":"stops","classes":["cancelled","stream_started","client_error","unauthorized","timeout_before_dispatch","timeout_after_dispatch","ambiguous_network"],"total":"total_deadline","limit":"attempt_limit","disabled":"retries_disabled"}
+
+ ✓ test/execution-policy.test.ts > execution policy decisions > keeps the policy version at 1 and clamps an enabled retry to two attempts 1ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > keeps jitter inside the remaining deadline 1ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > does not let a random value of 1 reach the cap 0ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > uses bounded backoff when Retry-After is not a delay 0ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > honors a valid Retry-After only when the wait fits 1ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > stops without another attempt for cancellation, output, client errors, and deadlines 1ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > retries a connection failure that has not been dispatched 0ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > aborts a backoff wait when the caller signal aborts 2ms
+ ✓ test/execution-policy.test.ts > execution policy decisions > keeps provider SDK retries off in the shipped clients 2ms
+ ✓ test/vertex-client.test.ts > vertex client selection > selects the location host and stable API without reading the active gcloud project 2ms
+ ✓ test/vertex-client.test.ts > vertex client selection > calls the configured project and location when Google environment variables point elsewhere 4ms
+ ✓ test/vertex-client.test.ts > vertex client selection > checks access on the configured project and location 2ms
+ ✓ test/vertex-client.test.ts > vertex client selection > refreshes a cached client by tenant, connection, and config version 0ms
+ ✓ test/vertex-client.test.ts > vertex client selection > validates a credential, project access, and a small inference without returning hidden text 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > keeps caller fields and converts a leading system message 2ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > uses the configured default when the caller sends no output limit 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects a later system message, prefill, and disagreeing limits 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > rejects unsupported parameters without removing them from the request 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic request conversion > preserves OpenAI caller fields in the OpenAI body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > maps the four finish reasons 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > returns refusal text and hides thinking content 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > rejects a tool-use block and keeps the reported attempt facts off the public body 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > keeps end_turn facts when the message contains a tool block 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > does not invent token counts the rejected message omitted 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic response normalization > stores cache categories separately and does not invent missing counts 0ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > maps authentication, rate limit, overload, and server errors without the provider body 1ms
+ ✓ test/anthropic-adapter.test.ts > Anthropic error normalization > stores the native 5xx type and request id and does not invent either 1ms
+stdout | test/cost-calculation.test.ts > model cost calculation > bills OpenAI input and output as an exact decimal
+COST_CALC {"name":"openai-tokens","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-v1"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > bills a stored OpenAI cache count once
+COST_CALC {"name":"openai-cache","status":"estimated","amount":"0.84","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > keeps an OpenAI cache count provisional when the cache rate is absent
+COST_CALC {"name":"openai-cache-unpriced","status":"provisional","amount":"0.8","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache-missing"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > estimates OpenAI usage when cache rates are set and cache counts are absent
+COST_CALC {"name":"openai-cache-rates-absent","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-cache-rates-absent"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > does not bill a negative cache subtraction as input
+COST_CALC {"name":"openai-negative-cache","status":"provisional","amount":"0.06","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-negative"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > bills Anthropic cache write and cache read without the summed prompt
+COST_CALC {"name":"anthropic-cache","status":"estimated","amount":"0.406","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"anthropic-v1"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > bills Vertex cached input and thinking tokens once
+COST_CALC {"name":"vertex-usage","status":"estimated","amount":"1.095","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-v1"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > does not fall back to a Vertex prompt total when uncached input is missing
+COST_CALC {"name":"vertex-no-prompt-fallback","status":"provisional","amount":"0.345","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-partial"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > estimates Vertex usage when cache and thinking rates are set and those counts are absent
+COST_CALC {"name":"vertex-optional-counts","status":"estimated","amount":"1.16","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"vertex-optional"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > selects the OpenRouter price for the stored serving provider
+COST_CALC {"name":"openrouter-serving","status":"estimated","amount":"1","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"deepinfra"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > treats missing usage as unknown and does not store zero
+COST_CALC {"name":"missing-usage","status":"unknown","amount":null,"allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-empty"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > treats a missing price as unknown for external and DGX allocated cost
+COST_CALC {"name":"missing-price","status":"unknown","amount":null,"allocatedStatus":"unknown","allocatedAmount":null,"priceVersionId":null}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > marks an unverified price and partial usage as provisional
+COST_CALC {"name":"provisional","status":"provisional","amount":"1","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"openai-partial"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > keeps a reconciled amount when a later price would calculate a new one
+COST_CALC {"name":"historical","status":"reconciled","amount":"0.7","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"price-old"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > costs a failed attempt when usage is stored and leaves a failed attempt unknown without usage
+COST_CALC {"name":"failed-with-usage","status":"estimated","amount":"0.0105","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"failed-priced"}
+COST_CALC {"name":"failed-without-usage","status":"unknown","amount":null,"allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"failed-empty"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > multiplies a rate that is not a binary fraction
+COST_CALC {"name":"decimal","status":"estimated","amount":"0.3","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"fraction"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > keeps DGX allocated operating cost apart from the external amount
+COST_CALC {"name":"dgx-allocated","status":"estimated","amount":"0.18","allocatedStatus":"estimated","allocatedAmount":"9","priceVersionId":"dgx-v1"}
+
+stdout | test/cost-calculation.test.ts > model cost calculation > charges a request fee only when some usage is present
+COST_CALC {"name":"request-fee","status":"estimated","amount":"0.25","allocatedStatus":null,"allocatedAmount":null,"priceVersionId":"fee"}
+
+ ✓ test/cost-calculation.test.ts > model cost calculation > bills OpenAI input and output as an exact decimal 2ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > bills a stored OpenAI cache count once 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > keeps an OpenAI cache count provisional when the cache rate is absent 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > estimates OpenAI usage when cache rates are set and cache counts are absent 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > does not bill a negative cache subtraction as input 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > bills Anthropic cache write and cache read without the summed prompt 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > bills Vertex cached input and thinking tokens once 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > does not fall back to a Vertex prompt total when uncached input is missing 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > estimates Vertex usage when cache and thinking rates are set and those counts are absent 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > selects the OpenRouter price for the stored serving provider 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > treats missing usage as unknown and does not store zero 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > treats a missing price as unknown for external and DGX allocated cost 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > marks an unverified price and partial usage as provisional 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > keeps a reconciled amount when a later price would calculate a new one 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > costs a failed attempt when usage is stored and leaves a failed attempt unknown without usage 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > multiplies a rate that is not a binary fraction 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > keeps DGX allocated operating cost apart from the external amount 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > prefers a region price and a service tier price over a later generic price 0ms
+ ✓ test/cost-calculation.test.ts > model cost calculation > charges a request fee only when some usage is present 0ms
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 1ms
+ ✓ test/validate-request.test.ts > request validation > keeps stream=true and rejects it until that deployment allows streaming 2ms
+ ✓ test/validate-request.test.ts > request validation > rejects tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 1ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 1ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+ ✓ test/private-contract.test.ts > private OpenAI-compatible contract > accepts vLLM and NIM text fixtures and does not invent missing usage 7ms
+ ✓ test/vertex-convert.test.ts > vertex request conversion > maps text messages, a leading system instruction, and supported sampling fields 2ms
+ ✓ test/vertex-convert.test.ts > vertex request conversion > rejects unsupported fields, a non-leading system message, and disagreeing token limits 1ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > keeps the serving model, visible text, safety finish, and separate token counts 1ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > does not invent a total when thinking tokens are present and the provider omits one 0ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > returns an empty safety outcome for a blocked prompt and rejects non-text parts 1ms
+ ✓ test/vertex-convert.test.ts > vertex response conversion > converts stream chunks in order and keeps usage off the visible text 1ms
+ ✓ test/compatible-policy.test.ts > compatible provider policy > keeps the approved hosts and sends only stored OpenRouter restrictions 1ms
+ ✓ test/compatible-policy.test.ts > compatible provider policy > does not treat a model slug or a routing object as a serving provider 1ms
+ ✓ test/compatible-policy.test.ts > compatible provider policy > reads the selected OpenRouter provider and matches the stored slug 1ms
+ ↓ test/compatible-live.test.ts > xAI live provider > runs one small non-streaming call and one small streaming call
+ ↓ test/compatible-live.test.ts > OpenRouter live provider > runs one small non-streaming call and one small streaming call
+ ↓ test/vertex-live.test.ts > vertex live provider > runs one small non-streaming call and one small streaming call
+
+ Test Files  44 passed | 2 skipped (46)
+      Tests  368 passed | 3 skipped (371)
+   Start at  10:25:58
+   Duration  803.37s (transform 4.11s, setup 195ms, collect 21.71s, tests 756.40s, environment 7ms, prepare 3.86s)
+
+EXIT:0

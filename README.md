@@ -1956,6 +1956,62 @@ docker compose run --rm app node dist/cli.js set-deployment-context-limit \
   --context-limit 128
 ```
 
+## Execution flow
+
+A chat request stays `pending` until the proxy records a terminal status.
+A completed response stores `succeeded`.
+A rejected response stores `failed`.
+A stream stores one stream status.
+A shutdown stores `interrupted` when the row write succeeds.
+The proxy uses at most 2 upstream attempts for one request.
+The same request does not retry and fall back.
+A priced success stores cost status `estimated`.
+A missing usage count stays `unknown`.
+The amount for a missing usage count stays null.
+
+## Operator checks
+
+Read `GET /internal/v1/metrics/summary` for request counts and stream latency.
+That route stores the P50 and the P95 of the stream duration.
+That route stores the P50 and the P95 of the time to the first text.
+That route does not store a P99.
+Read `GET /internal/v1/metrics/attempts` for attempt history.
+Read `GET /internal/v1/budgets/usage` for the budget.
+Read `GET /internal/v1/limits` for the limits.
+Read `GET /internal/v1/metrics/breakers` for breaker state.
+Each route uses the caller tenant.
+Another tenant does not appear in that body.
+
+## Incident response
+
+Turn retry off for one deployment with `set-execution-policy` and `--retries false`.
+That change does not change another tenant.
+Turn fallback off for one alias with `set-fallback-policy` and `--enabled false`.
+A named deployment still does not switch.
+Disable one deployment with `set-deployment-enabled`, `--name`, and `--enabled false`.
+The next request for that name returns `model_not_found`.
+The proxy does not call the upstream model.
+Disable one breaker with `set-deployment-breaker` and `--enabled false`.
+Reset one breaker with `reset-deployment-breaker`.
+Run `recover-budget` to close a finished attempt that still holds a reservation.
+A second run does not settle that attempt again.
+An uncertain charge stays provisional.
+A hard check that cannot reach the database returns HTTP 503.
+The code is `admission_unavailable`.
+The proxy does not call the upstream model.
+
+## Deployment and rollback
+
+Migrations `001` through `016` stay applied.
+This tree adds no later migration file.
+This tree drops nothing.
+The image `fb62fa7` stays ready on this database.
+Its latest migration file is `016_fallback_policy.sql`.
+The readiness route on that image checks for `016_fallback_policy.sql`.
+Do not delete a policy row to turn retry off.
+Do not delete a policy row to turn fallback off.
+Do not delete a migration row to roll back.
+
 ## Tests
 
 `npm test` must use Node.js 24.

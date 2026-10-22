@@ -1,0 +1,39 @@
+Cost ledger verification.
+
+Each line is copied from vitest.txt.
+The source lines are also in combined-policy.txt, failure-injection-matrix.txt, and multi-instance.txt.
+
+RELIABILITY_FAULT {"case":"normal","status":200,"hits":1,"failureClass":null,"amount":"0.07","costStatus":"estimated","reservation":"settled","elapsedMs":302}
+
+RELIABILITY_FAULT {"case":"missing-usage","status":200,"hits":1,"promptTokens":null,"amount":null,"costStatus":"unknown","reservation":"provisional"}
+
+RELIABILITY_FAULT {"case":"connection-refused","status":502,"code":"upstream_error","hits":0,"attempts":2,"failureClass":"connection_failure","amount":null,"elapsedMs":197}
+
+RELIABILITY_FAULT {"case":"timeout-after-send","status":504,"hits":1,"failureClass":"timeout_after_dispatch","costStatus":"unknown","amount":null,"expense":"uncertain","elapsedMs":297}
+
+RELIABILITY_FAULT {"case":"connection-close","status":502,"code":"upstream_error","hits":1,"attempts":1,"failureClass":"ambiguous_network","amount":null,"costStatus":"unknown","expense":"uncertain"}
+
+RELIABILITY_COMBINED {"case":"retry-budget","status":429,"code":"budget_exceeded","hits":1,"attempts":2,"failureClass":"rate_limit","secondDispatched":false,"reservation":"provisional","reserved":"12.000000000000"}
+
+RELIABILITY_COMBINED {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+
+RELIABILITY_COMBINED {"case":"missing-provider-cost","status":429,"code":"budget_unknown","hits":0,"dispatched":false}
+
+RELIABILITY_INSTANCE {"case":"crash-settlement","exit":86,"backlogBefore":"1","backlogAfter":"0","recognized":"0.03","settlesAfterRecover":"1","settlesAfterLater":"2","crashHits":1,"laterStatus":200}
+
+A priced success stores estimated.
+The normal amount is 0.07.
+A missing usage count stores null.
+That amount is not 0.
+A refused connection stores null.
+A timeout after dispatch stores null and uncertain.
+A closed socket stores null and uncertain.
+A hard budget stops the retry before a second upstream call.
+The first reservation stays provisional.
+Overlap recognition is 1.
+Overlap provisional is 0.4.
+A crashed attempt settles once.
+A second recover leaves the settle count at 1.
+A later request adds one settle.
+The recognized amount after the first recover is 0.03.
+An unknown price is budget_unknown and makes no upstream call.

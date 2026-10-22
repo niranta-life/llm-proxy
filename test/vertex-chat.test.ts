@@ -415,15 +415,35 @@ describe('vertex chat', () => {
   });
 
   it('cancels, times out, and applies backpressure without writing done', async () => {
-    const controller = new AbortController();
-    const pending = clientFor(alpha.secret, alpha.tenantId).chat.completions.create(
-      { model: 'auto', messages: [{ role: 'user', content: 'hang-connect' }], stream: true },
-      { signal: controller.signal },
-    );
-    setTimeout(() => controller.abort(), 50);
-    await expect(pending).rejects.toThrow();
-    await waitFor(alpha.tenantId, 'client_aborted');
-    expect((await latest(alpha.tenantId))?.stream_status).toBe('client_aborted');
+    enableStreaming(db, {
+      tenantId: alpha.tenantId,
+      deployment: 'gemini-alpha',
+      connectTimeoutMs: 5_000,
+      idleTimeoutMs: 400,
+      totalTimeoutMs: 3000,
+      backpressureTimeoutMs: 300,
+    });
+    try {
+      const controller = new AbortController();
+      const pending = clientFor(alpha.secret, alpha.tenantId).chat.completions.create(
+        { model: 'auto', messages: [{ role: 'user', content: 'hang-connect' }], stream: true },
+        { signal: controller.signal },
+      );
+      await waitFor(alpha.tenantId, 'connecting');
+      controller.abort();
+      await expect(pending).rejects.toThrow();
+      await waitFor(alpha.tenantId, 'client_aborted');
+      expect((await latest(alpha.tenantId))?.stream_status).toBe('client_aborted');
+    } finally {
+      enableStreaming(db, {
+        tenantId: alpha.tenantId,
+        deployment: 'gemini-alpha',
+        connectTimeoutMs: 400,
+        idleTimeoutMs: 400,
+        totalTimeoutMs: 3000,
+        backpressureTimeoutMs: 300,
+      });
+    }
 
     const timed = await postRaw(alpha, { model: 'auto', messages: [{ role: 'user', content: 'hang-connect' }], stream: true });
     expect(timed.status).toBe(504);

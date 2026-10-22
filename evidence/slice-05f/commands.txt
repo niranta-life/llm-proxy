@@ -1,0 +1,30 @@
+Commands.
+
+Node is v24.22.0 from nvm use 24.
+The working directory is the llm-proxy repository.
+VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+.env.live was not sourced.
+
+Type check.
+./node_modules/.bin/tsc --noEmit
+TSC_EXIT is 0.
+The log is tsc.txt.
+
+Full suite.
+./node_modules/.bin/vitest run --reporter=verbose
+The run started at 2026-10-22T07:43:00Z.
+The duration is 606.71s.
+Test files are 43 passed and 2 skipped.
+Tests are 309 passed and 3 skipped.
+VITEST_EXIT is 0.
+The three skipped tests are the live provider tests.
+The log is vitest.txt.
+
+Docker.
+docker context show
+The context is colima.
+docker compose build app
+The image log is docker-build.txt.
+The app service was not started by this command.
+The container llm-proxy-app-1 was not stopped.
+The volume llm-proxy_pgdata was not deleted.

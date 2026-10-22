@@ -1,0 +1,34 @@
+Rollback proof.
+
+This tree adds no migration file after 016_fallback_policy.sql.
+git diff on migrations 001 through 016 is empty.
+A search of the working tree found no new DROP.
+The existing files stay byte for byte.
+
+The image fb62fa7 stays ready on this database.
+Its latest migration file is 016_fallback_policy.sql.
+The readiness route on that image checks for 016_fallback_policy.sql.
+A later file does not remove that row.
+This file does not claim a readiness HTTP status.
+
+Retry rollback is set-execution-policy with --retries false.
+That change is one deployment.
+Another tenant with retries on still uses two attempts.
+Do not delete the policy row.
+
+Fallback rollback is set-fallback-policy with --enabled false.
+A named deployment still does not switch.
+Another tenant alias can still fall back.
+Do not delete the policy row.
+Do not delete the migration row.
+
+set-deployment-enabled with --name and --enabled false stops the next request for that name.
+The public code is model_not_found.
+The proxy does not call the upstream model.
+
+recover-budget closes a finished attempt once.
+A second run does not settle that attempt again.
+
+Colima was not stopped for this check.
+The volume llm-proxy_pgdata was not deleted.
+The container llm-proxy-app-1 was not stopped.

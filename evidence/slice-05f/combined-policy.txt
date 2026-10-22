@@ -1,0 +1,16 @@
+RELIABILITY_COMBINED {"case":"retry-budget","status":429,"code":"budget_exceeded","hits":1,"attempts":2,"failureClass":"rate_limit","secondDispatched":false,"reservation":"provisional","reserved":"12.000000000000"}
+RELIABILITY_COMBINED {"case":"retry-total-deadline","status":429,"hits":1,"attempts":1,"failureClass":"rate_limit","elapsedMs":86}
+RELIABILITY_COMBINED {"case":"breaker-fallback","status":503,"code":"circuit_open","hits":0,"attempts":1,"models":[]}
+RELIABILITY_COMBINED {"case":"candidate-breaker","status":502,"hits":1,"models":["rel-skip-primary"]}
+RELIABILITY_COMBINED {"case":"fallback-hard-budget","status":502,"hits":1,"models":["rel-cheap-primary"]}
+RELIABILITY_COMBINED {"case":"fallback-region","status":502,"hits":1,"models":["rel-region-primary"],"vertexCalls":0,"connectionLocation":"europe-west4","policyRegion":"us-central1"}
+RELIABILITY_COMBINED {"case":"concurrency-cap-one","status":200,"hits":2,"models":["rel-cap-primary","rel-cap-secondary"],"fallback":"true"}
+RELIABILITY_COMBINED {"case":"stream-forced-model","status":502,"hits":1,"models":["rel-named-stream"],"failureClass":"ambiguous_network","streamStatus":"provider_failed","done":false}
+RELIABILITY_COMBINED {"case":"fallback-before-output","status":200,"hits":2,"models":["rel-early-primary","rel-early-secondary"],"fallback":"true","done":true}
+RELIABILITY_COMBINED {"case":"no-fallback-after-output","status":200,"hits":1,"failureClass":"stream_started","done":false}
+RELIABILITY_COMBINED {"case":"fallback-off","status":502,"hits":1,"fallback":"false"}
+RELIABILITY_COMBINED {"case":"retry-and-fallback-cap","status":502,"hits":2,"models":["rel-both-primary","rel-both-secondary"]}
+RELIABILITY_COMBINED {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+RELIABILITY_COMBINED {"case":"missing-provider-cost","status":429,"code":"budget_unknown","hits":0,"dispatched":false}
+RELIABILITY_COMBINED {"case":"database-unavailable","status":503,"code":"admission_unavailable","hits":0,"elapsedMs":10207}
+RELIABILITY_COMBINED {"case":"deployment-disabled","before":{"status":200,"hits":1},"after":{"status":404,"code":"model_not_found","hits":0}}

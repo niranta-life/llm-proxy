@@ -39,6 +39,8 @@ import {
   type ExtractedFeatures,
   type FeatureExtractInput,
 } from './request-features.js';
+import { captureChatSample } from './samples.js';
+import type { SampleKeyManager } from './sample-crypto.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, loadCatalog } from './store.js';
 import type { StreamGate } from './stream.js';
 import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './validate.js';
@@ -130,6 +132,10 @@ export async function executeChat(input: {
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
   extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
+  sampleKeyManager?: SampleKeyManager | null;
+  sampleDraw?: number;
+  beforeSampleStore?: () => Promise<void> | void;
+  failSampleInsert?: () => boolean;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   const session = { ...input, featureRequest: featureInputFromChat(request) };
@@ -301,6 +307,20 @@ export async function executeChat(input: {
         if (gate.track) {
           await noteBreaker(input, route.deploymentId, observedAt, gate.probe, 'success');
         }
+        await captureChatSample({
+          pool: input.runtimePool,
+          logger: input.logger,
+          tenantId: input.tenantId,
+          requestId,
+          request,
+          response: completion.response,
+          route,
+          keyManager: input.sampleKeyManager ?? null,
+          nowMs: input.nowMs,
+          draw: input.sampleDraw,
+          beforeStore: input.beforeSampleStore,
+          failInsert: input.failSampleInsert,
+        });
         return completion.response;
       } catch (error) {
         if (error instanceof ProxyError && (error.code === 'circuit_open' || isAdmissionCode(error.code))) {

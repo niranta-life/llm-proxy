@@ -51,6 +51,9 @@ export const COMMAND_HELP: Readonly<Record<string, string>> = {
   'probe-private-health': 'Check the private endpoint health',
   'show-fallback-policy': 'Show the fallback policy for an alias',
   'list-inference': 'Show the connections, deployments, and aliases of a tenant',
+  'set-sample-policy': 'Set whether a tenant stores encrypted chat samples',
+  'set-deployment-data-class': 'Set the data class of a deployment',
+  'show-sample-policy': 'Show the sample policy for a tenant',
 };
 
 // Commands whose result includes a tenant secret that is shown only once.
@@ -77,6 +80,8 @@ const COMMAND_FIELD_HINTS: Readonly<Record<string, string>> = {
   'register-price.status': 'verified or unverified.',
   'set-tenant-budget.mode': 'observe, hard, or disabled.',
   'set-api-key-limits.mode': 'observe or hard. none removes the key limits.',
+  'set-sample-policy.mode': 'disabled, metadata_only, or encrypted_sample.',
+  'set-deployment-data-class.data-class': 'public, internal, confidential, restricted, or none.',
 };
 
 const FIELD_HINTS: Readonly<Record<string, string>> = {
@@ -100,6 +105,15 @@ const FIELD_HINTS: Readonly<Record<string, string>> = {
   addresses: 'IP addresses to pin, comma-separated.',
   'tls-verify': 'true or false.',
   'effective-at': 'Start time of the price, ISO 8601.',
+  'content-capture': 'true or false. false stores no chat content.',
+  replay: 'true or false. false denies future replay.',
+  'judge-disclosure': 'true or false. false denies future judge disclosure.',
+  'sample-rate': 'A rate from 0 to 1. Use at most 6 decimal places.',
+  'max-sample-bytes': 'Largest sample in bytes, from 0 to 1000000.',
+  'max-sample-count': 'Most open samples, from 0 to 1000000.',
+  'retention-seconds': 'How long a sample is kept, in seconds.',
+  classifications: 'Approved data classes, comma-separated.',
+  'data-class': 'public, internal, confidential, restricted, or none.',
 };
 
 export function fieldHint(command: string, field: string): string | undefined {

@@ -101,5 +101,25 @@ describe('configuration lookup', () => {
     expect(() => loadConfig(serviceEnv(db, { MAX_STREAMS_PER_TENANT: '0' }))).toThrow(/MAX_STREAMS_PER_TENANT/);
     expect(() => loadConfig(serviceEnv(db, { STREAM_SHUTDOWN_DRAIN_MS: '-1' }))).toThrow(/STREAM_SHUTDOWN_DRAIN_MS/);
     expect(configured.providerCredentialKey?.equals(Buffer.from(credentialKeyText, 'base64'))).toBe(true);
+    expect(configured.previousCredentialKeys).toEqual([]);
+    const previous = Buffer.alloc(32, 4).toString('base64');
+    const rotated = loadConfig(
+      serviceEnv(db, {
+        INFERENCE_ENABLED: 'true',
+        PROVIDER_CREDENTIAL_KEY: credentialKeyText,
+        PROVIDER_CREDENTIAL_KEY_PREVIOUS: previous,
+      }),
+    );
+    expect(rotated.previousCredentialKeys).toHaveLength(1);
+    expect(rotated.previousCredentialKeys[0]?.equals(Buffer.from(previous, 'base64'))).toBe(true);
+    expect(() =>
+      loadConfig(
+        serviceEnv(db, {
+          INFERENCE_ENABLED: 'true',
+          PROVIDER_CREDENTIAL_KEY: credentialKeyText,
+          PROVIDER_CREDENTIAL_KEY_PREVIOUS: 'not-a-key',
+        }),
+      ),
+    ).toThrow(/PROVIDER_CREDENTIAL_KEY_PREVIOUS/);
   });
 });

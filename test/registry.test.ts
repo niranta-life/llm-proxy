@@ -87,6 +87,7 @@ describe('provider registry', () => {
       '015_tenant_limits.sql',
       '016_fallback_policy.sql',
       '017_request_features.sql',
+      '018_sample_capture.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -110,6 +111,8 @@ describe('provider registry', () => {
     expect(fallbackPolicy).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const requestFeatures = readFileSync(join(projectRoot, 'migrations', '017_request_features.sql'), 'utf8');
     expect(requestFeatures).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    const sampleCapture = readFileSync(join(projectRoot, 'migrations', '018_sample_capture.sql'), 'utf8');
+    expect(sampleCapture).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

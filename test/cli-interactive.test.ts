@@ -50,6 +50,9 @@ const COMMANDS = [
   'set-tenant-budget',
   'recover-budget',
   'list-inference',
+  'set-sample-policy',
+  'set-deployment-data-class',
+  'show-sample-policy',
 ] as const;
 
 const VERTEX_KEY = '{"private_key":"abc"}';
@@ -811,6 +814,48 @@ const specs: Spec[] = [
     command: 'list-inference',
     configuration: 'tenant connections deployments and aliases',
     prepare: async () => ({ 'tenant-id': (await openaiChat()).tenantId }),
+  },
+  {
+    action: 'update',
+    command: 'set-sample-policy',
+    configuration: 'metadata only sample policy',
+    prepare: async () => ({
+      'tenant-id': (await openaiChat()).tenantId,
+      mode: 'metadata_only',
+      'content-capture': 'false',
+      replay: 'false',
+      'judge-disclosure': 'false',
+      'sample-rate': '0',
+      'max-sample-bytes': '0',
+      'max-sample-count': '0',
+      'retention-seconds': '0',
+    }),
+  },
+  {
+    action: 'update',
+    command: 'set-deployment-data-class',
+    configuration: 'deployment data class',
+    prepare: async () => ({
+      'tenant-id': (await openaiChat()).tenantId,
+      deployment: 'chat',
+      'data-class': 'internal',
+    }),
+  },
+  {
+    action: 'validate',
+    command: 'show-sample-policy',
+    configuration: 'stored sample policy',
+    prepare: async () => {
+      const tenantId = (await openaiChat()).tenantId;
+      ok([
+        'set-sample-policy',
+        '--tenant-id',
+        tenantId,
+        '--mode',
+        'metadata_only',
+      ]);
+      return { 'tenant-id': tenantId };
+    },
   },
 ];
 

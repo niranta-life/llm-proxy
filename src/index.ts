@@ -80,6 +80,7 @@ async function main(): Promise<void> {
     inferenceEnabled: config.inferenceEnabled,
     upstreamBaseUrl: config.openAiBaseUrl,
     credentialKey: config.providerCredentialKey,
+    previousCredentialKeys: config.previousCredentialKeys,
     maxActiveStreams: config.maxActiveStreams,
     maxStreamsPerTenant: config.maxStreamsPerTenant,
   });

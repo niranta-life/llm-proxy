@@ -20,6 +20,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | Usage + Cost Tracking | Prices each attempt from registered prices. Settles the budget reservation. | `src/inference/cost.ts`, `src/inference/cost-store.ts`, `src/db/prices.ts` |
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |
 | Key custody | Encrypts provider keys with AES-256-GCM. The key comes from `PROVIDER_CREDENTIAL_KEY`. | `src/credentials.ts` |
+| Sample capture | Stores an approved non-streaming text chat as an encrypted envelope. Metadata routes return no content. | `src/inference/samples.ts`, `src/inference/sample-crypto.ts` |
 | Logging | Removes secrets, prompts, and chat messages from logs. | `src/logger.ts`, `src/redact.ts` |
 | Admin | All config changes. There is no HTTP admin API. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts` |
 
@@ -46,6 +47,7 @@ Fallback is allowed only before the proxy sends a response header or a response 
 | `GET /internal/v1/metrics/summary`, `/attempts`, `/breakers`, `/costs` | Per-tenant metrics. See [Metrics](metrics.md). |
 | `GET /internal/v1/limits`, `GET /internal/v1/budgets/usage` | Per-tenant limit and budget state. See [Limits](limits.md). |
 | `GET /internal/v1/request-features`, `GET /internal/v1/request-features/{requestId}` | Characteristics of completed chats. No prompt or completion text. See [Metrics](metrics.md). |
+| `GET /internal/v1/samples`, `GET /internal/v1/samples/{sampleId}` | Metadata for encrypted samples. No prompt, completion, or ciphertext. See [Metrics](metrics.md). |
 
 ## Data model
 
@@ -55,8 +57,8 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 | --- | --- |
 | Tenants | `tenants`, `tenant_api_keys` |
 | Providers and routing | `provider_connections`, `model_deployments`, `model_aliases`, `private_endpoint_allowlist` |
-| Requests | `proxy_requests`, `model_attempts`, `request_features` |
-| Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations` |
+| Requests | `proxy_requests`, `model_attempts`, `request_features`, `request_samples` |
+| Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations`, `sample_policies` |
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |
 
@@ -74,7 +76,7 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 
 Not built. The design:
 
-- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. Add an opt-in, per-tenant store for request bodies, since prompts are not stored today.
+- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved non-streaming text chat as an encrypted sample. Replay, a judge, and rankings are not built.
 - **Evaluator.** Workers take jobs from a durable queue, replay stored requests on other deployments, and score them with a judge model.
 - **Optimizer.** Writes per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches.
 - **Infra.** Redis for hot counters and the job queue, and an external secret manager for provider keys.

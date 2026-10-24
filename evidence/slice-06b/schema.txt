@@ -1,0 +1,38 @@
+readiness version 017_request_features.sql row count 1
+applied version 018_sample_capture.sql row count 1
+018_sample_capture.sql does not drop a table or a column
+model_deployments.data_classification text
+request_samples.id uuid
+request_samples.tenant_id uuid
+request_samples.request_id uuid
+request_samples.policy_id uuid
+request_samples.policy_version integer
+request_samples.provider text
+request_samples.deployment_name text
+request_samples.data_classification text
+request_samples.schema_version integer
+request_samples.size_bytes integer
+request_samples.wrapping_key_version integer
+request_samples.wrapped_key_iv bytea
+request_samples.wrapped_key_tag bytea
+request_samples.wrapped_key_ciphertext bytea
+request_samples.content_iv bytea
+request_samples.content_tag bytea
+request_samples.content_ciphertext bytea
+request_samples.created_at timestamp with time zone
+request_samples.expires_at timestamp with time zone
+sample_policies.id uuid
+sample_policies.tenant_id uuid
+sample_policies.policy_version integer
+sample_policies.mode text
+sample_policies.content_capture boolean
+sample_policies.replay_permitted boolean
+sample_policies.judge_disclosure_permitted boolean
+sample_policies.sample_rate numeric
+sample_policies.max_sample_bytes integer
+sample_policies.max_sample_count integer
+sample_policies.retention_seconds integer
+sample_policies.approved_classifications ARRAY
+sample_policies.allowed_providers ARRAY
+sample_policies.allowed_deployments ARRAY
+sample_policies.created_at timestamp with time zone

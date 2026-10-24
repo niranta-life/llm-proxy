@@ -106,6 +106,11 @@ export async function createTestApp(
     afterAdmit?: () => Promise<void> | void;
     beforeSettle?: () => Promise<void> | void;
     extractFeatures?: import('../src/http/app.js').AppDeps['extractFeatures'];
+    previousCredentialKeys?: readonly Buffer[];
+    sampleKeyManager?: import('../src/http/app.js').AppDeps['sampleKeyManager'];
+    sampleDraw?: number;
+    beforeSampleStore?: () => Promise<void> | void;
+    failSampleInsert?: () => boolean;
   } = {},
 ) {
   const config = configFor(db);
@@ -120,6 +125,11 @@ export async function createTestApp(
     inferenceEnabled: options.inferenceEnabled ?? false,
     upstreamBaseUrl: options.upstreamBaseUrl ?? 'https://api.openai.com/v1',
     credentialKey: options.credentialKey ?? null,
+    previousCredentialKeys: options.previousCredentialKeys,
+    sampleKeyManager: options.sampleKeyManager,
+    sampleDraw: options.sampleDraw,
+    beforeSampleStore: options.beforeSampleStore,
+    failSampleInsert: options.failSampleInsert,
     maxActiveStreams: options.maxActiveStreams ?? config.maxActiveStreams,
     maxStreamsPerTenant: options.maxStreamsPerTenant ?? config.maxStreamsPerTenant,
     vertexClientFactory: options.vertexClientFactory,

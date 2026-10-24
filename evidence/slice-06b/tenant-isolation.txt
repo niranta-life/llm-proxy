@@ -1,0 +1,9 @@
+pass-1 tenant B list {"samples":[],"nextCursor":null}
+
+pass-1 tenant B by id status 404
+
+pass-2 tenant B list {"samples":[],"nextCursor":null}
+
+pass-2 tenant B by id status 404
+
+page tenant B by id status 404

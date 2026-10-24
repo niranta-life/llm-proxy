@@ -1,0 +1,11 @@
+missing permission, rejected class, size, and count left the chat at status 200
+
+streaming chat stored no sample
+
+revocation before storage kept the chat and stored no sample
+
+insert failure kept status 200, one attempt, and the feature row
+
+missing and throwing key managers stored no sample
+
+logs and non-ciphertext columns did not contain the sample text

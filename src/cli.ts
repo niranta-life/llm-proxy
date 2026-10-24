@@ -48,6 +48,8 @@ import {
   showFallbackPolicy,
 } from './db/fallback-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
+import { setDeploymentDataClass, setSamplePolicy, showSamplePolicy } from './db/sample-policy.js';
+import { isDataClass, isSampleMode } from './inference/sample-policy.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger, type Logger } from './logger.js';
 
@@ -152,6 +154,15 @@ type Flags = {
   regions?: string;
   'min-remaining-deadline-ms'?: string;
   'context-limit'?: string;
+  'content-capture'?: string;
+  replay?: string;
+  'judge-disclosure'?: string;
+  'sample-rate'?: string;
+  'max-sample-bytes'?: string;
+  'max-sample-count'?: string;
+  'retention-seconds'?: string;
+  classifications?: string;
+  'data-class'?: string;
 };
 
 function requireTenant(values: Flags): string | undefined {
@@ -163,6 +174,27 @@ function parseEnabled(value: string | undefined): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function parseDefaultFalse(value: string | undefined): boolean | undefined {
+  if (value === undefined) return false;
+  return parseEnabled(value);
+}
+
+function parseSampleRate(value: string | undefined): string | undefined {
+  const text = value ?? '0';
+  if (!/^(?:0(?:\.[0-9]{1,6})?|1(?:\.0{1,6})?)$/.test(text)) return undefined;
+  return text;
+}
+
+function parseDefaultBounded(
+  value: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  if (value === undefined) return fallback;
+  return parseBounded(value, minimum, maximum);
 }
 
 function parseCsv(value: string | undefined, allowEmpty: boolean): string[] | undefined {
@@ -1234,6 +1266,88 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     return;
   }
 
+  if (command === 'set-sample-policy') {
+    const tenantId = requireTenant(values);
+    const mode = values.mode ?? '';
+    const contentCapture = parseDefaultFalse(values['content-capture']);
+    const replay = parseDefaultFalse(values.replay);
+    const judgeDisclosure = parseDefaultFalse(values['judge-disclosure']);
+    const sampleRate = parseSampleRate(values['sample-rate']);
+    const maxSampleBytes = parseDefaultBounded(values['max-sample-bytes'], 0, 0, 1_000_000);
+    const maxSampleCount = parseDefaultBounded(values['max-sample-count'], 0, 0, 1_000_000);
+    const retentionSeconds = parseDefaultBounded(values['retention-seconds'], 0, 0, 315_360_000);
+    const classifications = parseCsv(values.classifications, true);
+    const providers = parseCsv(values.providers, true);
+    const deployments = parseCsv(values.deployments, true);
+    if (
+      tenantId === undefined
+      || !isSampleMode(mode)
+      || contentCapture === undefined
+      || replay === undefined
+      || judgeDisclosure === undefined
+      || sampleRate === undefined
+      || maxSampleBytes === undefined
+      || maxSampleCount === undefined
+      || retentionSeconds === undefined
+      || classifications === undefined
+      || providers === undefined
+      || deployments === undefined
+    ) {
+      logger.error('sample arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const stored = await setSamplePolicy(
+      pool,
+      tenantId,
+      mode,
+      contentCapture,
+      replay,
+      judgeDisclosure,
+      sampleRate,
+      maxSampleBytes,
+      maxSampleCount,
+      retentionSeconds,
+      classifications,
+      providers,
+      deployments,
+    );
+    process.stdout.write(`${JSON.stringify(stored)}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-data-class') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const value = values['data-class']?.trim() ?? '';
+    const dataClass = value === 'none' ? null : value;
+    if (
+      tenantId === undefined
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)
+      || name === 'auto'
+      || (dataClass !== null && !isDataClass(dataClass))
+    ) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentDataClass(pool, tenantId, name, dataClass);
+    process.stdout.write(`${JSON.stringify({ configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'show-sample-policy') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const stored = await showSamplePolicy(pool, tenantId);
+    process.stdout.write(`${JSON.stringify(stored ?? { attached: false })}\n`);
+    return;
+  }
+
   if (command === 'list-inference') {
     const tenantId = requireTenant(values);
     if (tenantId === undefined) {
@@ -1378,6 +1492,15 @@ async function main(): Promise<void> {
         regions: { type: 'string' },
         'min-remaining-deadline-ms': { type: 'string' },
         'context-limit': { type: 'string' },
+        'content-capture': { type: 'string' },
+        replay: { type: 'string' },
+        'judge-disclosure': { type: 'string' },
+        'sample-rate': { type: 'string' },
+        'max-sample-bytes': { type: 'string' },
+        'max-sample-count': { type: 'string' },
+        'retention-seconds': { type: 'string' },
+        classifications: { type: 'string' },
+        'data-class': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -1408,6 +1531,7 @@ async function main(): Promise<void> {
       && command !== 'set-connection-limit'
       && command !== 'set-deployment-limit'
       && command !== 'set-tenant-budget'
+      && command !== 'set-sample-policy'
     )
     || (
       values['requests-per-minute'] !== undefined
@@ -1459,13 +1583,22 @@ async function main(): Promise<void> {
     || (values['failure-threshold'] !== undefined && command !== 'set-deployment-breaker')
     || (values['cooldown-ms'] !== undefined && command !== 'set-deployment-breaker')
     || (values['max-probes'] !== undefined && command !== 'set-deployment-breaker')
-    || (values.deployments !== undefined && command !== 'set-fallback-policy')
+    || (values.deployments !== undefined && command !== 'set-fallback-policy' && command !== 'set-sample-policy')
     || (values.failures !== undefined && command !== 'set-fallback-policy')
     || (values['max-attempts'] !== undefined && command !== 'set-fallback-policy')
-    || (values.providers !== undefined && command !== 'set-fallback-policy')
+    || (values.providers !== undefined && command !== 'set-fallback-policy' && command !== 'set-sample-policy')
     || (values.regions !== undefined && command !== 'set-fallback-policy')
     || (values['min-remaining-deadline-ms'] !== undefined && command !== 'set-fallback-policy')
     || (values['context-limit'] !== undefined && command !== 'set-deployment-context-limit')
+    || (values['content-capture'] !== undefined && command !== 'set-sample-policy')
+    || (values.replay !== undefined && command !== 'set-sample-policy')
+    || (values['judge-disclosure'] !== undefined && command !== 'set-sample-policy')
+    || (values['sample-rate'] !== undefined && command !== 'set-sample-policy')
+    || (values['max-sample-bytes'] !== undefined && command !== 'set-sample-policy')
+    || (values['max-sample-count'] !== undefined && command !== 'set-sample-policy')
+    || (values['retention-seconds'] !== undefined && command !== 'set-sample-policy')
+    || (values.classifications !== undefined && command !== 'set-sample-policy')
+    || (values['data-class'] !== undefined && command !== 'set-deployment-data-class')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');

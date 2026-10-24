@@ -40,6 +40,7 @@ export type Config = {
   logLevel: LogLevel;
   inferenceEnabled: boolean;
   providerCredentialKey: Buffer | null;
+  previousCredentialKeys: Buffer[];
   openAiBaseUrl: string;
   maxActiveStreams: number;
   maxStreamsPerTenant: number;
@@ -76,6 +77,12 @@ function readOpenAiBaseUrl(env: NodeJS.ProcessEnv, errors: string[]): string {
   return value.replace(/\/+$/, '');
 }
 
+function decodeKey(text: string): Buffer | null {
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(text)) return null;
+  const decoded = Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  return decoded.length === 32 ? decoded : null;
+}
+
 function readCredentialKey(
   env: NodeJS.ProcessEnv,
   inferenceEnabled: boolean,
@@ -86,16 +93,32 @@ function readCredentialKey(
     if (inferenceEnabled) errors.push('missing PROVIDER_CREDENTIAL_KEY');
     return null;
   }
-  if (!/^[A-Za-z0-9+/=_-]+$/.test(text)) {
-    errors.push('PROVIDER_CREDENTIAL_KEY must be 32 bytes, base64-encoded');
-    return null;
-  }
-  const decoded = Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-  if (decoded.length !== 32) {
+  const decoded = decodeKey(text);
+  if (decoded === null) {
     errors.push('PROVIDER_CREDENTIAL_KEY must be 32 bytes, base64-encoded');
     return null;
   }
   return decoded;
+}
+
+function readPreviousCredentialKeys(env: NodeJS.ProcessEnv, errors: string[]): Buffer[] {
+  const text = readRequired(env, 'PROVIDER_CREDENTIAL_KEY_PREVIOUS');
+  if (text === undefined) return [];
+  const parts = text.split(',').map((item) => item.trim());
+  if (parts.length === 0 || parts.some((item) => item.length === 0)) {
+    errors.push('PROVIDER_CREDENTIAL_KEY_PREVIOUS must be 32-byte keys, base64-encoded, comma-separated');
+    return [];
+  }
+  const keys: Buffer[] = [];
+  for (const part of parts) {
+    const decoded = decodeKey(part);
+    if (decoded === null) {
+      errors.push('PROVIDER_CREDENTIAL_KEY_PREVIOUS must be 32-byte keys, base64-encoded, comma-separated');
+      return [];
+    }
+    keys.push(decoded);
+  }
+  return keys;
 }
 
 function readRequired(env: NodeJS.ProcessEnv, key: string): string | undefined {
@@ -178,6 +201,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const inferenceEnabled = readInferenceEnabled(env, errors);
   const openAiBaseUrl = readOpenAiBaseUrl(env, errors);
   const providerCredentialKey = readCredentialKey(env, inferenceEnabled, errors);
+  const previousCredentialKeys = readPreviousCredentialKeys(env, errors);
   const maxActiveStreams = readMaxActiveStreams(env, errors);
   const maxStreamsPerTenant = readMaxStreamsPerTenant(env, errors);
   const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
@@ -207,6 +231,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     logLevel: logLevelText as LogLevel,
     inferenceEnabled,
     providerCredentialKey,
+    previousCredentialKeys,
     openAiBaseUrl,
     maxActiveStreams,
     maxStreamsPerTenant,

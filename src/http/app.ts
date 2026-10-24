@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
+import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
+import { listSamples, parseSampleId, parseSampleListQuery, readSample } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
 import type { VertexClientFactory } from '../inference/vertex-client.js';
@@ -31,6 +33,11 @@ export type AppDeps = {
   inferenceEnabled: boolean;
   upstreamBaseUrl: string;
   credentialKey: Buffer | null;
+  previousCredentialKeys?: readonly Buffer[];
+  sampleKeyManager?: SampleKeyManager | null;
+  sampleDraw?: number;
+  beforeSampleStore?: () => Promise<void> | void;
+  failSampleInsert?: () => boolean;
   maxActiveStreams: number;
   maxStreamsPerTenant: number;
   vertexClientFactory?: VertexClientFactory;
@@ -84,6 +91,12 @@ export function buildApp(deps: AppDeps): ProxyApp {
   const app = Fastify({ logger: false }) as unknown as ProxyApp;
   const credentialStore: ProviderCredentialStore | null =
     deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
+  const sampleKeyManager: SampleKeyManager | null =
+    deps.sampleKeyManager !== undefined
+      ? deps.sampleKeyManager
+      : deps.credentialKey === null
+        ? null
+        : createSampleKeyManager(deps.credentialKey, deps.previousCredentialKeys ?? []);
   const streamGate = createStreamGate(deps.maxActiveStreams, deps.maxStreamsPerTenant);
   const nowMs = deps.now ?? ((): number => Date.now());
   app.streamGate = streamGate;
@@ -226,6 +239,10 @@ export function buildApp(deps: AppDeps): ProxyApp {
         afterAdmit: deps.afterAdmit,
         beforeSettle: deps.beforeSettle,
         extractFeatures: deps.extractFeatures,
+        sampleKeyManager,
+        sampleDraw: deps.sampleDraw,
+        beforeSampleStore: deps.beforeSampleStore,
+        failSampleInsert: deps.failSampleInsert,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -382,6 +399,45 @@ export function buildApp(deps: AppDeps): ProxyApp {
       }
     },
   );
+
+  app.get<{ Querystring: { limit?: string; cursor?: string; provider?: string } }>(
+    '/internal/v1/samples',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const query = parseSampleListQuery(request.query);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => listSamples(client, query));
+      } catch (error) {
+        if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+        deps.logger.error('sample read failed');
+        return reply
+          .code(500)
+          .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      }
+    },
+  );
+
+  app.get<{ Params: { sampleId: string } }>('/internal/v1/samples/:sampleId', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const sampleId = parseSampleId(request.params.sampleId);
+      const row = await withTenant(deps.runtimePool, auth.tenantId, (client) => readSample(client, sampleId));
+      if (row === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'sample_id', 'The sample was not found.').body());
+      }
+      return row;
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('sample read failed');
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
 
   app.get<{ Params: { requestId: string } }>('/internal/v1/request-features/:requestId', async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);

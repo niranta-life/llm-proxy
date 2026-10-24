@@ -39,6 +39,8 @@ const UPDATE = {
   'set-deployment-limit': ['tenant-id', 'deployment', 'mode', 'max-concurrency'],
   'set-tenant-budget': ['tenant-id', 'mode', 'monthly-amount'],
   'recover-budget': ['tenant-id'],
+  'set-sample-policy': ['tenant-id', 'mode', 'content-capture', 'replay', 'judge-disclosure', 'sample-rate', 'max-sample-bytes', 'max-sample-count', 'retention-seconds', 'classifications', 'providers', 'deployments'],
+  'set-deployment-data-class': ['tenant-id', 'deployment', 'data-class'],
 } as const;
 
 const VALIDATE = {
@@ -50,6 +52,7 @@ const VALIDATE = {
   'probe-private-health': ['tenant-id', 'deployment'],
   'show-fallback-policy': ['tenant-id', 'alias'],
   'list-inference': ['tenant-id'],
+  'show-sample-policy': ['tenant-id'],
 } as const;
 
 export const INTERACTIVE_GROUPS = {

@@ -1,0 +1,11 @@
+{"samples":[{"id":"38cf2b8f-0acf-47a9-827a-ee5d59b8bdbe","requestId":"31490c8d-6733-454e-a6c1-deac2241ab22","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":501,"createdAt":"2026-10-24T22:21:14.799Z","expiresAt":"2026-10-25T22:21:14.799Z"}],"nextCursor":null}
+
+{"id":"38cf2b8f-0acf-47a9-827a-ee5d59b8bdbe","requestId":"31490c8d-6733-454e-a6c1-deac2241ab22","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":501,"createdAt":"2026-10-24T22:21:14.799Z","expiresAt":"2026-10-25T22:21:14.799Z"}
+
+{"samples":[{"id":"51e6fe03-3fa9-4742-afbc-06985b239cd5","requestId":"25d670b0-a27f-43aa-955b-bc5aff5146f9","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":501,"createdAt":"2026-10-24T22:21:17.808Z","expiresAt":"2026-10-25T22:21:17.808Z"}],"nextCursor":null}
+
+{"id":"51e6fe03-3fa9-4742-afbc-06985b239cd5","requestId":"25d670b0-a27f-43aa-955b-bc5aff5146f9","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":501,"createdAt":"2026-10-24T22:21:17.808Z","expiresAt":"2026-10-25T22:21:17.808Z"}
+
+{"samples":[{"id":"fe7f0d7f-01ba-4fc4-8deb-57921a03f19d","requestId":"87d87cd2-8f92-4d56-8891-a8caff5bfd37","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":479,"createdAt":"2026-10-24T22:21:33.970Z","expiresAt":"2026-10-25T22:21:33.970Z"}],"nextCursor":"fe7f0d7f-01ba-4fc4-8deb-57921a03f19d"}
+
+{"samples":[{"id":"9ae30024-6ad6-4c30-96a0-64d8252dd956","requestId":"135b72fa-116a-4886-8fa6-433456a4ea8b","policyVersion":1,"provider":"openai","deployment":"chat","sizeBytes":479,"createdAt":"2026-10-24T22:21:33.895Z","expiresAt":"2026-10-25T22:21:33.895Z"}],"nextCursor":null}

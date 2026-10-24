@@ -56,6 +56,22 @@ Each row has the task category, how that category was chosen, a local input-toke
 
 The cost reference is the attempt id and the stored cost status. It is not a new charge. A missing cost row leaves those fields empty.
 
+## Encrypted samples
+
+`GET /internal/v1/samples` lists sample metadata for the caller. `GET /internal/v1/samples/{sampleId}` returns one row. Both use the same tenant headers as chat. Another tenant's row is not returned.
+
+The list accepts `limit` from 1 to 50, `provider`, and `cursor`. A bad value is rejected. The next page does not repeat ids from the page before it.
+
+Each row has the sample id, the request id, the policy version, the provider, the deployment, the ciphertext size, and the times. It does not include the prompt, the completion, or the ciphertext.
+
+A sample is stored only after the operator sets the mode to `encrypted_sample` and turns on content capture. The default is metadata only, which stores no content. Replay and judge disclosure are separate and default to denied. No route returns plaintext for replay or a judge.
+
+The stored bytes are an AES-256-GCM envelope. Each sample has its own data key. That key is wrapped by `PROVIDER_CREDENTIAL_KEY`. A retained previous wrapping key can open an older sample after rotation. The tenant id, the sample id, and the schema version are bound to the ciphertext.
+
+Capture runs after a completed non-streaming text chat. A streaming chat is not captured. A capture failure does not change the chat response and does not retry the provider. Hidden thinking, credentials, tool secrets, and caller metadata are not stored.
+
+Set the policy with `set-sample-policy`. Set the deployment data class with `set-deployment-data-class`. Show the current policy with `show-sample-policy`. Turn capture off with `--mode disabled` or `--mode metadata_only`.
+
 Categories are `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, and `unknown`. A caller may send `task` with one of those values. Any other `task` value is rejected and is not stored. When `task` is absent, local rules choose the category, or the category stays `unknown`. The proxy does not call a model to classify the request.
 
 A successful chat records structured output and tool use as false. `tools` and a non-text `response_format` are still rejected before a provider call. The feature row does not contain the prompt, the completion, or a credential.

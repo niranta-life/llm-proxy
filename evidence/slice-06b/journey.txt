@@ -1,0 +1,21 @@
+pass-1
+disabled chat status 200 and no sample
+enabled chat status 200 and body matched
+attempt count 1
+ciphertext bytes 501
+decrypted payload matched the visible chat
+metadata 200
+tenant B list 200 empty
+tenant B by id 404
+disabled mode stored no new sample
+
+pass-2
+disabled chat status 200 and no sample
+enabled chat status 200 and body matched
+attempt count 1
+ciphertext bytes 501
+decrypted payload matched the visible chat
+metadata 200
+tenant B list 200 empty
+tenant B by id 404
+disabled mode stored no new sample

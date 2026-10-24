@@ -1,0 +1,11 @@
+round trip matched
+ciphertext did not contain the plaintext token
+missing key manager stored nothing
+throwing key manager stored nothing
+wrong wrapping key returned null
+tampered ciphertext returned null
+changed associated data returned null
+rotated manager opened the previous sample
+new sample uses wrapping key version 2
+previous manager cannot open the new sample
+oversized payload was not encrypted

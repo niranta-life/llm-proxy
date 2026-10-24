@@ -1,0 +1,24 @@
+disabled capture false replay false judge false
+metadata_only capture false replay false judge false
+missing content capture does not store content
+data_class capture false replay false judge false
+data_class capture false replay false judge false
+selected capture true replay false judge false
+provider capture false replay false judge false
+deployment capture false replay false judge false
+provider capture false replay false judge false
+size capture false replay false judge false
+selected capture true replay false judge false
+count capture false replay false judge false
+selected capture true replay false judge false
+retention_elapsed capture false replay false judge false
+retention_elapsed capture false replay false judge false
+selected capture true replay false judge false
+rate capture false replay false judge false
+selected capture true replay false judge false
+rate capture false replay false judge false
+selected capture true replay false judge false
+rate capture false replay false judge false
+rate capture false replay false judge false
+every gate passed and replay and judge disclosure stayed denied
+payload keeps visible text and effective configuration

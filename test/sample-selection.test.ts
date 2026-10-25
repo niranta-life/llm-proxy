@@ -39,6 +39,7 @@ function policy(over: Partial<SamplePolicy> = {}): SamplePolicy {
   return {
     mode: 'encrypted_sample',
     contentCapture: true,
+    streamingCapture: false,
     replay: false,
     judgeDisclosure: false,
     sampleRate: 1,

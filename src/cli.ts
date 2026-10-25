@@ -157,6 +157,7 @@ type Flags = {
   'min-remaining-deadline-ms'?: string;
   'context-limit'?: string;
   'content-capture'?: string;
+  'streaming-capture'?: string;
   replay?: string;
   'judge-disclosure'?: string;
   'sample-rate'?: string;
@@ -1280,6 +1281,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     const tenantId = requireTenant(values);
     const mode = values.mode ?? '';
     const contentCapture = parseDefaultFalse(values['content-capture']);
+    const streamingCapture = parseDefaultFalse(values['streaming-capture']);
     const replay = parseDefaultFalse(values.replay);
     const judgeDisclosure = parseDefaultFalse(values['judge-disclosure']);
     const sampleRate = parseSampleRate(values['sample-rate']);
@@ -1298,6 +1300,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       tenantId === undefined
       || !isSampleMode(mode)
       || contentCapture === undefined
+      || streamingCapture === undefined
       || replay === undefined
       || judgeDisclosure === undefined
       || sampleRate === undefined
@@ -1336,6 +1339,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       providers,
       deployments,
       recentShare,
+      streamingCapture,
     );
     process.stdout.write(`${JSON.stringify(stored)}\n`);
     return;
@@ -1560,6 +1564,7 @@ async function main(): Promise<void> {
         'min-remaining-deadline-ms': { type: 'string' },
         'context-limit': { type: 'string' },
         'content-capture': { type: 'string' },
+        'streaming-capture': { type: 'string' },
         replay: { type: 'string' },
         'judge-disclosure': { type: 'string' },
         'sample-rate': { type: 'string' },
@@ -1660,6 +1665,7 @@ async function main(): Promise<void> {
     || (values['min-remaining-deadline-ms'] !== undefined && command !== 'set-fallback-policy')
     || (values['context-limit'] !== undefined && command !== 'set-deployment-context-limit')
     || (values['content-capture'] !== undefined && command !== 'set-sample-policy')
+    || (values['streaming-capture'] !== undefined && command !== 'set-sample-policy')
     || (values.replay !== undefined && command !== 'set-sample-policy')
     || (values['judge-disclosure'] !== undefined && command !== 'set-sample-policy')
     || (values['sample-rate'] !== undefined && command !== 'set-sample-policy')

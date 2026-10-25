@@ -4,6 +4,7 @@ export type StoredSamplePolicy = {
   policyVersion: number;
   mode: string;
   contentCapture: boolean;
+  streamingCapture: boolean;
   replay: boolean;
   judgeDisclosure: boolean;
   sampleRate: string | number;
@@ -31,10 +32,11 @@ export async function setSamplePolicy(
   providers: string[],
   deployments: string[],
   recentShare: string,
+  streamingCapture: boolean,
 ): Promise<{ policyId: string; policyVersion: number }> {
   const result = await pool.query<{ policy_id: string; policy_version: number }>(
     `SELECT policy_id, policy_version
-     FROM set_sample_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+     FROM set_sample_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       tenantId,
       mode,
@@ -49,6 +51,7 @@ export async function setSamplePolicy(
       providers,
       deployments,
       recentShare,
+      streamingCapture,
     ],
   );
   const row = result.rows[0];

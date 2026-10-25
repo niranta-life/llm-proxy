@@ -100,7 +100,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `019`. It drops nothing.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `020`. It drops nothing.
 
 | File | What it adds |
 | --- | --- |
@@ -123,8 +123,9 @@ SQL files in `migrations/` apply in lexical order, once, before the proxy listen
 | `017_request_features.sql` | Characteristics of a completed chat. No prompt or completion text. |
 | `018_sample_capture.sql` | A versioned sample policy and encrypted samples. The table stores ciphertext only. |
 | `019_sample_retention.sql` | Sample expiry, a metadata deletion audit, and a durable cleanup job. |
+| `020_stream_samples.sql` | Streaming capture flag and metadata columns for replay eligibility. Sample rows still store ciphertext only. |
 
-Readiness for this tree checks for `019_sample_retention.sql`. An image that expects `018_sample_capture.sql` stays ready on this database because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
+Readiness for this tree checks for `020_stream_samples.sql`. An image that expects `019_sample_retention.sql` stays ready on this database because that row remains recorded. An image that expects `018_sample_capture.sql` stays ready because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
 
 An older image can start on this database when `schema_migrations` still contains the latest file that image knows. Later rows can stay. Do not delete migration rows. Do not delete provider, price, policy, or breaker rows to roll back a behavior. Turn the behavior off with the CLI.
 
@@ -136,7 +137,7 @@ These changes affect one tenant, or one deployment, and do not call the provider
 
 - Turn retry off with `set-execution-policy`, `--deployment`, and `--retries false`. The command also needs the three deadline flags and the two backoff flags. See [Retry](retry.md).
 - Turn fallback off with `set-fallback-policy` and `--enabled false`. A named deployment still does not switch.
-- Turn sample capture off with `set-sample-policy` and `--mode disabled` or `--mode metadata_only`. A new chat then stores no sample. Replay and judge disclosure stay off unless you set them.
+- Turn sample capture off with `set-sample-policy` and `--mode disabled` or `--mode metadata_only`. A new chat then stores no sample. Replay and judge disclosure stay off unless you set them. Streaming capture stays off unless you set `--streaming-capture true`. A completed text stream then stores one encrypted sample. A stream that does not finish stores no replay-ready sample.
 - Disable one deployment with `set-deployment-enabled`, `--name`, and `--enabled false`. The next request for that name returns `model_not_found`.
 - Disable one breaker with `set-deployment-breaker`, `--deployment`, and `--enabled false`.
 - Reset one breaker with `reset-deployment-breaker` and `--deployment`. The next chat can reach the upstream.

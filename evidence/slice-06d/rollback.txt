@@ -1,0 +1,5 @@
+GET /health/ready for 019_sample_retention.sql status 200
+{"status":"ready","database":"ready"}
+applied version 019_sample_retention.sql row count 1
+applied version 020_stream_samples.sql row count 1
+020_stream_samples.sql does not drop a table or a column

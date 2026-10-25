@@ -58,7 +58,7 @@ export type SamplePayload = {
     upstreamModel: string;
     timeoutMs: number;
     dataClassification: string;
-    stream: false;
+    stream: boolean;
   };
   providerMetadata: {
     provider: string;
@@ -94,6 +94,7 @@ type PolicyRow = {
   policy_version: number;
   mode: string;
   content_capture: boolean;
+  streaming_capture: boolean;
   replay_permitted: boolean;
   judge_disclosure_permitted: boolean;
   sample_rate: string;
@@ -162,7 +163,7 @@ export function buildSamplePayload(input: {
       upstreamModel: input.route.upstreamModel,
       timeoutMs: input.route.timeoutMs,
       dataClassification: input.dataClass,
-      stream: false,
+      stream: input.request.stream,
     },
     providerMetadata: {
       provider: input.route.provider,
@@ -175,6 +176,14 @@ export function payloadBytes(payload: SamplePayload): number {
   return Buffer.byteLength(JSON.stringify(payload), 'utf8');
 }
 
+export function requestedCapabilityNames(request: ChatRequest): string[] {
+  const names = Object.keys(request.optional).map((key) =>
+    key === 'response_format' ? 'response_format_text' : key,
+  );
+  names.sort();
+  return names;
+}
+
 export async function captureChatSample(input: {
   pool: Pool;
   logger: Logger;
@@ -182,16 +191,22 @@ export async function captureChatSample(input: {
   requestId: string;
   request: ChatRequest;
   response: UpstreamCompletion['response'];
-  route: Pick<ResolvedRoute, 'deploymentId' | 'requestedModel' | 'deploymentName' | 'provider' | 'upstreamModel' | 'timeoutMs'>;
+  route: Pick<
+    ResolvedRoute,
+    'deploymentId' | 'requestedModel' | 'deploymentName' | 'provider' | 'upstreamModel' | 'timeoutMs' | 'location'
+  >;
   keyManager: SampleKeyManager | null;
   nowMs?: () => number;
   draw?: number;
   beforeStore?: () => Promise<void> | void;
   beforeInsert?: () => Promise<void> | void;
   failInsert?: () => boolean;
+  streamText?: string;
 }): Promise<void> {
+  let storedOk = false;
   try {
-    if (input.request.stream || input.keyManager === null) return;
+    if (input.keyManager === null) return;
+    if (input.request.stream && input.streamText === undefined) return;
     const nowMs = input.nowMs ?? Date.now;
     const started = nowMs();
     const draw = input.draw ?? deterministicDraw(input.tenantId, input.requestId);
@@ -200,12 +215,26 @@ export async function captureChatSample(input: {
       loadGate(client, input.route, now, { sampleBytes: 0, draw, ageMs: 0 }),
     );
     if (!early.decision.capture || early.loaded === null) return;
+    if (input.request.stream && !early.loaded.policy.streamingCapture) return;
     if (overBudget(started, nowMs())) return;
     const dataClass = early.facts.dataClass;
     if (dataClass === null) return;
+    const response =
+      input.streamText === undefined
+        ? input.response
+        : {
+            ...input.response,
+            choices: [
+              {
+                index: 0,
+                message: { role: 'assistant' as const, content: input.streamText },
+                finish_reason: input.response.choices[0]?.finish_reason ?? null,
+              },
+            ],
+          };
     const payload = buildSamplePayload({
       request: input.request,
-      response: input.response,
+      response,
       route: input.route,
       dataClass,
     });
@@ -263,13 +292,24 @@ export async function captureChatSample(input: {
         inputSize: coverage.inputSize,
         complexity: coverage.complexity,
         createdAt: storedAt,
+        requireStreaming: input.request.stream,
+        textOnly: true,
+        requiredCapabilities: requestedCapabilityNames(input.request),
+        sourceLocation: input.route.location,
       });
       if (!inserted) throw new Error('sample capture is no longer authorized');
       return true;
     });
-    if (stored) input.logger.info('sample stored', { requestId: input.requestId, sampleId });
+    if (stored) {
+      storedOk = true;
+      input.logger.info('sample stored', { requestId: input.requestId, sampleId });
+    }
   } catch {
     input.logger.error('sample was not stored', { requestId: input.requestId });
+  } finally {
+    if (input.request.stream) {
+      input.logger.info('stream sample capture finished', { requestId: input.requestId, stored: storedOk });
+    }
   }
 }
 
@@ -401,7 +441,7 @@ function authorizationFacts(policy: SamplePolicy | null, measured: CaptureFacts)
 
 async function loadPolicy(client: PoolClient): Promise<LoadedPolicy | null> {
   const result = await client.query<PolicyRow>(
-    `SELECT id, policy_version, mode, content_capture, replay_permitted, judge_disclosure_permitted,
+    `SELECT id, policy_version, mode, content_capture, streaming_capture, replay_permitted, judge_disclosure_permitted,
             sample_rate::text AS sample_rate, max_sample_bytes, max_sample_count, retention_seconds,
             recent_share::text AS recent_share,
             approved_classifications, allowed_providers, allowed_deployments
@@ -419,6 +459,7 @@ async function loadPolicy(client: PoolClient): Promise<LoadedPolicy | null> {
     policy: {
       mode: row.mode,
       contentCapture: row.content_capture,
+      streamingCapture: row.streaming_capture,
       replay: row.replay_permitted,
       judgeDisclosure: row.judge_disclosure_permitted,
       sampleRate: Number(row.sample_rate),
@@ -466,6 +507,10 @@ async function insertSample(
     inputSize: number;
     complexity: string;
     createdAt: Date;
+    requireStreaming: boolean;
+    textOnly: boolean;
+    requiredCapabilities: string[];
+    sourceLocation: string | null;
   },
 ): Promise<boolean> {
   // Read the latest policy in this statement. A revocation that commits after
@@ -476,7 +521,8 @@ async function insertSample(
        data_classification, schema_version, size_bytes, wrapping_key_version,
        wrapped_key_iv, wrapped_key_tag, wrapped_key_ciphertext,
        content_iv, content_tag, content_ciphertext, created_at, expires_at,
-       fingerprint, slot, task_category, input_size, complexity
+       fingerprint, slot, task_category, input_size, complexity,
+       exchange_complete, text_only, required_capabilities, source_location
      )
      SELECT
        $1, $2, $3, policy.id, policy.policy_version, $4, $5,
@@ -484,11 +530,13 @@ async function insertSample(
        $10, $11, $12,
        $13, $14, $15, $16,
        $16::timestamptz + (policy.retention_seconds * interval '1 second'),
-       $17, $18, $19, $20, $21
+       $17, $18, $19, $20, $21,
+       true, $23, $24::text[], $25
      FROM sample_policies AS policy
      WHERE policy.tenant_id = $2::uuid
        AND policy.mode = 'encrypted_sample'
        AND policy.content_capture = true
+       AND ($22::boolean = false OR policy.streaming_capture = true)
        AND policy.policy_version = (
          SELECT max(latest.policy_version)
          FROM sample_policies AS latest
@@ -516,6 +564,10 @@ async function insertSample(
       input.taskCategory,
       input.inputSize,
       input.complexity,
+      input.requireStreaming,
+      input.textOnly,
+      input.requiredCapabilities,
+      input.sourceLocation,
     ],
   );
   return (result.rowCount ?? 0) === 1;

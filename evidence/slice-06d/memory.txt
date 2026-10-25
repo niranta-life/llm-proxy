@@ -1,0 +1,2 @@
+in-memory buffer discarded when the next delta crosses the ceiling
+completed over-size stream forwarded the text and stored no sample

@@ -89,6 +89,7 @@ describe('provider registry', () => {
       '017_request_features.sql',
       '018_sample_capture.sql',
       '019_sample_retention.sql',
+      '020_stream_samples.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -116,6 +117,8 @@ describe('provider registry', () => {
     expect(sampleCapture).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const sampleRetention = readFileSync(join(projectRoot, 'migrations', '019_sample_retention.sql'), 'utf8');
     expect(sampleRetention).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    const streamSamples = readFileSync(join(projectRoot, 'migrations', '020_stream_samples.sql'), 'utf8');
+    expect(streamSamples).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

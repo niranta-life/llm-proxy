@@ -1,0 +1,116 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 454B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 102B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
+#4 resolve docker.io/library/node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 206.67kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [build 3/6] COPY package.json package-lock.json tsconfig.json ./
+#7 CACHED
+
+#8 [build 4/6] COPY src ./src
+#8 DONE 0.0s
+
+#9 [build 5/6] RUN npm ci
+#9 2.686 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#9 3.000 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#9 5.095 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#9 8.949 
+#9 8.949 added 344 packages, and audited 345 packages in 9s
+#9 8.949 
+#9 8.949 67 packages are looking for funding
+#9 8.949   run `npm fund` for details
+#9 8.971 
+#9 8.971 7 vulnerabilities (5 moderate, 2 critical)
+#9 8.971 
+#9 8.971 To address all issues (including breaking changes), run:
+#9 8.971   npm audit fix --force
+#9 8.971 
+#9 8.971 Run `npm audit` for details.
+#9 8.973 npm warn install-scripts 4 packages have install scripts not yet covered by allowScripts:
+#9 8.973 npm warn install-scripts   @google/genai@2.30.0 (preinstall: echo 'preinstall: no-op')
+#9 8.973 npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+#9 8.973 npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+#9 8.973 npm warn install-scripts   ssh2@1.17.0 (install: node install.js)
+#9 8.973 npm warn install-scripts
+#9 8.973 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#9 8.975 npm notice
+#9 8.975 npm notice New major version of npm available! 11.19.1 -> 12.2.1
+#9 8.975 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+#9 8.975 npm notice To update run: npm install -g npm@12.2.1
+#9 8.975 npm notice
+#9 DONE 9.8s
+
+#10 [build 6/6] RUN npm run build
+#10 0.657 
+#10 0.657 > llm-proxy@0.0.0 build
+#10 0.657 > tsc -p tsconfig.json
+#10 0.657 
+#10 DONE 6.5s
+
+#11 [stage-1 3/6] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [stage-1 4/6] RUN npm ci --omit=dev && npm cache clean --force
+#12 CACHED
+
+#13 [stage-1 5/6] COPY --from=build /app/dist ./dist
+#13 DONE 0.0s
+
+#14 [stage-1 6/6] COPY migrations ./migrations
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 0.1s done
+#15 exporting manifest sha256:34deb372a4b233bd21a7dd255bee1a63f0b8c16266d92904d9e1b3ce999256e0 done
+#15 exporting config sha256:59d53a66a06f890834e785774a8700c0b60aeed0311434bf319c81d947a530f2 done
+#15 exporting attestation manifest sha256:ef92c29e431e2cb9477171d395a219e679d0f09398d1e8381cb518ee0720d430 0.0s done
+#15 exporting manifest list sha256:082c3ab8e257a440c234b4a07da45ad873e92311ec9465089caf7315f07528e9 0.0s done
+#15 naming to docker.io/library/llm-proxy:slice-06d done
+#15 unpacking to docker.io/library/llm-proxy:slice-06d 0.1s done
+#15 DONE 0.2s
+
+What's Next?
+  View a summary of image vulnerabilities and recommendations → docker scout quickview
+BUILD_EXIT:0
+image migrations:
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+006_anthropic_streaming.sql
+007_stream_interrupted.sql
+008_provider_registry.sql
+009_vertex_provider.sql
+010_compatible_providers.sql
+011_private_endpoint.sql
+012_cost_accounting.sql
+013_execution_policy.sql
+014_provider_breaker.sql
+015_tenant_limits.sql
+016_fallback_policy.sql
+017_request_features.sql
+018_sample_capture.sql
+019_sample_retention.sql
+020_stream_samples.sql
+drop check:
+020_stream_samples.sql does not drop a table or a column

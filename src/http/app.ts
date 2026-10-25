@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
+import { parseEligibilityBody, readSampleEligibility } from '../inference/sample-eligibility.js';
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
@@ -449,6 +450,30 @@ export function buildApp(deps: AppDeps): ProxyApp {
     } catch (error) {
       if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
       deps.logger.error('sample read failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    }
+  });
+
+  app.post<{ Params: { sampleId: string } }>('/internal/v1/samples/:sampleId/eligibility-check', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const sampleId = parseSampleId(request.params.sampleId);
+      const body = parseEligibilityBody(request.body);
+      const report = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+        readSampleEligibility(client, sampleId, body.deployment),
+      );
+      if (report === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'sample_id', 'The sample was not found.').body());
+      }
+      return report;
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('sample eligibility failed', { message: errorMessage(error) });
       return reply
         .code(500)
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());

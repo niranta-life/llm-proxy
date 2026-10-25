@@ -1,0 +1,11 @@
+approved eligible true reasons 0 checks 9 policy 22
+unapproved reason deployment_unauthorized
+capability reason capability_mismatch
+residency reason residency_denied
+provider reason provider_denied
+unknown tool_or_multimodal result unknown reason content_inspection
+expired reason expired
+replay off reason replay_denied
+capture revoked reason capture_denied
+ciphertext digest unchanged
+response and log omitted the sample text

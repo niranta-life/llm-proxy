@@ -1,0 +1,33 @@
+openai complete has two text deltas, finish stop, and done
+openai unicode splits a combining mark across two deltas
+openai unicode bytes split one character across writes
+openai empty has finish stop and done and no text
+openai missing terminal has text and no done
+openai provider failure is an upstream 500
+openai cancel aborts after the first frame
+openai slow consumer pauses the caller
+openai oversize sends two deltas above the byte ceiling
+openai revoke clears streaming capture after the first frame
+anthropic complete uses normal.sse
+anthropic thinking uses thinking.sse and stores visible text only
+anthropic tool uses tool-use.sse and stores no sample
+vertex complete sends two text parts and finish
+vertex thought omits the thought part
+capture off completed stream stored 0
+openai capture on stored 1 and the SSE bytes matched capture off
+anthropic capture on stored 1 and the text matched the forwarded deltas
+vertex capture on stored 1 and the SSE bytes matched capture off aside from the clock
+unicode combining mark and split bytes stayed in order
+empty openai and vertex completions stored one sample each
+missing terminal stored 0
+provider failure stored 0 and added one attempt
+client cancel stored 0
+slow consumer stored 0
+over-size completed stream stored 0
+mid-stream revocation stored 0 and the forwarded deltas stayed in order
+thinking samples kept visible text only and the tool stream stored 0
+non-stream capture still stored one sample with stream false
+journey completed sample stored and cancelled stream stored 0
+openai sdk text matched with capture off and on and one sample was stored
+in-memory buffer discarded when the next delta crosses the ceiling
+completed over-size stream forwarded the text and stored no sample

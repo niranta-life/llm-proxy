@@ -20,6 +20,9 @@ import {
   type ExtractedFeatures,
   type FeatureExtractInput,
 } from './request-features.js';
+import { captureChatSample } from './samples.js';
+import type { SampleKeyManager } from './sample-crypto.js';
+import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
 import {
   deadlineKindOf,
@@ -113,6 +116,11 @@ export async function runChatStream(input: {
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
   extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
+  sampleKeyManager?: SampleKeyManager | null;
+  sampleDraw?: number;
+  beforeSampleStore?: () => Promise<void> | void;
+  beforeSampleInsert?: () => Promise<void> | void;
+  failSampleInsert?: () => boolean;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -146,6 +154,12 @@ export async function runChatStream(input: {
   let attemptId = '';
   let apiKey = '';
   let opened = false;
+  let gateReleased = false;
+  const releaseGate = (): void => {
+    if (gateReleased) return;
+    gateReleased = true;
+    input.gate.release(input.tenantId);
+  };
   let ordinal = 1;
   let fellBack = false;
   let fallbackUsed = false;
@@ -226,6 +240,7 @@ export async function runChatStream(input: {
     });
     const started = process.hrtime.bigint();
     let machine = initialStreamMachine();
+    const visible = createVisibleCapture();
     let header: { id: string; model: string; created: number } | null = null;
     let bytesWritten = 0;
     let chunkCount = 0;
@@ -372,6 +387,7 @@ export async function runChatStream(input: {
         if (rendered === null) continue;
         bytesWritten += await writeFrame(input.reply, rendered, timeouts.backpressure, input.signal, deadline.signal);
         chunkCount += 1;
+        if (event.type === 'text_delta') appendVisibleDelta(visible, event.text);
       }
       }
     } catch (error) {
@@ -518,10 +534,44 @@ export async function runChatStream(input: {
     });
 
     if (outputStarted) {
+      let downstreamClosed = false;
       try {
         input.reply.end();
+        downstreamClosed = true;
       } catch {
-        // The caller may already have closed the socket.
+        downstreamClosed = false;
+      }
+      releaseGate();
+      const text = visibleCaptureText(visible);
+      if (downstreamClosed && terminal === 'completed' && text !== null) {
+        await captureChatSample({
+          pool: input.runtimePool,
+          logger: input.logger,
+          tenantId: input.tenantId,
+          requestId,
+          request: input.request,
+          response: {
+            id: header?.id ?? 'chatcmpl-stream',
+            object: 'chat.completion',
+            created: header?.created ?? 0,
+            model: header?.model ?? input.route.upstreamModel,
+            choices: [
+              {
+                index: 0,
+                message: { role: 'assistant', content: text },
+                finish_reason: stopReason,
+              },
+            ],
+          },
+          route: input.route,
+          keyManager: input.sampleKeyManager ?? null,
+          nowMs: input.nowMs,
+          draw: input.sampleDraw,
+          beforeStore: input.beforeSampleStore,
+          beforeInsert: input.beforeSampleInsert,
+          failInsert: input.failSampleInsert,
+          streamText: text,
+        });
       }
       return;
     }
@@ -596,7 +646,7 @@ export async function runChatStream(input: {
     }
     apiKey = '';
     untrack();
-    input.gate.release(input.tenantId);
+    releaseGate();
     await transport.release();
   }
 }

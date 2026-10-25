@@ -1,0 +1,1 @@
+openai sdk text matched with capture off and on and one sample was stored

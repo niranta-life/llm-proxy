@@ -826,6 +826,7 @@ const specs: Spec[] = [
       'tenant-id': (await openaiChat()).tenantId,
       mode: 'metadata_only',
       'content-capture': 'false',
+      'streaming-capture': 'false',
       replay: 'false',
       'judge-disclosure': 'false',
       'sample-rate': '0',

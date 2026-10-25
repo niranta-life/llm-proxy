@@ -20,7 +20,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | Usage + Cost Tracking | Prices each attempt from registered prices. Settles the budget reservation. | `src/inference/cost.ts`, `src/inference/cost-store.ts`, `src/db/prices.ts` |
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |
 | Key custody | Encrypts provider keys with AES-256-GCM. The key comes from `PROVIDER_CREDENTIAL_KEY`. | `src/credentials.ts` |
-| Sample capture | Stores an approved non-streaming text chat as an encrypted envelope. A bounded recent and diverse set is kept. Expired and revoked samples are deleted by a PostgreSQL job. Metadata routes return no content. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts` |
+| Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. Expired and revoked samples are deleted by a PostgreSQL job. Metadata routes return no content. An eligibility check reads metadata and does not run a replay. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
 | Logging | Removes secrets, prompts, and chat messages from logs. | `src/logger.ts`, `src/redact.ts` |
 | Admin | All config changes. There is no HTTP admin API. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts` |
 
@@ -49,6 +49,7 @@ Fallback is allowed only before the proxy sends a response header or a response 
 | `GET /internal/v1/request-features`, `GET /internal/v1/request-features/{requestId}` | Characteristics of completed chats. No prompt or completion text. See [Metrics](metrics.md). |
 | `GET /internal/v1/samples`, `GET /internal/v1/samples/{sampleId}`, `GET /internal/v1/samples/stats` | Metadata and coverage counts for encrypted samples. No prompt, completion, or ciphertext. See [Metrics](metrics.md). |
 | `DELETE /internal/v1/samples/{sampleId}` | Deletes one sample for the calling tenant. |
+| `POST /internal/v1/samples/{sampleId}/eligibility-check` | Metadata-only replay eligibility for one target deployment. It does not decrypt the sample or start a replay. |
 
 ## Data model
 
@@ -77,7 +78,7 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 
 Not built. The design:
 
-- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved non-streaming text chat as an encrypted sample and delete it when it expires or capture is turned off. Replay, a judge, and rankings are not built.
+- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on, and delete it when it expires or capture is turned off. An eligibility check reports whether that sample may be replayed later. Replay, a judge, and rankings are not built.
 - **Evaluator.** Workers take jobs from a durable queue, replay stored requests on other deployments, and score them with a judge model.
 - **Optimizer.** Writes per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches.
 - **Infra.** Redis for hot counters and the job queue, and an external secret manager for provider keys.

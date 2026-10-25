@@ -179,6 +179,11 @@ export async function executeChat(input: {
       afterAdmit: input.afterAdmit,
       beforeSettle: input.beforeSettle,
       extractFeatures: input.extractFeatures,
+      sampleKeyManager: input.sampleKeyManager ?? null,
+      sampleDraw: input.sampleDraw,
+      beforeSampleStore: input.beforeSampleStore,
+      beforeSampleInsert: input.beforeSampleInsert,
+      failSampleInsert: input.failSampleInsert,
     });
     return undefined;
   }

@@ -1,0 +1,11 @@
+streaming capture enabled
+capture off stored 0
+capture on stored 1 encrypted sample
+incremental output matched capture off
+cancelled stream stored 0
+approved target eligible true policy 22
+unapproved target eligible false reason deployment_unauthorized
+eligibility added 0 model attempts
+eligibility added 0 sample jobs
+eligibility added 0 provider calls
+routing policy version unchanged during the metadata checks

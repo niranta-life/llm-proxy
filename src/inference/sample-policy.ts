@@ -8,6 +8,7 @@ export type DataClass = (typeof DATA_CLASSES)[number];
 export type SamplePolicy = {
   mode: SampleMode;
   contentCapture: boolean;
+  streamingCapture: boolean;
   replay: boolean;
   judgeDisclosure: boolean;
   sampleRate: number;
@@ -55,6 +56,7 @@ export function defaultSamplePolicy(): SamplePolicy {
   return {
     mode: 'metadata_only',
     contentCapture: false,
+    streamingCapture: false,
     replay: false,
     judgeDisclosure: false,
     sampleRate: 0,

@@ -70,7 +70,9 @@ A sample is stored only after the operator sets the mode to `encrypted_sample` a
 
 The stored bytes are an AES-256-GCM envelope. Each sample has its own data key. That key is wrapped by `PROVIDER_CREDENTIAL_KEY`. A retained previous wrapping key can open an older sample after rotation. The tenant id, the sample id, and the schema version are bound to the ciphertext.
 
-Capture runs after a completed non-streaming text chat. A streaming chat is not captured. The insert stores a row only when the latest policy still allows encrypted capture. A capture failure does not change the chat response and does not retry the provider. Hidden thinking, credentials, tool secrets, and caller metadata are not stored.
+Capture runs after a completed non-streaming text chat. A completed text stream is captured only when streaming capture is also on. The default is off. The insert stores a row only when the latest policy still allows encrypted capture. A capture failure does not change the chat response and does not retry the provider. The stored stream text is the caller-visible text in order. Hidden thinking, tool-use arguments and results, credentials, and caller metadata are not stored. A failed, cancelled, truncated, revoked, or over-size stream stores no replay-ready sample.
+
+`POST /internal/v1/samples/{sampleId}/eligibility-check` takes `{ "deployment": "<name>" }`. It returns `eligible`, `reasons`, one result for each metadata check, and the policy version. A check that needs the sample text is `unknown`. `eligible` is true only when every check passes. The route does not decrypt the sample, call a provider, start a replay, reserve budget, call a judge, change rankings, or change routing.
 
 Set the policy with `set-sample-policy`. Set the deployment data class with `set-deployment-data-class`. Show the current policy with `show-sample-policy`. Show coverage with `show-sample-stats`. Delete one sample with `delete-sample`. Delete expired and revoked samples with `cleanup-expired-samples`. Turn capture off with `--mode disabled` or `--mode metadata_only`. A cleanup failure does not change the chat response and does not add a provider attempt.
 

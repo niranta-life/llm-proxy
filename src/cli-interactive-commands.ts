@@ -39,7 +39,7 @@ const UPDATE = {
   'set-deployment-limit': ['tenant-id', 'deployment', 'mode', 'max-concurrency'],
   'set-tenant-budget': ['tenant-id', 'mode', 'monthly-amount'],
   'recover-budget': ['tenant-id'],
-  'set-sample-policy': ['tenant-id', 'mode', 'content-capture', 'replay', 'judge-disclosure', 'sample-rate', 'max-sample-bytes', 'max-sample-count', 'retention-seconds', 'classifications', 'providers', 'deployments'],
+  'set-sample-policy': ['tenant-id', 'mode', 'content-capture', 'streaming-capture', 'replay', 'judge-disclosure', 'sample-rate', 'max-sample-bytes', 'max-sample-count', 'retention-seconds', 'classifications', 'providers', 'deployments'],
   'set-deployment-data-class': ['tenant-id', 'deployment', 'data-class'],
   'delete-sample': ['tenant-id', 'sample-id'],
   'cleanup-expired-samples': ['tenant-id'],

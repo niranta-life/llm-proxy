@@ -109,6 +109,7 @@ const FIELD_HINTS: Readonly<Record<string, string>> = {
   'tls-verify': 'true or false.',
   'effective-at': 'Start time of the price, ISO 8601.',
   'content-capture': 'true or false. false stores no chat content.',
+  'streaming-capture': 'true or false. false stores no streamed text. The default is false.',
   replay: 'true or false. false denies future replay.',
   'judge-disclosure': 'true or false. false denies future judge disclosure.',
   'sample-rate': 'A rate from 0 to 1. Use at most 6 decimal places.',

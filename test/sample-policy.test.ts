@@ -29,6 +29,7 @@ function policy(over: Partial<SamplePolicy> = {}): SamplePolicy {
   return {
     mode: 'encrypted_sample',
     contentCapture: true,
+    streamingCapture: false,
     replay: false,
     judgeDisclosure: false,
     sampleRate: 1,
@@ -52,6 +53,7 @@ describe('sample capture policy', () => {
   it('defaults to metadata only and keeps replay and judge disclosure denied', () => {
     expect(defaultSamplePolicy().mode).toBe('metadata_only');
     expect(defaultSamplePolicy().contentCapture).toBe(false);
+    expect(defaultSamplePolicy().streamingCapture).toBe(false);
     expect(defaultSamplePolicy().replay).toBe(false);
     expect(defaultSamplePolicy().judgeDisclosure).toBe(false);
     const missing = decideSampleCapture(null, facts());

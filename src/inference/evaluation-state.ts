@@ -30,6 +30,23 @@ export const ITEM_REASON_CODES = [
   'item_limit_exceeded',
   'run_limit_exceeded',
   'sample_category_mismatch',
+  'replay_completed',
+  'provider_timeout',
+  'provider_rate_limited',
+  'provider_error',
+  'malformed_output',
+  'usage_missing',
+  'cost_missing',
+  'invalid_canonical',
+  'semantic_rejected',
+  'deployment_unhealthy',
+  'rate_limited',
+  'concurrency_limited',
+  'not_dispatched',
+  'uncertain',
+  'kill_switch',
+  'admission_unavailable',
+  'output_not_sealed',
 ] as const;
 
 export type RunStatus = (typeof RUN_STATUSES)[number];

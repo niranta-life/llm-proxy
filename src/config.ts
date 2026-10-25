@@ -46,6 +46,7 @@ export type Config = {
   maxStreamsPerTenant: number;
   streamShutdownDrainMs: number;
   evaluationExecutionEnabled: boolean;
+  evaluationReplayTenantIds: readonly string[];
   database: {
     host: string;
     port: number;
@@ -171,6 +172,24 @@ function readEvaluationExecutionEnabled(env: NodeJS.ProcessEnv, errors: string[]
   return false;
 }
 
+const TENANT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function readEvaluationReplayTenants(env: NodeJS.ProcessEnv, errors: string[]): readonly string[] {
+  const value = env.EVALUATION_REPLAY_TENANTS;
+  if (value === undefined || value.trim() === '') return [];
+  const ids: string[] = [];
+  for (const part of value.split(',')) {
+    const id = part.trim().toLowerCase();
+    if (id === '') continue;
+    if (!TENANT_ID.test(id)) {
+      errors.push('EVALUATION_REPLAY_TENANTS must be a comma-separated list of tenant ids');
+      return [];
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 function readPort(value: string, label: string, errors: string[]): number | undefined {
   if (!/^\d+$/.test(value)) {
     errors.push(`${label} must be an integer from 1 to 65535`);
@@ -216,6 +235,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const maxStreamsPerTenant = readMaxStreamsPerTenant(env, errors);
   const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
   const evaluationExecutionEnabled = readEvaluationExecutionEnabled(env, errors);
+  const evaluationReplayTenantIds = readEvaluationReplayTenants(env, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -248,6 +268,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     maxStreamsPerTenant,
     streamShutdownDrainMs,
     evaluationExecutionEnabled,
+    evaluationReplayTenantIds,
     database: {
       host: databaseHost,
       port: databasePort,

@@ -1,0 +1,2 @@
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stops a call when permission is revoked or the run is cancelled during execution 2330ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stays idle for another tenant, stops on the kill switch, and still loads a dry run 4035ms

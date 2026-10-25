@@ -1,0 +1,18 @@
+ ✓ test/evaluations-replay.test.ts > challenger model replay > keeps the replay path off the public proxy and off production routing 1ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > replays one approved sample on the pinned challenger and hides the output text 1173ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > does not call the provider for a sample or deployment from another tenant 2260ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > fails an expired sample, a revoked permission, a capability mismatch, and bad ciphertext before dispatch 4317ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stops a call when permission is revoked or the run is cancelled during execution 2291ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > records timeout, rate limit, malformed output, missing usage, and missing cost 5750ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > does not call the provider when the evaluation budget is exceeded 1222ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > does not dispatch after a crash before the call and does not repeat a call after dispatch 2164ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > does not apply a duplicate delivery of a completed replay 1030ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > keeps two evaluations inside the tenant concurrency limit and blocks a second request rate 2340ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > rejects tool input, leaves routing unchanged, and replays twenty samples without leaking text 2796ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stays idle for another tenant, stops on the kill switch, and still loads a dry run 4342ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > fails unhealthy and residency checks before the provider call 2121ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > reads a half-open breaker and does not take the production probe 3451ms
+ ↓ test/evaluations-replay.test.ts > optional live challenger replay > is not part of the mock suite
+ Test Files  57 passed | 2 skipped (59)
+      Tests  497 passed | 4 skipped (501)
+EXIT:0

@@ -69,7 +69,8 @@ The process refuses to listen when a required value is missing or invalid.
 | `MAX_ACTIVE_STREAMS` | no | Open streams in this process. Default `32`. Integer from 1 through 10000. |
 | `MAX_STREAMS_PER_TENANT` | no | Open streams for one tenant in this process. Default `32`. Same range. Not shared with another process. |
 | `STREAM_SHUTDOWN_DRAIN_MS` | no | Drain time after `SIGTERM` or `SIGINT`. Default `5000`. Integer from 0 through 600000. |
-| `EVALUATION_EXECUTION_ENABLED` | no | `true` or `false`. Default `false`. This slice does not call a model when the value is `true`. |
+| `EVALUATION_EXECUTION_ENABLED` | no | `true` or `false`. Default `false`. A `true` value does not call a model by itself. |
+| `EVALUATION_REPLAY_TENANTS` | no | Comma-separated tenant ids. Default empty. Invalid text is a configuration error. Ids are stored in lowercase. Duplicate ids are kept once. |
 | `EVALUATION_DRY_RUN` | worker only | `true` or `false`. Default `false`. `true` lets the evaluation worker advance dry-run items. It does not call a model. |
 | `EVALUATION_WORKER_DRAIN` | worker only | `true` or `false`. Default `false`. `true` makes the worker exit after the queue is idle. |
 
@@ -103,7 +104,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `021`. It drops nothing.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `022`. It drops no table and no column.
 
 | File | What it adds |
 | --- | --- |
@@ -128,8 +129,9 @@ SQL files in `migrations/` apply in lexical order, once, before the proxy listen
 | `019_sample_retention.sql` | Sample expiry, a metadata deletion audit, and a durable cleanup job. |
 | `020_stream_samples.sql` | Streaming capture flag and metadata columns for replay eligibility. Sample rows still store ciphertext only. |
 | `021_evaluation_orchestration.sql` | Evaluation definitions, runs, items, and dry-run worker jobs. The rows store metadata only. |
+| `022_evaluation_replay.sql` | Replay jobs, replay attempts, and evaluation traffic on `proxy_requests`. Challenger output is ciphertext. Dry-run rows stay valid. |
 
-Readiness for this tree checks for `021_evaluation_orchestration.sql`. An image that expects `020_stream_samples.sql` stays ready on this database because that row remains recorded. An image that expects `019_sample_retention.sql` stays ready on this database because that row remains recorded. An image that expects `018_sample_capture.sql` stays ready because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
+Readiness for this tree checks for `022_evaluation_replay.sql`. An image that expects `021_evaluation_orchestration.sql` stays ready on this database because that row remains recorded. An image that expects `020_stream_samples.sql` stays ready on this database because that row remains recorded. An image that expects `019_sample_retention.sql` stays ready on this database because that row remains recorded. An image that expects `018_sample_capture.sql` stays ready because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
 
 An older image can start on this database when `schema_migrations` still contains the latest file that image knows. Later rows can stay. Do not delete migration rows. Do not delete provider, price, policy, or breaker rows to roll back a behavior. Turn the behavior off with the CLI.
 
@@ -171,11 +173,15 @@ Use this order. Do not skip a step.
 
 `POST /internal/v1/samples/{sampleId}/eligibility-check` reports metadata only. It does not start a replay.
 
-`POST /internal/v1/evaluations/preflight` checks a dry-run plan. `POST /internal/v1/evaluations` stores a queued run when the check passes. The routes do not decrypt a sample and do not call a model. Cancel a queued run with `POST /internal/v1/evaluations/{id}/cancel`. The run stays `cancelled` and the worker does not complete its items.
+`POST /internal/v1/evaluations/preflight` checks a plan. `POST /internal/v1/evaluations` stores a queued run when the check passes. The routes do not decrypt a sample and do not call a model. `mode` is `dry_run` or `replay`. Cancel a queued run with `POST /internal/v1/evaluations/{id}/cancel`. The run stays `cancelled` and the worker does not complete its items.
+
+A replay worker decrypts one approved sample in that tenant. It calls the pinned challenger through the provider adapter. It does not call `POST /v1/chat/completions`. It does not use `model=auto`. It does not run tools. It stores the challenger output as ciphertext. Operator JSON has cost, latency, usage, and status. It has no prompt and no completion text. The worker reads breaker state. It does not claim a production probe and it does not change the breaker row.
+
+A replay call runs only when `EVALUATION_EXECUTION_ENABLED` is `true`, the tenant id is in `EVALUATION_REPLAY_TENANTS`, and the job kind is `replay`. Dry-run jobs stay on the dry-run path. That path does not call a model.
 
 ## Evaluation rollback
 
-Stop the evaluation worker. Leave `EVALUATION_EXECUTION_ENABLED` unset or `false`. Leave `021_evaluation_orchestration.sql` applied. Do not delete that version row. The inference process does not start the evaluation worker. Readiness for an image that expects `020_stream_samples.sql` still finds that version row. A later image that expects `021_evaluation_orchestration.sql` stays ready on the same database.
+Stop the evaluation worker. Leave `EVALUATION_EXECUTION_ENABLED` unset or `false`. Leave `EVALUATION_REPLAY_TENANTS` empty. Leave `022_evaluation_replay.sql` applied. Do not delete that version row. The inference process does not start the evaluation worker. Readiness for an image that expects `021_evaluation_orchestration.sql` still finds that version row. Readiness for an image that expects `020_stream_samples.sql` still finds that version row.
 
 To run the worker as a second process:
 
@@ -183,11 +189,11 @@ To run the worker as a second process:
 EVALUATION_DRY_RUN=true node dist/evaluation-worker.js
 ```
 
-`SIGTERM` stops new claims. A leased item stays recoverable after the lease time. The worker does not call a model.
+`SIGTERM` stops new claims. A leased item stays recoverable after the lease time. Dry-run does not call a model. Set `EVALUATION_EXECUTION_ENABLED=false` to stop new replay calls. A call that already left the worker is not sent again.
 
 ## Docker deployment
 
-Compose runs one `postgres:16` service and one `app` service. The image build context is this directory. The app listens on port 8080. Inference stays off until `INFERENCE_ENABLED` is true. `PROVIDER_CREDENTIAL_KEY` is required when inference is on. The cleanup worker starts inside the app process. It is not a second Compose service. The evaluation worker is a separate process. The image command stays `node dist/index.js`. Run `node dist/evaluation-worker.js` only when you want dry-run evaluation jobs. Evaluation execution stays off unless `EVALUATION_DRY_RUN` is `true`. That mode does not call a model. `stop_grace_period` is 20 seconds. The ready check calls `http://127.0.0.1:8080/health/ready`.
+Compose runs one `postgres:16` service and one `app` service. The image build context is this directory. The app listens on port 8080. Inference stays off until `INFERENCE_ENABLED` is true. `PROVIDER_CREDENTIAL_KEY` is required when inference is on. The cleanup worker starts inside the app process. It is not a second Compose service. The evaluation worker is a separate process. The image command stays `node dist/index.js`. Run `node dist/evaluation-worker.js` only when you want evaluation jobs. Dry-run state changes run when `EVALUATION_DRY_RUN` is `true`. That path does not call a model. A replay call runs when `EVALUATION_EXECUTION_ENABLED` is `true`, the tenant is listed in `EVALUATION_REPLAY_TENANTS`, and the job kind is `replay`. `stop_grace_period` is 20 seconds. The ready check calls `http://127.0.0.1:8080/health/ready`.
 
 Two or more app processes can share one database. Give each process the same `PROVIDER_CREDENTIAL_KEY` and the same previous keys. Each process keeps its own stream slots. Sample rows are shared through PostgreSQL.
 

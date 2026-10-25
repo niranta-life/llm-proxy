@@ -1,0 +1,8 @@
+The replay worker reads breaker admission.
+A half-open breaker with max_probes 1 stays at probes_inflight 0 after a completed replay.
+An open breaker whose cooldown has elapsed stays open with probes_inflight 0.
+The next production guard claims that one probe and moves the row to half_open.
+An open breaker inside its cooldown fails the item as deployment_unhealthy and leaves probes_inflight 0.
+Test: reads a half-open breaker and does not take the production probe.
+Result: passed.
+Suite: 497 passed, 4 skipped, EXIT 0.

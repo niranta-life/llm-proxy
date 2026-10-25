@@ -313,6 +313,51 @@ export async function insertPending(
   return { requestId, attemptId, protectedCredential };
 }
 
+export async function insertEvaluationPending(
+  client: PoolClient,
+  tenantId: string,
+  route: ResolvedRoute,
+): Promise<{ requestId: string; attemptId: string; protectedCredential: string | null }> {
+  const request = await client.query<{ id: string }>(
+    `INSERT INTO proxy_requests (
+       tenant_id, deployment_id, deployment_config_version, connection_id, connection_version,
+       requested_model, status, traffic_class
+     ) VALUES ($1, $2, $3, $4, $5, $6, 'pending', 'evaluation')
+     RETURNING id`,
+    [
+      tenantId,
+      route.deploymentId,
+      route.configVersion,
+      route.connectionId,
+      route.connectionVersion,
+      route.requestedModel,
+    ],
+  );
+  const requestId = request.rows[0]?.id;
+  if (requestId === undefined) throw new Error('request was not created');
+  const attempt = await client.query<{ id: string }>(
+    `INSERT INTO model_attempts (
+       tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status,
+       attempt_ordinal, policy_id, policy_version,
+       trigger_reason, fallback_policy_id, fallback_policy_version
+     ) VALUES ($1, $2, $3, $4, $5, 'pending', 1, $6, $7, 'primary', NULL, NULL)
+     RETURNING id`,
+    [
+      tenantId,
+      requestId,
+      route.deploymentId,
+      route.configVersion,
+      route.upstreamModel,
+      route.executionPolicy?.id ?? null,
+      route.executionPolicy?.version ?? 1,
+    ],
+  );
+  const attemptId = attempt.rows[0]?.id;
+  if (attemptId === undefined) throw new Error('attempt was not created');
+  const protectedCredential = await openRouteCredential(client, tenantId, route.connectionId);
+  return { requestId, attemptId, protectedCredential };
+}
+
 export async function openRouteCredential(
   client: PoolClient,
   tenantId: string,

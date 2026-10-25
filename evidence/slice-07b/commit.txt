@@ -1,0 +1,4 @@
+Parent: 9ab923ee45231dc394c2f85296990ee100fda416
+Subject: feat(proxy): replay approved samples on a pinned challenger
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

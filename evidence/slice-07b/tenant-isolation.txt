@@ -1,0 +1,11 @@
+ ✓ test/evaluations-replay.test.ts > challenger model replay > does not call the provider for a sample or deployment from another tenant 2315ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stays idle for another tenant, stops on the kill switch, and still loads a dry run 4035ms
+stdout | test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant
+ ✓ test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant 1775ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > creates a dry run, pages it, and hides it from another tenant 1337ms
+ ✓ test/fallback-policy.test.ts > policy-controlled fallback > does not call a deployment owned by another tenant 39ms
+stdout | test/breaker.test.ts > provider circuit breaker > does not change another tenant
+ ✓ test/breaker.test.ts > provider circuit breaker > does not change another tenant 330ms
+ ✓ test/stream-samples-http.test.ts > streaming samples and replay eligibility > reports eligibility without a replay and hides the sample from another tenant 3459ms
+ ✓ test/anthropic-stream-integration.test.ts > Anthropic streaming > keeps a tenant off another tenant configuration and credential 224ms
+ ✓ test/evaluations-replay.test.ts > challenger model replay > stays idle for another tenant, stops on the kill switch, and still loads a dry run 4035ms

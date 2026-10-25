@@ -14,6 +14,7 @@ import {
   type PreflightSampleFact,
 } from './evaluation-preflight.js';
 import {
+  ITEM_REASON_CODES,
   countItems,
   isItemStatus,
   isRunStatus,
@@ -50,7 +51,7 @@ export type EvaluationPlan = {
   judgeDeployment: string | null;
   requiredCapabilities: string[] | null;
   budgetEstimate: string;
-  mode: 'dry_run';
+  mode: 'dry_run' | 'replay';
 };
 
 export type EvaluationRunView = {
@@ -62,8 +63,8 @@ export type EvaluationRunView = {
   sampleCategory: string;
   challengerDeployment: string;
   judgeDeployment: string | null;
-  mode: 'dry_run';
-  modelExecution: 'off';
+  mode: 'dry_run' | 'replay';
+  modelExecution: 'off' | 'pinned';
   itemCount: number;
   pendingCount: number;
   queuedCount: number;
@@ -83,6 +84,17 @@ export type EvaluationItemView = {
   ordinal: number;
   status: ItemStatus;
   reasonCode: ItemReasonCode | null;
+  originalDeployment?: string;
+  challengerDeployment?: string;
+  configVersion?: number;
+  adapterVersion?: number;
+  providerResponseId?: string | null;
+  latencyMs?: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  costAmount?: string | null;
+  costStatus?: string | null;
 };
 
 type RunRow = {
@@ -187,7 +199,9 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
     throw invalidRequest('budget_estimate', 'invalid_parameter', 'budgetEstimate is invalid.');
   }
   const budgetEstimate = canonicalBudget(body.budgetEstimate);
-  if (body.mode !== 'dry_run') throw invalidRequest('mode', 'invalid_parameter', 'mode must be dry_run.');
+  if (body.mode !== 'dry_run' && body.mode !== 'replay') {
+    throw invalidRequest('mode', 'invalid_parameter', 'mode must be dry_run or replay.');
+  }
   return {
     name,
     sampleCategory,
@@ -196,7 +210,7 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
     judgeDeployment,
     requiredCapabilities,
     budgetEstimate,
-    mode: 'dry_run',
+    mode: body.mode,
   };
 }
 
@@ -251,8 +265,8 @@ export function evaluationRequestHash(plan: EvaluationPlan): string {
 
 export function snapshotFor(plan: EvaluationPlan): Record<string, unknown> {
   return {
-    mode: 'dry_run',
-    modelExecution: 'off',
+    mode: plan.mode,
+    modelExecution: plan.mode === 'replay' ? 'pinned' : 'off',
     name: plan.name,
     sampleCategory: plan.sampleCategory,
     sampleIds: [...plan.sampleIds],
@@ -264,7 +278,7 @@ export function snapshotFor(plan: EvaluationPlan): Record<string, unknown> {
 }
 
 export async function preflightStoredPlan(client: PoolClient, plan: EvaluationPlan): Promise<{ accepted: true; itemCount: number }> {
-  const facts = await loadPreflightFacts(client, plan);
+  const facts = await loadEvaluationFacts(client, plan);
   preflightEvaluation(facts);
   return { accepted: true, itemCount: plan.sampleIds.length };
 }
@@ -337,12 +351,14 @@ export async function createEvaluation(
   }
   await applyRun(client, runId, 'preflight');
   await applyRun(client, runId, 'queued');
+  const jobKind = plan.mode === 'replay' ? 'replay' : 'dry_run';
+  const jobKeyPrefix = jobKind === 'replay' ? 'replay' : 'dry-run';
   for (const itemId of itemIds) {
     await applyItem(client, itemId, 'queued', null);
     await client.query(
       `INSERT INTO evaluation_jobs (tenant_id, run_id, item_id, kind, idempotency_key, status, payload)
-       VALUES ($1, $2, $3, 'dry_run', $4, 'pending', jsonb_build_object('kind', 'dry_run'))`,
-      [tenantId, runId, itemId, `dry-run:${itemId}`],
+       VALUES ($1, $2, $3, $4, $5, 'pending', jsonb_build_object('kind', $4::text))`,
+      [tenantId, runId, itemId, jobKind, `${jobKeyPrefix}:${itemId}`],
     );
   }
   await syncRunProgress(client, runId);
@@ -401,15 +417,33 @@ export async function listEvaluationItems(
     ordinal: number;
     status: string;
     reason_code: string | null;
+    attempt_id: string | null;
+    original_deployment: string | null;
+    challenger_deployment: string | null;
+    config_version: number | null;
+    adapter_version: number | null;
+    provider_response_id: string | null;
+    latency_ms: number | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    cost_amount: string | null;
+    cost_status: string | null;
   }>(
-    `SELECT id::text AS id, sample_id::text AS sample_id, ordinal, status, reason_code
-     FROM evaluation_items
-     WHERE run_id = $1
+    `SELECT i.id::text AS id, i.sample_id::text AS sample_id, i.ordinal, i.status, i.reason_code,
+            a.id::text AS attempt_id, a.original_deployment, a.challenger_deployment,
+            a.config_version, a.adapter_version, a.provider_response_id, a.latency_ms,
+            a.prompt_tokens, a.completion_tokens, a.total_tokens,
+            a.cost_amount::text AS cost_amount, a.cost_status
+     FROM evaluation_items i
+     LEFT JOIN evaluation_attempts a
+       ON a.tenant_id = i.tenant_id AND a.item_id = i.id
+     WHERE i.run_id = $1
        AND (
          $2::uuid IS NULL
-         OR ordinal > (SELECT cursor_item.ordinal FROM evaluation_items cursor_item WHERE cursor_item.id = $2)
+         OR i.ordinal > (SELECT cursor_item.ordinal FROM evaluation_items cursor_item WHERE cursor_item.id = $2)
        )
-     ORDER BY ordinal ASC
+     ORDER BY i.ordinal ASC
      LIMIT $3`,
     [evaluationId, query.cursor, query.limit + 1],
   );
@@ -536,7 +570,7 @@ export async function syncRunProgress(client: PoolClient, runId: string): Promis
   );
 }
 
-async function loadPreflightFacts(client: PoolClient, plan: EvaluationPlan): Promise<PreflightFacts> {
+export async function loadEvaluationFacts(client: PoolClient, plan: EvaluationPlan): Promise<PreflightFacts> {
   const sampleResult = await client.query<{
     id: string;
     task_category: string | null;
@@ -792,8 +826,8 @@ function runFromRow(row: RunRow): EvaluationRunView {
     sampleCategory: row.sample_category,
     challengerDeployment: row.challenger_deployment,
     judgeDeployment: row.judge_deployment,
-    mode: 'dry_run',
-    modelExecution: 'off',
+    mode: snapshotMode(row.config_snapshot).mode,
+    modelExecution: snapshotMode(row.config_snapshot).modelExecution,
     itemCount: row.item_count,
     pendingCount: row.pending_count,
     queuedCount: row.queued_count,
@@ -814,38 +848,60 @@ function itemFromRow(row: {
   ordinal: number;
   status: string;
   reason_code: string | null;
+  attempt_id: string | null;
+  original_deployment: string | null;
+  challenger_deployment: string | null;
+  config_version: number | null;
+  adapter_version: number | null;
+  provider_response_id: string | null;
+  latency_ms: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cost_amount: string | null;
+  cost_status: string | null;
 }): EvaluationItemView {
   if (!isItemStatus(row.status)) {
     throw proxyError(500, 'server_error', 'internal_error', null, 'The request failed.');
   }
-  return {
+  const view: EvaluationItemView = {
     id: row.id,
     sampleId: row.sample_id,
     ordinal: row.ordinal,
     status: row.status,
     reasonCode: isReason(row.reason_code) ? row.reason_code : null,
   };
+  if (row.attempt_id === null) return view;
+  view.originalDeployment = row.original_deployment ?? undefined;
+  view.challengerDeployment = row.challenger_deployment ?? undefined;
+  view.configVersion = row.config_version ?? undefined;
+  view.adapterVersion = row.adapter_version ?? undefined;
+  view.providerResponseId = row.provider_response_id;
+  view.latencyMs = row.latency_ms;
+  view.promptTokens = row.prompt_tokens;
+  view.completionTokens = row.completion_tokens;
+  view.totalTokens = row.total_tokens;
+  view.costAmount = row.cost_amount === null ? null : canonicalBudget(row.cost_amount);
+  view.costStatus = row.cost_status;
+  return view;
+}
+
+function snapshotMode(snapshot: Record<string, unknown>): {
+  mode: 'dry_run' | 'replay';
+  modelExecution: 'off' | 'pinned';
+} {
+  if (snapshot.mode === 'replay' && snapshot.modelExecution === 'pinned') {
+    return { mode: 'replay', modelExecution: 'pinned' };
+  }
+  if (snapshot.mode === 'dry_run' && snapshot.modelExecution === 'off') {
+    return { mode: 'dry_run', modelExecution: 'off' };
+  }
+  throw proxyError(500, 'server_error', 'internal_error', null, 'The request failed.');
 }
 
 function isReason(value: string | null): value is ItemReasonCode {
   if (value === null) return false;
-  return (
-    value === 'dry_run' ||
-    value === 'cancelled' ||
-    value === 'sample_not_owned' ||
-    value === 'sample_expired' ||
-    value === 'sample_incomplete' ||
-    value === 'replay_denied' ||
-    value === 'judge_disclosure_denied' ||
-    value === 'deployment_unauthorized' ||
-    value === 'capability_mismatch' ||
-    value === 'residency_denied' ||
-    value === 'provider_denied' ||
-    value === 'budget_exceeded' ||
-    value === 'item_limit_exceeded' ||
-    value === 'run_limit_exceeded' ||
-    value === 'sample_category_mismatch'
-  );
+  return (ITEM_REASON_CODES as readonly string[]).includes(value);
 }
 
 function iso(value: Date | string): string {

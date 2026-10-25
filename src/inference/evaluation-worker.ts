@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import type { ProviderCredentialStore } from '../credentials.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import {
@@ -8,6 +9,8 @@ import {
   syncRunProgress,
 } from './evaluations.js';
 import { isItemStatus, isRunStatus } from './evaluation-state.js';
+import { advanceReplay } from './replay-execution.js';
+import type { SampleKeyManager } from './sample-crypto.js';
 
 export type ClaimedEvaluationJob = {
   jobId: string;
@@ -22,11 +25,21 @@ export type EvaluationWorkerOptions = {
   executionEnabled: boolean;
   signal?: AbortSignal;
   pollMs?: number;
+  replayTenantIds?: readonly string[];
+  upstreamBaseUrl?: string;
+  credentialStore?: ProviderCredentialStore | null;
+  sampleKeyManager?: SampleKeyManager | null;
+  fetchImpl?: typeof fetch;
+  stopBeforeDispatch?: boolean;
+  stopAfterDispatch?: boolean;
+  beforeDispatch?: () => Promise<void> | void;
+  logger?: Logger;
+  callCounter?: { count: number };
 };
 
 export type EvaluationPollResult = {
   claimed: boolean;
-  outcome: 'idle' | 'completed' | 'duplicate' | 'cancelled' | 'skipped';
+  outcome: 'idle' | 'completed' | 'duplicate' | 'cancelled' | 'failed' | 'not_dispatched' | 'dispatched' | 'skipped';
 };
 
 export async function claimEvaluationJob(pool: Pool, workerId: string): Promise<ClaimedEvaluationJob | null> {
@@ -61,16 +74,44 @@ export async function finishEvaluationJob(
   return result.rows[0]?.finish_evaluation_job === true;
 }
 
+export async function claimReplayEvaluationJob(
+  pool: Pool,
+  workerId: string,
+  tenantIds: readonly string[],
+): Promise<ClaimedEvaluationJob | null> {
+  if (tenantIds.length === 0) return null;
+  const result = await pool.query<{ job_id: string; tenant_id: string; run_id: string; item_id: string }>(
+    `SELECT job_id::text AS job_id, tenant_id::text AS tenant_id, run_id::text AS run_id, item_id::text AS item_id
+     FROM claim_replay_evaluation_job($1, $2::uuid[])`,
+    [workerId, tenantIds],
+  );
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  return { jobId: row.job_id, tenantId: row.tenant_id, runId: row.run_id, itemId: row.item_id };
+}
+
 export async function pollEvaluationOnce(pool: Pool, options: EvaluationWorkerOptions): Promise<EvaluationPollResult> {
   if (options.signal?.aborted) return { claimed: false, outcome: 'idle' };
-  if (!options.dryRun) return { claimed: false, outcome: 'skipped' };
-  const claimed = await claimEvaluationJob(pool, options.workerId);
+  if (options.dryRun) {
+    const claimed = await claimEvaluationJob(pool, options.workerId);
+    if (claimed === null) return { claimed: false, outcome: 'idle' };
+    if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
+    await heartbeatEvaluationJob(pool, claimed.jobId, options.workerId);
+    const outcome = await advanceDryRun(pool, claimed);
+    await finishEvaluationJob(pool, claimed.jobId, options.workerId, outcome === 'cancelled' ? 'cancelled' : 'succeeded');
+    return { claimed: true, outcome };
+  }
+  const replayTenantIds = options.replayTenantIds ?? [];
+  if (!options.executionEnabled || replayTenantIds.length === 0) return { claimed: false, outcome: 'skipped' };
+  const claimed = await claimReplayEvaluationJob(pool, options.workerId, replayTenantIds);
   if (claimed === null) return { claimed: false, outcome: 'idle' };
   if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
   await heartbeatEvaluationJob(pool, claimed.jobId, options.workerId);
-  const outcome = await advanceDryRun(pool, claimed);
-  await finishEvaluationJob(pool, claimed.jobId, options.workerId, outcome === 'cancelled' ? 'cancelled' : 'succeeded');
-  return { claimed: true, outcome };
+  const advance = await advanceReplay(pool, claimed, options);
+  if (advance.finish !== null) {
+    await finishEvaluationJob(pool, claimed.jobId, options.workerId, advance.finish);
+  }
+  return { claimed: true, outcome: advance.outcome };
 }
 
 export async function runEvaluationWorker(
@@ -79,6 +120,8 @@ export async function runEvaluationWorker(
   options: EvaluationWorkerOptions,
 ): Promise<void> {
   const pollMs = options.pollMs ?? 250;
+  const callCounter = options.callCounter ?? { count: 0 };
+  const workerOptions = options.callCounter === undefined ? { ...options, callCounter } : options;
   logger.info('evaluation worker started', {
     dryRun: options.dryRun,
     executionEnabled: options.executionEnabled,
@@ -86,14 +129,14 @@ export async function runEvaluationWorker(
   });
   const aborted = (): boolean => options.signal?.aborted === true;
   while (!aborted()) {
-    const result = await pollEvaluationOnce(pool, options);
+    const result = await pollEvaluationOnce(pool, workerOptions);
     if (aborted()) break;
     if (result.outcome === 'idle' || result.outcome === 'skipped') {
       const stopped = await sleep(pollMs, options.signal);
       if (stopped) break;
     }
   }
-  logger.info('evaluation worker stopped', { modelCalls: 0 });
+  logger.info('evaluation worker stopped', { modelCalls: callCounter.count });
 }
 
 async function advanceDryRun(

@@ -1,7 +1,9 @@
 import { ConfigError, loadConfig } from './config.js';
+import { createCredentialStore } from './credentials.js';
 import { createPool } from './db/pools.js';
 import { migrate } from './db/migrate.js';
 import { pollEvaluationOnce, runEvaluationWorker } from './inference/evaluation-worker.js';
+import { createSampleKeyManager } from './inference/sample-crypto.js';
 import { createLogger } from './logger.js';
 
 function errorMessage(error: unknown): string {
@@ -58,25 +60,37 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => stop('SIGTERM'));
   process.on('SIGINT', () => stop('SIGINT'));
 
+  const credentialStore =
+    config.providerCredentialKey === null
+      ? null
+      : createCredentialStore(config.providerCredentialKey, config.previousCredentialKeys);
+  const sampleKeyManager =
+    config.providerCredentialKey === null
+      ? null
+      : createSampleKeyManager(config.providerCredentialKey, config.previousCredentialKeys);
+  const callCounter = { count: 0 };
+  const workerOptions = {
+    workerId: 'evaluation-worker',
+    dryRun,
+    executionEnabled: config.evaluationExecutionEnabled,
+    replayTenantIds: config.evaluationReplayTenantIds,
+    upstreamBaseUrl: config.openAiBaseUrl,
+    credentialStore,
+    sampleKeyManager,
+    signal: controller.signal,
+    logger,
+    callCounter,
+  };
+
   try {
     if (drain) {
       while (!controller.signal.aborted) {
-        const result = await pollEvaluationOnce(runtimePool, {
-          workerId: 'evaluation-worker',
-          dryRun,
-          executionEnabled: config.evaluationExecutionEnabled,
-          signal: controller.signal,
-        });
+        const result = await pollEvaluationOnce(runtimePool, workerOptions);
         if (result.outcome === 'idle' || result.outcome === 'skipped') break;
       }
-      logger.info('evaluation worker drain complete', { modelCalls: 0 });
+      logger.info('evaluation worker drain complete', { modelCalls: callCounter.count });
     } else {
-      await runEvaluationWorker(runtimePool, logger, {
-        workerId: 'evaluation-worker',
-        dryRun,
-        executionEnabled: config.evaluationExecutionEnabled,
-        signal: controller.signal,
-      });
+      await runEvaluationWorker(runtimePool, logger, workerOptions);
     }
   } catch (error) {
     logger.error('evaluation worker failed', { message: errorMessage(error) });

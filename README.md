@@ -224,7 +224,7 @@ curl -s http://127.0.0.1:8080/health/live
 curl -s http://127.0.0.1:8080/health/ready
 ```
 
-Live returns `{"status":"live"}`. Ready returns `{"status":"ready","database":"ready"}` when Postgres is up and `schema_migrations` has the latest migration for this image. If it is not ready, the route returns HTTP 503 and live stays 200.
+Live returns `{"status":"live"}`. Ready returns `{"status":"ready","database":"ready"}` when Postgres is up and `schema_migrations` has the latest migration for this image. If it is not ready, the route returns HTTP 503 and live stays 200. During shutdown it also returns HTTP 503, with `{"status":"not_ready","reason":"shutting_down"}`.
 
 Chat stays off until inference is on and a deployment is enabled. Create a tenant, turn inference on, and register OpenAI:
 
@@ -250,6 +250,8 @@ docker compose run --rm app node dist/cli.js set-alias \
 ```
 
 The CLI prints the tenant secret once. Save it. The database stores only a verifier.
+
+To keep a provider key out of the process arguments, pass it with `--api-key-stdin` instead of `--api-key`. See [docs/providers.md](docs/providers.md).
 
 The same commands can run as prompts. `--interactive` has to be the only argument:
 

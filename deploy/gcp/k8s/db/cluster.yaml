@@ -1,0 +1,46 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: llm-pg
+spec:
+  instances: __PG_INSTANCES__
+  imageName: __POSTGRES_IMAGE__ # pinned to major 16; CNPG's default image is a newer major
+  enableSuperuserAccess: true # init.sh needs a real superuser to create llm_owner BYPASSRLS
+  superuserSecret:
+    name: llm-pg-superuser
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 20Gi
+    storageClass: premium-rwo
+  walStorage:
+    size: 10Gi
+    storageClass: premium-rwo
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  bootstrap:
+    initdb:
+      database: llm_proxy
+      # Bootstrap owner of the database. Deliberately not llm_owner: scripts/gcp/db-bootstrap.sh creates
+      # llm_owner (NOLOGIN, BYPASSRLS) and the three login roles itself, and CNPG's initdb must not
+      # have made a role with that name first. The app never logs in as llm_proxy_owner.
+      owner: llm_proxy_owner
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        iam.gke.io/gcp-service-account: __BACKUP_GSA__
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: llm-pg-store
+  affinity:
+    topologyKey: topology.kubernetes.io/zone

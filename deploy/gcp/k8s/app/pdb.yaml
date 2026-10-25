@@ -1,0 +1,13 @@
+# With one replica the budget must be 0, or it would stall node upgrades.
+# With two replicas set PDB_MIN_AVAILABLE=1 in settings.env.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: llm-proxy
+  labels:
+    app: llm-proxy
+spec:
+  minAvailable: __PDB_MIN_AVAILABLE__
+  selector:
+    matchLabels:
+      app: llm-proxy

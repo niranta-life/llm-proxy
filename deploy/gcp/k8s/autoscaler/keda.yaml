@@ -1,0 +1,18 @@
+# Used only when AUTOSCALER=keda (needs KEDA core installed by operators.sh).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: llm-proxy
+  labels:
+    app: llm-proxy
+spec:
+  scaleTargetRef:
+    name: llm-proxy
+  minReplicaCount: __MIN_REPLICAS__ # never zero
+  maxReplicaCount: __MAX_REPLICAS__
+  cooldownPeriod: 600
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "60"

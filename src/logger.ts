@@ -10,6 +10,32 @@ const RANK: Record<LogLevel, number> = {
   error: 40,
 };
 
+// Cloud Logging expects WARNING, not warn.
+const SEVERITY: Record<LogLevel, string> = {
+  debug: 'DEBUG',
+  info: 'INFO',
+  warn: 'WARNING',
+  error: 'ERROR',
+};
+
+// Core keys always win, with one exception: a caller severity of 'critical' becomes the
+// Cloud Logging severity CRITICAL so alerts can filter on it. Callers pass exception
+// details as `message`, which Cloud Logging reads as the log text, so that one field is
+// emitted as `error_message`. Any other collision is kept as `field_<key>`, not dropped.
+const CORE_KEYS: ReadonlySet<string> = new Set(['time', 'level', 'severity', 'msg', 'message']);
+
+const CRITICAL_SEVERITY = 'critical';
+
+function withoutCoreKeyCollisions(fields: LogFields | undefined): LogFields {
+  const safe: LogFields = {};
+  for (const [key, value] of Object.entries(fields ?? {})) {
+    if (key === 'message') safe.error_message = value;
+    else if (key === 'severity' && value === CRITICAL_SEVERITY) continue;
+    else safe[CORE_KEYS.has(key) ? `field_${key}` : key] = value;
+  }
+  return safe;
+}
+
 export type LogFields = Record<string, unknown>;
 
 export type Logger = {
@@ -25,8 +51,10 @@ export function createLogger(level: LogLevel, stream: Writable = process.stdout)
     const event = redact({
       time: new Date().toISOString(),
       level: eventLevel,
+      severity: fields?.severity === CRITICAL_SEVERITY ? 'CRITICAL' : SEVERITY[eventLevel],
       msg: message,
-      ...fields,
+      message,
+      ...withoutCoreKeyCollisions(fields),
     });
     stream.write(`${JSON.stringify(event)}\n`);
   }

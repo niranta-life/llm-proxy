@@ -1,0 +1,8 @@
+# Builds the image from the repository Dockerfile. Used by scripts/gcp/build.sh.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]
+options:
+  # Required when a custom service account runs the build. (not yet verified live: "Verify first" U10 in docs/gcp-deployment.md)
+  logging: CLOUD_LOGGING_ONLY

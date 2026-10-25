@@ -1,0 +1,40 @@
+# The production database created from the backups bucket instead of from scratch.
+# Used only by `scripts/gcp/database.sh --restore` (and by later runs of database.sh against a
+# cluster that was created this way, so a re-apply never flips it back to initdb).
+#
+# It is ../db plus three changes to Cluster llm-pg:
+#   1. bootstrap: recovery from the barman object store, instead of initdb
+#   2. externalClusters: where to recover from (server name inside the bucket)
+#   3. the cluster archives its own WAL and backups under a NEW server name. Writing into the
+#      server name it recovered from would collide with the archive that is already there.
+# Placeholders: __RECOVERY_SERVER__ (default llm-pg), __ARCHIVE_SERVER__ (new, per restore).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: llm-proxy
+resources:
+  - ../db
+patches:
+  - target:
+      group: postgresql.cnpg.io
+      version: v1
+      kind: Cluster
+      name: llm-pg
+    patch: |-
+      - op: remove
+        path: /spec/bootstrap/initdb
+      - op: add
+        path: /spec/bootstrap/recovery
+        value:
+          source: origin
+      - op: add
+        path: /spec/externalClusters
+        value:
+          - name: origin
+            plugin:
+              name: barman-cloud.cloudnative-pg.io
+              parameters:
+                barmanObjectName: llm-pg-store
+                serverName: __RECOVERY_SERVER__
+      - op: add
+        path: /spec/plugins/0/parameters/serverName
+        value: __ARCHIVE_SERVER__

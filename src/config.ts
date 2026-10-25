@@ -47,6 +47,9 @@ export type Config = {
   streamShutdownDrainMs: number;
   evaluationExecutionEnabled: boolean;
   evaluationReplayTenantIds: readonly string[];
+  migrationLockTimeoutMs: number;
+  migrationStatementTimeoutMs: number;
+  httpKeepAliveTimeoutMs: number;
   database: {
     host: string;
     port: number;
@@ -190,6 +193,22 @@ function readEvaluationReplayTenants(env: NodeJS.ProcessEnv, errors: string[]): 
   return ids;
 }
 
+function readMillisecondWindow(env: NodeJS.ProcessEnv, name: string, fallback: string, errors: string[]): number {
+  const text = env[name];
+  const value = text === undefined || text.trim() === '' ? fallback : text.trim();
+  const label = `${name} must be an integer from 1000 to 3600000 milliseconds`;
+  if (!/^\d+$/.test(value)) {
+    errors.push(label);
+    return Number(fallback);
+  }
+  const parsed = Number(value);
+  if (parsed < 1000 || parsed > 3_600_000) {
+    errors.push(label);
+    return Number(fallback);
+  }
+  return parsed;
+}
+
 function readPort(value: string, label: string, errors: string[]): number | undefined {
   if (!/^\d+$/.test(value)) {
     errors.push(`${label} must be an integer from 1 to 65535`);
@@ -236,6 +255,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
   const evaluationExecutionEnabled = readEvaluationExecutionEnabled(env, errors);
   const evaluationReplayTenantIds = readEvaluationReplayTenants(env, errors);
+  const migrationLockTimeoutMs = readMillisecondWindow(env, 'MIGRATION_LOCK_TIMEOUT_MS', '60000', errors);
+  const migrationStatementTimeoutMs = readMillisecondWindow(env, 'MIGRATION_STATEMENT_TIMEOUT_MS', '600000', errors);
+  const httpKeepAliveTimeoutMs = readMillisecondWindow(env, 'HTTP_KEEP_ALIVE_TIMEOUT_MS', '620000', errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -269,6 +291,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     streamShutdownDrainMs,
     evaluationExecutionEnabled,
     evaluationReplayTenantIds,
+    migrationLockTimeoutMs,
+    migrationStatementTimeoutMs,
+    httpKeepAliveTimeoutMs,
     database: {
       host: databaseHost,
       port: databasePort,

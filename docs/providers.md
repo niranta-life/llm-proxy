@@ -22,6 +22,21 @@ docker compose up -d --force-recreate app
 
 Timeouts you set are integers from 100 through 600000 milliseconds.
 
+## Passing provider keys safely
+
+`--api-key <value>` puts the key in the process arguments, where `ps`, shell history, and `kubectl exec` audit logs can see it. Use `--api-key-stdin` instead. It reads the key from standard input, drops trailing newlines, and rejects an empty key. It cannot be combined with `--api-key`, and it needs piped input (it refuses a terminal).
+
+```bash
+printf '%s' "$OPENAI_API_KEY" | docker compose run --rm -T app node dist/cli.js register-openai-connection \
+  --tenant-id <tenant-id> --api-key-stdin
+printf '%s' "$KEY" | kubectl exec -i <pod> -- node dist/cli.js register-openai-connection \
+  --tenant-id <tenant-id> --api-key-stdin
+```
+
+Every command that takes `--api-key` also takes `--api-key-stdin`: `register-` and `set-` for openai and anthropic, and `register-` for vertex, xai, openrouter, and dgx. The interactive mode (`--interactive`) prompts for the key and does not use this flag. The input is limited to 64 KiB, which is enough for a service-account JSON file.
+
+The examples in this document use `--api-key` for brevity. In scripts, prefer `--api-key-stdin`.
+
 ## OpenAI
 
 The base URL is `OPENAI_BASE_URL`. If that variable is absent, the proxy uses `https://api.openai.com/v1`. Set it when you point at a mock server. A caller cannot change it on the request.

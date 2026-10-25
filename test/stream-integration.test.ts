@@ -940,7 +940,7 @@ describe('OpenAI streaming', () => {
       expect(hits).toHaveLength(before + 1);
       const logs = lines.join('\n');
       expect(logs).toContain('attempt result was not recorded');
-      expect(logs).toContain('"severity":"critical"');
+      expect(logs).toContain('"severity":"CRITICAL"');
       const row = await latestAttempt(state.tenantId);
       expect(row?.request_status).toBe('pending');
       expect(row?.stream_status).toBe('streaming');

@@ -1,0 +1,50 @@
+# Field names are from GKE Gateway docs and not checked on a cluster. (not yet verified live: "Verify first" U6 in docs/gcp-deployment.md)
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: llm-proxy
+spec:
+  default:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    config:
+      type: HTTP
+      httpHealthCheck:
+        port: 8080
+        requestPath: /health/ready
+  targetRef:
+    group: ""
+    kind: Service
+    name: llm-proxy
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: llm-proxy
+spec:
+  default:
+    timeoutSec: 700 # longer than the 600 s maximum stream timeout
+    connectionDraining:
+      drainingTimeoutSec: 60
+    securityPolicy: llm-proxy-team-only
+    logging:
+      enabled: true
+      sampleRate: 100000
+  targetRef:
+    group: ""
+    kind: Service
+    name: llm-proxy
+---
+apiVersion: networking.gke.io/v1
+kind: GCPGatewayPolicy
+metadata:
+  name: llm-proxy-gw
+spec:
+  default:
+    sslPolicy: llm-proxy-modern # minimum TLS 1.2
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: llm-proxy-gw

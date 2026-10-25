@@ -298,7 +298,7 @@ describe('chat lifecycle', () => {
       expect(harness.mock.hits).toHaveLength(1);
       const logs = harness.ctx.lines.join('\n');
       expect(logs).toContain('attempt result was not recorded');
-      expect(logs).toContain('"severity":"critical"');
+      expect(logs).toContain('"severity":"CRITICAL"');
       expect(logs).not.toContain('unique-prompt-telemetry-zeta');
       expect(logs).not.toContain('sk-test-lifecycle-telemetry');
       const stored = await harness.admin.query<{ status: string }>(

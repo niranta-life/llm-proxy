@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: llm-proxy
+spec:
+  podSelector:
+    matchLabels:
+      app: llm-proxy
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Google load balancer and health-check ranges only. (not yet verified live: "Verify first" U8 in docs/gcp-deployment.md)
+    - from:
+        - ipBlock: { cidr: 35.191.0.0/16 }
+        - ipBlock: { cidr: 130.211.0.0/22 }
+      ports:
+        - port: 8080
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to: # NodeLocal DNS cache, if enabled (not yet verified live: "Verify first" U8 in docs/gcp-deployment.md)
+        - ipBlock: { cidr: 169.254.20.10/32 }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to: # GKE metadata server: Vertex workload_identity token (not yet verified live: "Verify first" U3 in docs/gcp-deployment.md)
+        - ipBlock: { cidr: 169.254.169.254/32 }
+      ports:
+        - { port: 80, protocol: TCP }
+        - { port: 988, protocol: TCP }
+    - to: # Postgres
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: llm-pg
+      ports:
+        - port: 5432
+    - to: # OpenAI, Anthropic, Vertex over HTTPS
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [169.254.0.0/16]
+      ports:
+        - port: 443

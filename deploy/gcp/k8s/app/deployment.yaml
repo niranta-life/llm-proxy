@@ -1,0 +1,111 @@
+# No `replicas:` field on purpose: the autoscaler (k8s/autoscaler) owns the
+# count, so a deploy never resets it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-proxy
+  labels:
+    app: llm-proxy
+spec:
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 900 # above the 750 s startup budget
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: llm-proxy
+  template:
+    metadata:
+      labels:
+        app: llm-proxy
+    spec:
+      serviceAccountName: llm-proxy
+      # Must exceed the whole shutdown path: preStop 10 + stream drain 30 + hard-exit allowance 15
+      # + request settlement up to 10 = 65 seconds. 90 leaves 25 seconds of slack.
+      # (src/index.ts: the hard exit timer fires drain + 15 s after SIGTERM.)
+      # Not yet verified on a live cluster: see "Verify first" U4 in docs/gcp-deployment.md.
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # the Dockerfile's USER node is non-numeric; node is uid 1000 in the official image
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: llm-proxy
+      containers:
+        - name: llm-proxy
+          image: __IMAGE__
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - { name: HOST, value: "0.0.0.0" }
+            - { name: PORT, value: "8080" }
+            - { name: LOG_LEVEL, value: "info" }
+            - { name: INFERENCE_ENABLED, value: "true" }
+            - { name: DATABASE_HOST, value: "llm-pg-rw" }
+            - { name: DATABASE_PORT, value: "5432" }
+            - { name: DATABASE_NAME, value: "llm_proxy" }
+            - { name: MIGRATOR_USER, value: "llm_migrator" }
+            - { name: AUTH_USER, value: "llm_auth" }
+            - { name: RUNTIME_USER, value: "llm_runtime" }
+            - { name: MAX_ACTIVE_STREAMS, value: "32" }
+            - { name: MAX_STREAMS_PER_TENANT, value: "32" }
+            - { name: STREAM_SHUTDOWN_DRAIN_MS, value: "30000" }
+            # ---- APP TUNING (each accepts 1000 to 3600000 ms) ----
+            - { name: MIGRATION_LOCK_TIMEOUT_MS, value: "60000" } # wait for the migration advisory lock; a second pod waits this long for the first
+            - { name: MIGRATION_STATEMENT_TIMEOUT_MS, value: "600000" } # longest single migration statement
+            - { name: HTTP_KEEP_ALIVE_TIMEOUT_MS, value: "620000" } # must exceed the load balancer's ~600 s backend keepalive
+            # ---- end APP TUNING ----
+            - name: MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: llm-proxy-secrets, key: migrator-password }
+            - name: AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: llm-proxy-secrets, key: auth-password }
+            - name: RUNTIME_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: llm-proxy-secrets, key: runtime-password }
+            - name: PROVIDER_CREDENTIAL_KEY
+              valueFrom:
+                secretKeyRef: { name: llm-proxy-secrets, key: provider-credential-key }
+          resources: # Autopilot sets limits equal to requests
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          # Startup budget: migrations run before the app listens. 5 s x 150 = 750 s, which covers the
+          # longest migration statement (600 s) plus lock wait (60 s) plus boot. progressDeadlineSeconds
+          # in the Deployment must stay above it. A separate migrate step (a Job before the rollout)
+          # is a future option if migrations outgrow this.
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 150 # up to 750 seconds
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6 # a slow DB check must not flap readiness
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "10"] # lets the load balancer stop sending traffic before SIGTERM
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true # drop this line if the app needs to write to disk (see "Verify first" U9 in docs/gcp-deployment.md)
+            capabilities:
+              drop: ["ALL"]

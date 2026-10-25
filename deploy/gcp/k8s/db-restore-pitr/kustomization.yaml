@@ -1,0 +1,18 @@
+# ../db-restore, recovering to a point in time instead of the end of the archived WAL.
+# Placeholder __RECOVERY_TIME__ is "YYYY-MM-DD HH:MM:SS+00".
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: llm-proxy
+resources:
+  - ../db-restore
+patches:
+  - target:
+      group: postgresql.cnpg.io
+      version: v1
+      kind: Cluster
+      name: llm-pg
+    patch: |-
+      - op: add
+        path: /spec/bootstrap/recovery/recoveryTarget
+        value:
+          targetTime: "__RECOVERY_TIME__"

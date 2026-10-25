@@ -1,0 +1,12 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: llm-pg-store
+spec:
+  configuration:
+    destinationPath: gs://__BACKUP_BUCKET__/
+    googleCredentials:
+      gkeEnvironment: true # Workload Identity, no key
+    wal:
+      compression: gzip
+  retentionPolicy: "14d"

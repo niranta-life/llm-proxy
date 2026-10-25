@@ -1,0 +1,40 @@
+# Throwaway restore of production backups. Applied by scripts/gcp/restore-drill.sh.
+# The llm-drill namespace is created by the script (kubectl create fails if it exists), not here.
+# It has no `plugins:` block on purpose, so it cannot archive WAL into production's path.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: llm-pg-store
+  namespace: llm-drill
+spec:
+  configuration:
+    destinationPath: gs://__BACKUP_BUCKET__/
+    googleCredentials:
+      gkeEnvironment: true
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: drill
+  namespace: llm-drill
+spec:
+  instances: 1
+  imageName: __POSTGRES_IMAGE__ # same major as production; the default image is a newer major
+  storage:
+    size: 20Gi
+    storageClass: premium-rwo
+  bootstrap:
+    recovery:
+      source: origin
+      # PITR: add   recoveryTarget: { targetTime: "<YYYY-MM-DD HH:MM:SS+00>" }
+  externalClusters:
+    - name: origin
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: llm-pg-store
+          serverName: llm-pg
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        iam.gke.io/gcp-service-account: __RESTORE_GSA__

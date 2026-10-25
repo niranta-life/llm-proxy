@@ -1,0 +1,27 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: llm-proxy
+  labels:
+    app: llm-proxy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llm-proxy
+  minReplicas: __MIN_REPLICAS__
+  maxReplicas: __MAX_REPLICAS__
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      # Avoids flapping. It does NOT protect open streams: a scale-down still
+      # cuts them after the drain.
+      stabilizationWindowSeconds: 600
+      policies:
+        - { type: Pods, value: 1, periodSeconds: 300 }

@@ -1,0 +1,27 @@
+# One global external Application Load Balancer. Applied once by up.sh; the
+# address and certificate map are created by OpenTofu.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: llm-proxy-gw
+  namespace: llm-proxy
+  annotations:
+    networking.gke.io/certmap: llm-proxy # (not yet verified live: "Verify first" U7 in docs/gcp-deployment.md)
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+  addresses:
+    - type: NamedAddress
+      value: llm-proxy-lb

@@ -1,0 +1,120 @@
+NOTE: The Docker Desktop credential helper blocked registry metadata.
+This build uses a temporary Docker config with no credsStore.
+The Docker context remains colima. The base image is node:24-bookworm-slim.
+The build context is a detached worktree of the Slice 07A commit.
+DOCKER_BUILDKIT=0 so the build uses the local base image.
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            BuildKit is currently disabled; enable it by removing the DOCKER_BUILDKIT=0
+            environment-variable.
+
+Sending build context to Docker daemon  1.401MB
+
+Step 1/16 : FROM node:24-bookworm-slim AS build
+ ---> 55fb5f5a527e
+Step 2/16 : WORKDIR /app
+ ---> Running in 44522392c2af
+ ---> Removed intermediate container 44522392c2af
+ ---> 315b85159b4c
+Step 3/16 : COPY package.json package-lock.json tsconfig.json ./
+ ---> 396bd3b92d69
+Step 4/16 : COPY src ./src
+ ---> bf32fef46585
+Step 5/16 : RUN npm ci
+ ---> Running in aa7906629731
+npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 344 packages, and audited 345 packages in 4s
+
+67 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (5 moderate, 2 critical)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn install-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @google/genai@2.30.0 (preinstall: echo 'preinstall: no-op')
+npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+npm warn install-scripts   ssh2@1.17.0 (install: node install.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice
+npm notice New major version of npm available! 11.19.1 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+ ---> Removed intermediate container aa7906629731
+ ---> f160e3795c36
+Step 6/16 : RUN npm run build
+ ---> Running in 0334d82ae99c
+
+> llm-proxy@0.0.0 build
+> tsc -p tsconfig.json
+
+ ---> Removed intermediate container 0334d82ae99c
+ ---> 0e14f2f8fcc3
+Step 7/16 : FROM node:24-bookworm-slim
+ ---> 55fb5f5a527e
+Step 8/16 : WORKDIR /app
+ ---> Using cache
+ ---> 315b85159b4c
+Step 9/16 : ENV NODE_ENV=production
+ ---> Running in 98511ec2ccef
+ ---> Removed intermediate container 98511ec2ccef
+ ---> 1df2c163f50d
+Step 10/16 : COPY package.json package-lock.json ./
+ ---> e0e5e794ef9d
+Step 11/16 : RUN npm ci --omit=dev && npm cache clean --force
+ ---> Running in 9fbf1efe7b70
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+added 142 packages, and audited 143 packages in 2s
+
+29 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @google/genai@2.30.0 (preinstall: echo 'preinstall: no-op')
+npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice
+npm notice New major version of npm available! 11.19.1 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+npm warn using --force Recommended protections disabled.
+ ---> Removed intermediate container 9fbf1efe7b70
+ ---> ba5ca265c811
+Step 12/16 : COPY --from=build /app/dist ./dist
+ ---> cc96140a9229
+Step 13/16 : COPY migrations ./migrations
+ ---> 6c4651f076a8
+Step 14/16 : USER node
+ ---> Running in e5b62e132721
+ ---> Removed intermediate container e5b62e132721
+ ---> 494bdfca0770
+Step 15/16 : EXPOSE 8080
+ ---> Running in ef208febdd34
+ ---> Removed intermediate container ef208febdd34
+ ---> ef6adc8703ea
+Step 16/16 : CMD ["node", "dist/index.js"]
+ ---> Running in 58728215ad17
+ ---> Removed intermediate container 58728215ad17
+ ---> 0652abffc1dd
+Successfully built 0652abffc1dd
+Successfully tagged llm-proxy:slice-07a
+BUILD_EXIT:0
+CMD=["node","dist/index.js"] USER=node
+v24.22.1
+dist/evaluation-worker.js
+dist/index.js
+migrations/020_stream_samples.sql
+migrations/021_evaluation_orchestration.sql
+WRAP_EXIT:0

@@ -299,6 +299,7 @@ describe('Anthropic integration', () => {
       '018_sample_capture.sql',
       '019_sample_retention.sql',
       '020_stream_samples.sql',
+      '021_evaluation_orchestration.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

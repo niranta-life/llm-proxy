@@ -1,0 +1,5 @@
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > replays a duplicate Idempotency-Key and rejects the same key with a different payload 897ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > advances a dry run once across crash, duplicate delivery, and two workers 2932ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > cancels a queued run, rejects an illegal stored transition, and keeps state on an outage 1785ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > stores a second version when the definition name already exists 904ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > does not deadlock when cancel runs with the worker 1146ms

@@ -1,0 +1,21 @@
+Documented rollback in docs/operations.md:
+
+Stop the evaluation worker.
+Leave EVALUATION_EXECUTION_ENABLED unset or false.
+Leave 021_evaluation_orchestration.sql applied.
+Do not delete that version row.
+The inference process does not start the evaluation worker.
+Readiness for an image that expects 020_stream_samples.sql still finds that version row.
+
+Launch check, after both workers had exited:
+workerStopped true
+versions include 018_sample_capture.sql, 019_sample_retention.sql, 020_stream_samples.sql, and 021_evaluation_orchestration.sql
+priorImageSees020 true
+GET /health/ready on the inference process returned {"status":"ready","database":"ready"}
+The inference logs do not contain "evaluation worker".
+API processes exited 0 after SIGTERM.
+src/index.ts has no evaluation-worker string. Dockerfile CMD remains node dist/index.js.
+Image inspect: CMD ["node","dist/index.js"], user node, node v24.22.1.
+The image contains dist/index.js, dist/evaluation-worker.js, migrations/020_stream_samples.sql, and migrations/021_evaluation_orchestration.sql.
+
+The worker does not call a model in this slice. Stopping it leaves inference on the same database.

@@ -45,6 +45,7 @@ export type Config = {
   maxActiveStreams: number;
   maxStreamsPerTenant: number;
   streamShutdownDrainMs: number;
+  evaluationExecutionEnabled: boolean;
   database: {
     host: string;
     port: number;
@@ -161,6 +162,15 @@ function readStreamShutdownDrainMs(env: NodeJS.ProcessEnv, errors: string[]): nu
   return readBoundedInteger(env, 'STREAM_SHUTDOWN_DRAIN_MS', '5000', 0, 600_000, errors);
 }
 
+function readEvaluationExecutionEnabled(env: NodeJS.ProcessEnv, errors: string[]): boolean {
+  const value = env.EVALUATION_EXECUTION_ENABLED;
+  if (value === undefined || value.trim() === '') return false;
+  if (value.trim() === 'true') return true;
+  if (value.trim() === 'false') return false;
+  errors.push('EVALUATION_EXECUTION_ENABLED must be true or false');
+  return false;
+}
+
 function readPort(value: string, label: string, errors: string[]): number | undefined {
   if (!/^\d+$/.test(value)) {
     errors.push(`${label} must be an integer from 1 to 65535`);
@@ -205,6 +215,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const maxActiveStreams = readMaxActiveStreams(env, errors);
   const maxStreamsPerTenant = readMaxStreamsPerTenant(env, errors);
   const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
+  const evaluationExecutionEnabled = readEvaluationExecutionEnabled(env, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -236,6 +247,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     maxActiveStreams,
     maxStreamsPerTenant,
     streamShutdownDrainMs,
+    evaluationExecutionEnabled,
     database: {
       host: databaseHost,
       port: databasePort,

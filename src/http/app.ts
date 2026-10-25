@@ -3,6 +3,18 @@ import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
+import {
+  cancelEvaluation,
+  createEvaluation,
+  listEvaluationItems,
+  listEvaluations,
+  parseEvaluationId,
+  parseEvaluationListQuery,
+  parseEvaluationPlan,
+  parseIdempotencyKey,
+  preflightStoredPlan,
+  readEvaluation,
+} from '../inference/evaluations.js';
 import { parseEligibilityBody, readSampleEligibility } from '../inference/sample-eligibility.js';
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
@@ -526,11 +538,142 @@ export function buildApp(deps: AppDeps): ProxyApp {
     }
   });
 
+  function sendEvaluationError(reply: FastifyReply, error: unknown): FastifyReply {
+    if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+    deps.logger.error('evaluation request failed', { message: errorMessage(error) });
+    return reply
+      .code(500)
+      .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+  }
+
+  app.post('/internal/v1/evaluations/preflight', { bodyLimit: 65_536 }, async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const plan = parseEvaluationPlan(request.body);
+      const result = await withTenant(deps.runtimePool, auth.tenantId, (client) => preflightStoredPlan(client, plan));
+      return {
+        accepted: result.accepted,
+        itemCount: result.itemCount,
+        mode: plan.mode,
+        modelExecution: 'off' as const,
+        sampleCategory: plan.sampleCategory,
+        challengerDeployment: plan.challengerDeployment,
+        judgeDeployment: plan.judgeDeployment,
+        budgetEstimate: plan.budgetEstimate,
+      };
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.post('/internal/v1/evaluations', { bodyLimit: 65_536 }, async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const plan = parseEvaluationPlan(request.body);
+      const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+      const created = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+        createEvaluation(client, auth.tenantId, idempotencyKey, plan),
+      );
+      return reply.code(created.replayed ? 200 : 201).send(created.run);
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.get<{ Querystring: { limit?: string; cursor?: string } }>('/internal/v1/evaluations', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const query = parseEvaluationListQuery(request.query);
+      return await withTenant(deps.runtimePool, auth.tenantId, (client) => listEvaluations(client, query));
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { evaluationId: string } }>('/internal/v1/evaluations/:evaluationId', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const evaluationId = parseEvaluationId(request.params.evaluationId);
+      const run = await withTenant(deps.runtimePool, auth.tenantId, (client) => readEvaluation(client, evaluationId));
+      if (run === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'evaluation_id', 'The evaluation was not found.').body());
+      }
+      return run;
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { evaluationId: string }; Querystring: { limit?: string; cursor?: string } }>(
+    '/internal/v1/evaluations/:evaluationId/items',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const evaluationId = parseEvaluationId(request.params.evaluationId);
+        const query = parseEvaluationListQuery(request.query);
+        const page = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          listEvaluationItems(client, evaluationId, query),
+        );
+        if (page === null) {
+          return reply
+            .code(404)
+            .send(
+              proxyError(404, 'invalid_request_error', 'not_found', 'evaluation_id', 'The evaluation was not found.').body(),
+            );
+        }
+        return page;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { evaluationId: string } }>(
+    '/internal/v1/evaluations/:evaluationId/cancel',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const evaluationId = parseEvaluationId(request.params.evaluationId);
+        const run = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          cancelEvaluation(client, evaluationId),
+        );
+        if (run === null) {
+          return reply
+            .code(404)
+            .send(
+              proxyError(404, 'invalid_request_error', 'not_found', 'evaluation_id', 'The evaluation was not found.').body(),
+            );
+        }
+        return run;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });
   });
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode =
+      typeof error === 'object' && error !== null && 'statusCode' in error ? Number(error.statusCode) : 500;
+    const path = request.url.split('?')[0] ?? '';
+    if (path.startsWith('/internal/v1/evaluations') && statusCode === 413) {
+      reply
+        .code(413)
+        .send(proxyError(413, 'invalid_request_error', 'request_too_large', null, 'The request is too large.').body());
+      return;
+    }
     deps.logger.error('request failed', { message: errorMessage(error) });
     reply.code(500).send({ error: 'internal_error' });
   });

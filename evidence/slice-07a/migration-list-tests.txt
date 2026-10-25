@@ -1,0 +1,104 @@
+(node:66226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:66285) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:66648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ↓ test/cli-interactive.test.ts > interactive CLI > lists every current command in one action group
+ ✓ test/cli-interactive.test.ts > interactive CLI > keeps the HTTP server free of configuration routes 1ms
+ ↓ test/cli-interactive.test.ts > interactive CLI > rejects --interactive mixed with another argument
+ ↓ test/cli-interactive.test.ts > interactive CLI > rejects a stray flag on the existing flag path
+ ↓ test/cli-interactive.test.ts > interactive CLI > rejects an unknown interactive action and leaves tenants unchanged
+ ↓ test/cli-interactive.test.ts > interactive CLI > rejects a blank tenant name the same way as the flag command
+ ↓ test/cli-interactive.test.ts > interactive CLI > create provision-tenant (tenant name and label)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create add-key (tenant api key label)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-openai-connection (openai api key connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-anthropic-connection (anthropic endpoint and workspace)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex service_account project and location)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex adc without an api key)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex workload_identity without an api key)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-vertex-connection (vertex impersonation service account)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-xai-connection (xai api key connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-openrouter-connection (openrouter api key connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-dgx-connection (dgx private endpoint connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openai deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (anthropic deployment with default max output tokens)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (vertex deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (xai deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (openrouter downstream providers and data collection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-deployment (dgx deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create register-price (price version rates region tier and serving provider)
+ ↓ test/cli-interactive.test.ts > interactive CLI > create approve-private-endpoint (private host port addresses tls and health endpoint)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update revoke-key (revoke a tenant api key)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-openai-credential (replace openai api key)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-anthropic-credential (replace anthropic api key)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable openai connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-connection-enabled (disable anthropic connection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-enabled (disable a deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-alias (alias auto to a deployment)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-streaming (enable tenant streaming)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-streaming (deployment streaming timeouts)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-concurrency (dgx deployment max concurrency)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-health (deployment health status)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-service-tier (deployment service tier)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update reconcile-attempt-cost (reconcile an estimated attempt cost)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-execution-policy (retries and deadlines)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-breaker (enabled breaker window samples threshold cooldown and probes)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update reset-deployment-breaker (reset breaker to closed)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-fallback-policy (fallback alias deployments failures capabilities and providers)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-context-limit (deployment context limit)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-data-collection (deployment data collection)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-limits (tenant request concurrency stream token and lease limits)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-api-key-limits (api key limits)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-connection-limit (connection concurrency and share group)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-limit (deployment admission concurrency)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-tenant-budget (tenant monthly budget)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update recover-budget (close open budget reservations)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate validate-deployment (deployment validation status)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-credential (stored vertex credential that fails before the network)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate validate-vertex-access (stored vertex access that fails before the network)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate test-vertex-inference (stored vertex deployment that fails before the network)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate list-private-models (stored dgx route that fails before a live provider)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate probe-private-health (stored dgx health route that fails before a live provider)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate show-fallback-policy (stored fallback policy)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate list-inference (tenant connections deployments and aliases)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-sample-policy (metadata only sample policy)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update set-deployment-data-class (deployment data class)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate show-sample-policy (stored sample policy)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update delete-sample (missing sample)
+ ↓ test/cli-interactive.test.ts > interactive CLI > update cleanup-expired-samples (expired sample cleanup)
+ ↓ test/cli-interactive.test.ts > interactive CLI > validate show-sample-stats (empty sample stats)
+ ↓ test/cli-interactive.test.ts > interactive CLI > runs a scripted create update and validate journey twice
+(node:66653) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 910ms
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call
+ ↓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure
+(node:66670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/registry.test.ts > provider registry > keeps migrations 001 through 007 and adds the registry columns 20ms
+ ↓ test/registry.test.ts > provider registry > serves OpenAI, Anthropic, and an enabled Vertex deployment on one tenant
+ ↓ test/registry.test.ts > provider registry > registers each new provider and rejects invalid configuration before a write
+ ↓ test/registry.test.ts > provider registry > separates validation status from health and increments configuration version
+ ↓ test/registry.test.ts > provider registry > isolates tenant configuration, validation, and credential references
+
+ Test Files  3 passed (3)
+      Tests  3 passed | 78 skipped (81)
+   Start at  11:52:03
+   Duration  4.60s (transform 216ms, setup 4ms, collect 590ms, tests 933ms, environment 0ms, prepare 75ms)
+
+(node:66672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

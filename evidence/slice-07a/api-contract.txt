@@ -1,0 +1,27 @@
+(node:4485) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:4606) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > rejects an illegal run transition and accepts the same status again 1ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > creates a dry run, pages it, and hides it from another tenant 1286ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > replays a duplicate Idempotency-Key and rejects the same key with a different payload 897ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > rejects invalid plans with a specific code and does not decrypt 7424ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > advances a dry run once across crash, duplicate delivery, and two workers 2932ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > cancels a queued run, rejects an illegal stored transition, and keeps state on an outage 1785ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > stores a second version when the definition name already exists 904ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > does not deadlock when cancel runs with the worker 1146ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  12:24:08
+   Duration  19.81s (transform 157ms, setup 2ms, collect 345ms, tests 16.41s, environment 0ms, prepare 27ms)
+
+(node:4946) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

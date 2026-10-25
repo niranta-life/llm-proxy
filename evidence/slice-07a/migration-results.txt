@@ -1,0 +1,38 @@
+Fresh PostgreSQL 16. The first API process applied migrations 001 through 021 on startup. The second API process found that schema already applied.
+
+Applied list from api-launch.txt, step api-a-log:
+001_schema.sql
+002_security.sql
+003_inference.sql
+004_anthropic.sql
+005_openai_streaming.sql
+006_anthropic_streaming.sql
+007_stream_interrupted.sql
+008_provider_registry.sql
+009_vertex_provider.sql
+010_compatible_providers.sql
+011_private_endpoint.sql
+012_cost_accounting.sql
+013_execution_policy.sql
+014_provider_breaker.sql
+015_tenant_limits.sql
+016_fallback_policy.sql
+017_request_features.sql
+018_sample_capture.sql
+019_sample_retention.sql
+020_stream_samples.sql
+021_evaluation_orchestration.sql
+
+Rollback query on that database returned all four of 018, 019, 020, and 021.
+priorImageSees020 was true.
+GET /health/ready returned {"status":"ready","database":"ready"}.
+
+File hashes. git diff of 018, 019, and 020 against HEAD is empty.
+sha256 018_sample_capture.sql 7596efa4864fd42b3315f50e0b74ba6c4c1989a45c436011758740451ec48ee0
+sha256 019_sample_retention.sql 6affb9e54db05ef5df6a0377c7347d70bdd2230afa669e125c7d09301e5fa353
+sha256 020_stream_samples.sql 9c1dc3b39cfce2f3b72be53776b3749a8e0e14ce4f7529c5c2beeca8395586bd
+sha256 021_evaluation_orchestration.sql 359531dbb06a641adc93309909b9bd31c9338bdee55931e3f2aa167460c80a97
+
+src/index.ts and Dockerfile have no diff against HEAD.
+
+Testcontainers also recorded 021 plus unchanged 018, 019, and 020. See test/evaluations-http.test.ts. That file passed 8 tests. The full suite passed 483 tests. Registry and Anthropic migration-list checks are in that suite.

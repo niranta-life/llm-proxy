@@ -1,0 +1,12 @@
+Test: durable evaluation orchestration > advances a dry run once across crash, duplicate delivery, and two workers
+Result: passed. Duration 2932ms. See worker-tests.txt and api-contract.txt.
+
+The test expires a lease and lets a second worker finish the items once. A later duplicate delivery does not increase the completed count. Two concurrent workers complete the same two items once. The mock upstream hit count does not change during those polls. dryRun false returns skipped and claims nothing.
+
+Process launch: worker-launch.txt
+Run id f667d1b9-428b-48a9-949e-aa759c1f1b2b.
+Worker 1 exit 0. Run status completed. completedCount 1. Item reasonCode dry_run. Item id 4415dd2c-871e-4a3f-adf4-86acb8935bdf.
+Worker 2 exit 0. completedCount stays 1. The item id is unchanged.
+modelCallsDuringWorkers is 0. Mock hits stay at 1. That hit is the sample chat before the workers start.
+EVALUATION_EXECUTION_ENABLED was unset.
+Both worker logs say modelCalls 0.

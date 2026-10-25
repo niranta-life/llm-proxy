@@ -1,0 +1,10 @@
+Test: durable evaluation orchestration > creates a dry run, pages it, and hides it from another tenant
+Result: passed. Duration 1286ms. Node v24.22.1. PostgreSQL 16 through Testcontainers.
+Log: api-contract.txt
+
+The test creates a run for one tenant. A second tenant receives 404 not_found for the run and for its items. The second tenant list is {"evaluations":[],"nextCursor":null}. A query under that tenant's row-level-security context returns no evaluation_runs rows.
+
+The same file also replays one Idempotency-Key and rejects that key with a different payload. The replay returns HTTP 200 and the same run id. The conflict returns HTTP 409. The body is {"error":{"message":"The idempotency key was used with a different request.","type":"invalid_request_error","param":"Idempotency-Key","code":"idempotency_conflict"}}. The database still has one row for that key.
+
+The launch check used one tenant on two API processes. Both lists matched. The bodies do not contain the prompt token or the completion token.
+Run id f667d1b9-428b-48a9-949e-aa759c1f1b2b. Tenant a85720ba-4f5c-46a9-ac69-105b869213dc.

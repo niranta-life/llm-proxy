@@ -1,0 +1,4 @@
+Parent: 41b7a5337fc02df3a66e216f7769a521b85e83d3
+Subject: feat(proxy): store durable evaluation runs without a model call.
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

@@ -1057,7 +1057,11 @@ describe('interactive CLI', () => {
   it('keeps the HTTP server free of configuration routes', () => {
     const source = readFileSync(join(projectRoot, 'src/http/app.ts'), 'utf8');
     const posts = [...source.matchAll(/app\.post\('([^']+)'/g)].map((match) => match[1]);
-    expect(posts).toEqual(['/v1/chat/completions']);
+    expect(posts).toEqual([
+      '/v1/chat/completions',
+      '/internal/v1/evaluations/preflight',
+      '/internal/v1/evaluations',
+    ]);
   });
 
   it('rejects --interactive mixed with another argument', () => {

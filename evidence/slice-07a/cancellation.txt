@@ -1,0 +1,14 @@
+Test: durable evaluation orchestration > cancels a queued run, rejects an illegal stored transition, and keeps state on an outage
+Result: passed. Duration 1785ms. See api-contract.txt.
+
+Cancel of a queued run returns status cancelled, cancelledCount 1, completedCount 0, queuedCount 0.
+A second cancel returns the same cancelled run.
+The item status is cancelled and the reason code is cancelled.
+A dry-run poll after that cancel is idle. It does not complete the item.
+An illegal stored transition from queued to completed throws. The status stays queued.
+The same status queued is idempotent.
+An admin update of the snapshot throws because the snapshot is immutable.
+An aborted worker signal does not claim the job. The run stays queued.
+A closed runtime pool returns HTTP 500 with the OpenAI envelope code internal_error. The run stays queued.
+A dead database pool rejects the worker poll. The run stays queued.
+A concurrent cancel and dry-run worker do not report a deadlock. The run ends cancelled or completed. A completed run returns 409 illegal_transition on cancel. That test passed in 1146ms.

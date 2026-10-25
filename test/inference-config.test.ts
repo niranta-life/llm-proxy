@@ -96,6 +96,7 @@ describe('configuration lookup', () => {
     expect(loadConfig(serviceEnv(db)).maxActiveStreams).toBe(32);
     expect(loadConfig(serviceEnv(db)).maxStreamsPerTenant).toBe(32);
     expect(loadConfig(serviceEnv(db)).streamShutdownDrainMs).toBe(5000);
+    expect(loadConfig(serviceEnv(db)).evaluationExecutionEnabled).toBe(false);
     expect(loadConfig(serviceEnv(db, { STREAM_SHUTDOWN_DRAIN_MS: '0' })).streamShutdownDrainMs).toBe(0);
     expect(() => loadConfig(serviceEnv(db, { MAX_ACTIVE_STREAMS: '0' }))).toThrow(/MAX_ACTIVE_STREAMS/);
     expect(() => loadConfig(serviceEnv(db, { MAX_STREAMS_PER_TENANT: '0' }))).toThrow(/MAX_STREAMS_PER_TENANT/);

@@ -1,0 +1,28 @@
+command: npm test -- test/production-hardening.test.ts
+host figures from this run are not a production SLO
+additional_inference_latency_ms 9.831197999999858
+capture_on_mean_ms 100.96203124999738
+capture_off_mean_ms 91.13083324999752
+selection_overhead_ms 25.502687750002224
+selection_mean_ms 116.63352099999975
+feature_cpu_user_us 1164
+feature_cpu_system_us 378
+feature_wall_ms 1.2773750000051223
+feature_iterations 400
+capture_attempts 34
+capture_stored 21
+capture_miss 13
+capture_success_rate 0.6176470588235294
+rss_before_kb 108144
+rss_during_kb 108496
+rss_delta_kb 352
+request_samples_bytes_start 57344
+request_samples_bytes_end 286720
+request_samples_bytes_growth 229376
+cleanup_backlog_after_crash 1
+cleanup_backlog_after_recovery 0
+expiry_to_deletion_ms 693
+worker_interval_ms 60000
+decrypt_failures 2
+decrypt_successes 3
+tenant_isolation pass

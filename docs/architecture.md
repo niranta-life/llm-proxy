@@ -20,7 +20,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | Usage + Cost Tracking | Prices each attempt from registered prices. Settles the budget reservation. | `src/inference/cost.ts`, `src/inference/cost-store.ts`, `src/db/prices.ts` |
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |
 | Key custody | Encrypts provider keys with AES-256-GCM. The key comes from `PROVIDER_CREDENTIAL_KEY`. | `src/credentials.ts` |
-| Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. Expired and revoked samples are deleted by a PostgreSQL job. Metadata routes return no content. An eligibility check reads metadata and does not run a replay. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
+| Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. The proxy process runs the cleanup job. Metadata routes return no content. An eligibility check reads metadata and does not run a replay. A capture failure does not change the chat result. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
 | Logging | Removes secrets, prompts, and chat messages from logs. | `src/logger.ts`, `src/redact.ts` |
 | Admin | All config changes. There is no HTTP admin API. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts` |
 
@@ -33,6 +33,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 5. Admission: limits are checked and the budget is reserved.
 6. Adapter: the provider is called. Retry and fallback decide after each failed attempt. A new attempt goes back to step 4.
 7. Cost and metrics: the attempt is priced and stored. The budget reservation is settled.
+8. Capture: a completed non-streaming chat may store one encrypted sample before the JSON response returns. A completed stream may store one sample after the caller has the last byte. The stream slot is released before that write. A capture or feature-extraction failure does not change the chat status and does not add a provider attempt.
 
 Fallback is allowed only before the proxy sends a response header or a response byte. After that, a failure ends the stream with an error. The proxy never joins output from two models.
 
@@ -66,19 +67,22 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 
 A policy change stores a new version. The proxy does not edit a stored policy in place.
 
+`request_samples` stores ciphertext and metadata. It does not store a second copy of the prompt as plaintext. `sample_deletions` records that a sample was removed and the reason. `sample_jobs` records one cleanup run. The cleanup worker is not a separate Compose service. `src/index.ts` starts it in the proxy process. The interval is 60 seconds. Each automatic run uses one idempotency key for the current hour and for every tenant. `cleanup-expired-samples` uses one key per tenant per minute.
+
 ## Trust boundaries
 
 - **Caller → proxy.** The caller holds a tenant id and secret only. It cannot pass a provider key or a provider URL.
 - **Proxy → database.** The proxy logs in as `llm_auth` (secret checks) and `llm_runtime` (tenant work). Both roles are `NOBYPASSRLS`. The runtime role cannot read provider key ciphertext or secret verifiers. `llm_migrator` runs migrations. `llm_owner` owns the tables and cannot log in.
 - **Proxy → provider.** Base URLs for hosted providers are fixed in code. A private endpoint must be on the tenant's allowlist with pinned addresses. Redirects are refused.
 - **Operator → proxy.** Config changes only through the CLI, with database access. Nothing on the network can change config.
-- **TLS.** The proxy does not terminate TLS. Put it behind a load balancer or reverse proxy that does.
+- **Key custody for samples.** `PROVIDER_CREDENTIAL_KEY` seals a new provider credential and wraps a new sample. `PROVIDER_CREDENTIAL_KEY_PREVIOUS` is an optional comma-separated list of retained 32-byte keys. Those keys open an older provider credential and an older sample. The HTTP server and the operator CLI both pass that list when they open a stored credential. A wrong key opens nothing. A changed ciphertext opens nothing. The current key still seals new values.
+- **TLS.** The proxy does not terminate TLS. Put it behind a load balancer or reverse proxy that does. Each proxy process has its own stream slots. Two processes share one PostgreSQL database and the same sample rows.
 
 ## Planned: Continuous Learning System
 
 Not built. The design:
 
-- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on, and delete it when it expires or capture is turned off. An eligibility check reports whether that sample may be replayed later. Replay, a judge, and rankings are not built.
+- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on, and delete it when it expires or capture is turned off. An eligibility check reports whether that sample may be replayed later. Replay, a judge, rankings, and automatic model evaluation are not built.
 - **Evaluator.** Workers take jobs from a durable queue, replay stored requests on other deployments, and score them with a judge model.
 - **Optimizer.** Writes per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches.
 - **Infra.** Redis for hot counters and the job queue, and an external secret manager for provider keys.

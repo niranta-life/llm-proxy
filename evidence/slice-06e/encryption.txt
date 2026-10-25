@@ -1,0 +1,7 @@
+old wrapping version 1
+new wrapping version 2
+rotated manager opened both samples
+the rotated process opened the provider credential with the retained key
+wrong key opened nothing
+tampered ciphertext opened nothing
+the stored row still opens after the tamper check

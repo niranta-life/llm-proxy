@@ -1,0 +1,124 @@
+This report records the checks that ran for learning-history capture.
+It does not say that production traffic was sampled.
+It does not add a model evaluation.
+
+Hardening command: npm test -- test/production-hardening.test.ts
+The command ran from llm-proxy on Node 24.
+VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+SLICE_06E_EVIDENCE was evidence/slice-06e for that command only.
+The log is evidence/slice-06e/hardening.txt.
+Test Files 1 passed (1).
+Tests 15 passed (15).
+Start at 05:01:22.
+Duration 58.68s.
+HARDENING_EXIT:0.
+
+Full regression command: npm test
+The command ran from llm-proxy on Node 24.
+VERTEX_LIVE, XAI_LIVE, OPENROUTER_LIVE, and SLICE_06E_EVIDENCE were unset.
+The log is evidence/slice-06e/vitest.txt.
+Test Files 55 passed | 2 skipped (57).
+Tests 475 passed | 3 skipped (478).
+Start at 05:47:52.
+Duration 673.98s.
+VITEST_EXIT:0.
+The skipped files are the live provider tests.
+An earlier run of the same command failed test/budgets.test.ts.
+The second request in a one-request minute window returned 200.
+That log is not this suite result.
+Admission code and the 5 second pool timeouts were not changed.
+
+Figures are in evidence/slice-06e/measurements.txt.
+additional_inference_latency_ms is 9.831197999999858.
+feature_cpu_user_us is 1164.
+feature_cpu_system_us is 378.
+selection_overhead_ms is 25.502687750002224.
+capture_success_rate is 0.6176470588235294.
+rss_delta_kb is 352.
+request_samples_bytes_growth is 229376.
+cleanup_backlog_after_crash is 1.
+cleanup_backlog_after_recovery is 0.
+expiry_to_deletion_ms is 693.
+worker_interval_ms is 60000.
+decrypt_failures is 2.
+decrypt_successes is 3.
+tenant_isolation is pass.
+These host figures are not a production SLO.
+The workload is named in evidence/slice-06e/known-limitations.txt.
+
+Encryption evidence is evidence/slice-06e/encryption.txt.
+A sample sealed with wrapping version 1 opened after rotation.
+A sample sealed with wrapping version 2 opened with the same manager.
+The rotated process called the provider with the retained key.
+The operator CLI uses the same previous keys.
+test/cli-key-rotation.test.ts sealed a synthetic credential with key A.
+It then ran dist/cli.js list-private-models with current key B and previous key A.
+The command exited 0.
+The local server received the original bearer token.
+That test passed inside the full regression above.
+A wrong key opened nothing.
+A tampered copy opened nothing.
+The stored row still opened.
+
+Tenant isolation evidence is evidence/slice-06e/tenant-isolation.txt.
+Two proxy processes served two tenants at the same time.
+Content capture was on for one tenant.
+The other tenant stored no sample and received 404 for the stored sample.
+Row level security returned no foreign sample row.
+
+Sample counts at the end of the hardening file are in evidence/slice-06e/sample-distribution.txt.
+coding 2.
+extraction 1.
+summarization 1.
+unknown 15.
+writing 2.
+
+Retention evidence is evidence/slice-06e/retention.txt.
+One tenant kept a sample for 7200 seconds.
+The other tenant kept a sample for 1800 seconds.
+An expired row put back by an administrator stayed hidden.
+Cleanup deleted that row again.
+
+Worker evidence is evidence/slice-06e/worker-recovery.txt.
+A cleanup that committed and then stopped left the job unfinished.
+The retry removed 0 and did not add a deletion audit.
+Two cleanup commands in bucket 2026-10-25T12:02 reported removed 0 and 2.
+One proxy was killed after a sample was stored.
+The other proxy still served chat.
+The sample row remained.
+
+Rollback evidence is evidence/slice-06e/rollback.txt.
+A policy change to disabled during the provider call stored no sample.
+Disabled mode stored no new sample.
+The sample route returned 404.
+Readiness returned 200 with status ready and database ready.
+Readiness for 019_sample_retention.sql returned 200.
+The earlier ciphertext row remained until cleanup.
+
+Release order is in docs/operations.md.
+Metadata collection comes first.
+Content capture stays off by default.
+Streaming capture stays off by default.
+Enable content capture for one test tenant.
+Start with synthetic data.
+Verify encryption and deletion before approved business data.
+Rollback disables capture and hides new reads immediately.
+Historical ciphertext stays under the active policy and the expiry rule.
+No automatic model evaluation was added.
+
+The tree is ready for that operator sequence on synthetic data.
+It is not a running sample of business traffic.
+Compose still has one app service.
+The multi-process proof is two operating-system processes on one PostgreSQL.
+
+Docker command: DOCKER_HOST=unix:///Users/nitin/.colima/default/docker.sock docker build -t llm-proxy:slice-06e .
+The image was built again after the operator CLI passed previous keys into the credential store.
+The log is evidence/slice-06e/docker-build.txt.
+BUILD_EXIT:0.
+The image manifest list is sha256:9307a5a77c54401f92666e4207b63f4be664f0ec8ef7d9c5362da2c9d518237b.
+The image lists migrations 001_schema.sql through 020_stream_samples.sql.
+020_stream_samples.sql does not drop a table or a column.
+dist/cli.js in the image calls createCredentialStore with config.previousCredentialKeys.
+No Compose app named llm-proxy-app-1 was running.
+No container was stopped.
+The pgdata volume was left in place.

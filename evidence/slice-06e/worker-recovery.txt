@@ -1,0 +1,8 @@
+crash key expire-cleanup:harden-crash committed the delete and left the job unfinished
+the retry finished the job and did not add a deletion audit
+concurrent cleanup bucket 2026-10-25T12:02
+concurrent removed 0,2
+two workers deleted each expired sample once
+one proxy was killed after a sample was stored
+the other proxy still served chat
+the sample row remained

@@ -299,9 +299,9 @@ function parseCapabilities(value: string | undefined): string[] | undefined {
   return parts;
 }
 
-function credentialStore(key: Buffer | null) {
-  if (key === null) throw new Error('PROVIDER_CREDENTIAL_KEY is required');
-  return createCredentialStore(key);
+function credentialStore(config: Config) {
+  if (config.providerCredentialKey === null) throw new Error('PROVIDER_CREDENTIAL_KEY is required');
+  return createCredentialStore(config.providerCredentialKey, config.previousCredentialKeys);
 }
 
 const RATE = /^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/;
@@ -462,7 +462,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
-    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+    const protectedCredential = credentialStore(config).protect(apiKey);
     if (command === 'register-anthropic-connection') {
       const created = await registerAnthropicConnection(
         pool,
@@ -507,7 +507,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     });
     const protectedCredential =
       prepared.authMode === 'service_account'
-        ? credentialStore(config.providerCredentialKey).protect(apiKey, 'service_account')
+        ? credentialStore(config).protect(apiKey, 'service_account')
         : null;
     const created = await registerRegistryConnection(pool, {
       tenantId,
@@ -560,7 +560,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       serviceAccountIdentity: values['service-account'],
       apiVersion: values['api-version'],
     });
-    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey, 'api_key');
+    const protectedCredential = credentialStore(config).protect(apiKey, 'api_key');
     const created = await registerRegistryConnection(pool, {
       tenantId,
       provider: prepared.provider,
@@ -595,7 +595,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
-    const protectedCredential = credentialStore(config.providerCredentialKey).protect(apiKey);
+    const protectedCredential = credentialStore(config).protect(apiKey);
     if (command === 'register-openai-connection') {
       const created = await registerOpenAiConnection(pool, tenantId, protectedCredential);
       process.stdout.write(
@@ -821,7 +821,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     }
     let credentialJson: string | null = null;
     if (loaded.protectedCredential !== null) {
-      credentialJson = credentialStore(config.providerCredentialKey).open(loaded.protectedCredential);
+      credentialJson = credentialStore(config).open(loaded.protectedCredential);
     }
     const spec: VertexClientSpec = {
       tenantId,
@@ -895,7 +895,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       return;
     }
     const runtimePool = createPool(config, 'runtime', logger, 1);
-    const store = credentialStore(config.providerCredentialKey);
+    const store = credentialStore(config);
     try {
       const result = command === 'list-private-models'
         ? await listPrivateModels({ runtimePool, store, tenantId, deployment: name })

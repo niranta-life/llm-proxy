@@ -31,7 +31,7 @@ A finished stream ends with one `data: [DONE]`, and only after the provider fini
 - Anthropic ends with `message_stop`.
 - Vertex ends with a finish reason.
 
-A timeout does not write `[DONE]`. A failure after headers does not write `[DONE]` and does not change the HTTP status. The proxy does not store the raw event stream. It stores encrypted caller-visible text only when streaming capture is on and the stream completed. The default is off. Capture does not change the bytes that are forwarded.
+A timeout does not write `[DONE]`. A failure after headers does not write `[DONE]` and does not change the HTTP status. The proxy does not store the raw event stream. It stores encrypted caller-visible text only when streaming capture is on and the stream completed. The default is off. Capture does not change the bytes that are forwarded. The stream slot is released when the response ends. The sample write runs after that release. A slow caller ends as `slow_consumer` and stores no sample. A caller abort ends as `client_aborted` and stores no sample. A stream that ends without the provider terminal event is `stream_truncated` and stores no sample. A buffer past the capture ceiling stores no sample. The caller still receives the forwarded bytes.
 
 An Anthropic stream sends each `text_delta` in content-block order. An empty text block adds no text. A `ping` adds no text. The proxy does not send `thinking_delta` or `signature_delta`. It rejects a serving model that is not the deployment model, a content block with type `fallback`, and a `tool_use` block. The stream is one HTTP request and does not use the Anthropic SDK stream helper. The proxy reads the event bytes and does not treat a missing terminal event as success.
 

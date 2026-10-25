@@ -1,0 +1,5 @@
+two proxy processes served two tenants at the same time
+content capture was on for one tenant
+the other tenant stored no sample
+the other tenant received 404 for the stored sample
+row level security returned no foreign sample row

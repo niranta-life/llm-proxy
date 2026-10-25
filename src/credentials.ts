@@ -5,8 +5,12 @@ export type ProviderCredentialStore = {
   open(protectedCredential: string): string;
 };
 
-export function createCredentialStore(key: Buffer): ProviderCredentialStore {
+export function createCredentialStore(key: Buffer, previous: readonly Buffer[] = []): ProviderCredentialStore {
   if (key.length !== 32) throw new Error('credential key must be 32 bytes');
+  for (const older of previous) {
+    if (older.length !== 32) throw new Error('credential key must be 32 bytes');
+  }
+  const keys = [key, ...previous];
 
   return {
     protect(secret: string, mode: 'api_key' | 'service_account' = 'api_key'): string {
@@ -43,9 +47,18 @@ export function createCredentialStore(key: Buffer): ProviderCredentialStore {
       if (iv.length !== 12 || tag.length !== 16 || data.length === 0) {
         throw new Error('protected credential is invalid');
       }
-      const decipher = createDecipheriv('aes-256-gcm', key, iv);
-      decipher.setAuthTag(tag);
-      return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+      let last: unknown;
+      for (const candidate of keys) {
+        try {
+          const decipher = createDecipheriv('aes-256-gcm', candidate, iv);
+          decipher.setAuthTag(tag);
+          return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+        } catch (error) {
+          last = error;
+        }
+      }
+      if (last instanceof Error) throw last;
+      throw new Error('protected credential is invalid');
     },
   };
 }

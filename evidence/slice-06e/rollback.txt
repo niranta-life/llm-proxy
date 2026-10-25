@@ -1,0 +1,7 @@
+a policy change to disabled during the provider call stored no sample
+metadata mode stored no content
+disabled mode stored no new sample
+the earlier ciphertext row remained until cleanup
+the sample route returned 404 after capture was disabled
+readiness 200 {"status":"ready","database":"ready"}
+readiness for 019_sample_retention.sql returned 200

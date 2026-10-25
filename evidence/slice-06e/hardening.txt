@@ -1,0 +1,30 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose test/production-hardening.test.ts
+
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.0
+ ✓ test/production-hardening.test.ts > learning history production hardening > serves concurrent tenants and captures only the approved tenant 3215ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > keeps a different retention on each tenant 2747ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > enforces one cap and skips a duplicate 2681ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > accepts a large request and a large output without storing an over-size sample 1959ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > drops an incomplete stream under backpressure, cancel, and a missing terminal 2257ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > stores nothing when the policy is revoked during the provider call 1465ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > keeps the chat when feature extraction or capture fails 1692ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > opens a rotated key, rejects the wrong key, and rejects a tampered payload 1977ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > keeps cost, retry, and fallback results for the same inputs 6009ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > calls only the approved provider 2840ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > recovers a crashed cleanup and lets two workers delete once 5038ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > hides a restored expired sample and deletes it again 1321ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > fails closed when admission cannot lock and then serves the same database 12652ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > keeps a stored sample when one proxy process is killed 2055ms
+ ✓ test/production-hardening.test.ts > learning history production hardening > records measurements, rollback, and the absence of raw content 3927ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  05:01:22
+   Duration  58.68s (transform 355ms, setup 2ms, collect 772ms, tests 52.34s, environment 0ms, prepare 68ms)
+
+HARDENING_EXIT:0

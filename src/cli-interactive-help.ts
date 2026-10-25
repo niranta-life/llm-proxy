@@ -51,7 +51,7 @@ export const COMMAND_HELP: Readonly<Record<string, string>> = {
   'probe-private-health': 'Check the private endpoint health',
   'show-fallback-policy': 'Show the fallback policy for an alias',
   'list-inference': 'Show the connections, deployments, and aliases of a tenant',
-  'set-sample-policy': 'Set whether a tenant stores encrypted chat samples',
+  'set-sample-policy': 'Set whether a tenant stores encrypted chat samples. Disabled and metadata-only modes store no content.',
   'set-deployment-data-class': 'Set the data class of a deployment',
   'show-sample-policy': 'Show the sample policy for a tenant',
   'delete-sample': 'Delete one encrypted sample for a tenant',

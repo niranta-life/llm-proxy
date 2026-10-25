@@ -1,0 +1,4 @@
+one tenant keeps a sample for 7200 seconds
+the other tenant keeps a sample for 1800 seconds
+an expired row put back by an administrator stayed hidden
+cleanup deleted that row again

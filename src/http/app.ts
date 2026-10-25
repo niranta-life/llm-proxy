@@ -92,7 +92,9 @@ function streamReply(reply: FastifyReply): StreamHttp {
 export function buildApp(deps: AppDeps): ProxyApp {
   const app = Fastify({ logger: false }) as unknown as ProxyApp;
   const credentialStore: ProviderCredentialStore | null =
-    deps.credentialKey === null ? null : createCredentialStore(deps.credentialKey);
+    deps.credentialKey === null
+      ? null
+      : createCredentialStore(deps.credentialKey, deps.previousCredentialKeys ?? []);
   const sampleKeyManager: SampleKeyManager | null =
     deps.sampleKeyManager !== undefined
       ? deps.sampleKeyManager

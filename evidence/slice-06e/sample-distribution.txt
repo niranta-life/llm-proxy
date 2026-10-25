@@ -1,0 +1,6 @@
+SELECT task_category, count(*) FROM request_samples WHERE tenant_id = ANY($1) GROUP BY task_category
+coding 2
+extraction 1
+summarization 1
+unknown 15
+writing 2

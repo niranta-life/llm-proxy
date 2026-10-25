@@ -1,0 +1,37 @@
+command: npm test -- test/production-hardening.test.ts
+The command ran on Node 24 from llm-proxy.
+VERTEX_LIVE, XAI_LIVE, and OPENROUTER_LIVE were unset.
+SLICE_06E_EVIDENCE pointed at evidence/slice-06e for this run only.
+Host figures from this run are not a production SLO.
+
+The workload was two shipped proxy processes, one Testcontainers PostgreSQL 16, the shipped cleanup function, a mock OpenAI server, a mock Anthropic server, and an in-process Vertex client. Requests were synthetic.
+
+additional_inference_latency_ms is the mean of four capture-on non-stream chats minus the mean of four capture-off chats. The value in measurements.txt is 9.831197999999858. capture_on_mean_ms is 100.96203124999738. capture_off_mean_ms is 91.13083324999752.
+
+selection_overhead_ms is the mean of four encrypted-sample chats at sample rate 0 minus the capture-off mean. The value is 25.502687750002224. selection_mean_ms is 116.63352099999975. A negative delta on another host is noise. This run does not set a latency budget.
+
+feature_cpu_user_us is 1164. feature_cpu_system_us is 378. feature_wall_ms is 1.2773750000051223. Those figures are 400 direct calls of extractRequestFeatures in the test process. They are not timed inside the chat route.
+
+rss_before_kb is 108144. rss_during_kb is 108496. rss_delta_kb is 352. The command was ps rss of one proxy process before and during one held captured stream. This is not a per-stream allocator measurement.
+
+request_samples_bytes_start is 57344. request_samples_bytes_end is 286720. request_samples_bytes_growth is 229376. The query is pg_total_relation_size of public.request_samples at the start and at the end of this file. A full suite can start from a larger table. This file does not report that later size.
+
+capture_attempts is 34. capture_stored is 21. capture_miss is 13. capture_success_rate is 0.6176470588235294. The miss count includes intentional misses. Those misses are the cap, a duplicate, an over-size body, an incomplete stream, a revoked policy, and a capture failure. The rate is not a production capture target.
+
+The sample distribution is the rows still stored at the end of the file. coding 2. extraction 1. summarization 1. unknown 15. writing 2. Expired rows deleted earlier are not in that count. The capture counter and the category count are separate measurements.
+
+cleanup_backlog_after_crash is 1. That count is sample_jobs whose status is not succeeded, taken after a cleanup that committed and then threw. cleanup_backlog_after_recovery is 0 for that idempotency key. expiry_to_deletion_ms is 693. That delay is deleted_at minus expires_at for one direct cleanup call. It is not a wait for the 60 second timer. worker_interval_ms is 60000. That number is CLEANUP_INTERVAL_MS in src/inference/sample-jobs.ts. This run did not time the timer.
+
+decrypt_failures is 2. decrypt_successes is 3. The failures are a wrong key and a tampered copy. The stored row still opened. tenant_isolation is pass for one two-tenant case.
+
+Compose runs one app service and one PostgreSQL service. This proof uses two operating-system processes on one database. It does not start a second Compose app. The cleanup worker stays inside the proxy process.
+
+Database unavailability held the admission lock. The test did not drop the database. A later chat on that database returned 200.
+
+Putting an expired sample back used administrator SQL after cleanup deleted the live row. There is no restore API. The hidden row was deleted again.
+
+Replay was not executed. A judge was not called. No evaluation budget was reserved. Rankings were not updated.
+
+PROVIDER_CREDENTIAL_KEY_PREVIOUS opens a provider credential and a sample sealed with that key. The HTTP server and the operator CLI both pass that list. A process that omits the previous key cannot open those values. New seals use the current key only.
+
+Content capture stays off until an operator turns it on. Streaming capture stays off until an operator turns it on. Metadata mode stores no content.

@@ -137,7 +137,11 @@ These changes affect one tenant, or one deployment, and do not call the provider
 
 - Turn retry off with `set-execution-policy`, `--deployment`, and `--retries false`. The command also needs the three deadline flags and the two backoff flags. See [Retry](retry.md).
 - Turn fallback off with `set-fallback-policy` and `--enabled false`. A named deployment still does not switch.
-- Turn sample capture off with `set-sample-policy` and `--mode disabled` or `--mode metadata_only`. A new chat then stores no sample. Replay and judge disclosure stay off unless you set them. Streaming capture stays off unless you set `--streaming-capture true`. A completed text stream then stores one encrypted sample. A stream that does not finish stores no replay-ready sample.
+- Turn sample capture off with `set-sample-policy` and `--mode disabled` or `--mode metadata_only`. A new chat then stores no sample. A sample stored earlier is hidden on the next read. The ciphertext row stays until cleanup deletes it as revoked, or until it expires under a policy that still allows encrypted content. Replay and judge disclosure stay off unless you set them. Streaming capture stays off unless you set `--streaming-capture true`. A completed text stream then stores one encrypted sample. A stream that does not finish stores no replay-ready sample. Feature extraction and capture are optional. A failure in either one does not change the chat status and does not add a provider attempt.
+- To rotate the wrapping key, set `PROVIDER_CREDENTIAL_KEY` to the new 32-byte key and set `PROVIDER_CREDENTIAL_KEY_PREVIOUS` to the old key. Restart the proxy. New samples and new provider credentials use the new key. The old key still opens samples and provider credentials that it sealed. The operator CLI uses those same keys when it opens a stored credential. A wrong key opens nothing. Check one old sample and one new sample before you drop the previous key.
+- If cleanup stops after the delete is committed, the job stays `running` until its lock time. Set `locked_until` in the past for that idempotency key, then run `cleanup-expired-samples` again. The second run deletes nothing that was already audited. Two cleanup commands for the same tenant in the same minute share one job key. One of them claims the job. The expired rows are deleted once.
+- A proxy process can stop after a sample is stored. Another process that uses the same database still serves chat and still sees that sample. `SIGKILL` does not roll the sample back.
+- A hard check that cannot take the admission lock returns HTTP 503 `admission_unavailable` and does not call the provider. The database stays in place. A later chat uses it again. Do not drop the database to clear that error.
 - Disable one deployment with `set-deployment-enabled`, `--name`, and `--enabled false`. The next request for that name returns `model_not_found`.
 - Disable one breaker with `set-deployment-breaker`, `--deployment`, and `--enabled false`.
 - Reset one breaker with `reset-deployment-breaker` and `--deployment`. The next chat can reach the upstream.
@@ -148,6 +152,34 @@ A hard check that cannot reach the database returns HTTP 503 `admission_unavaila
 During a chat, the request stays `pending` until a terminal status is stored. A completed response stores `succeeded`. A rejected response stores `failed`. A stream stores one stream status. Shutdown stores `interrupted` when the row write succeeds. A priced success stores cost status `estimated`. Missing usage stays `unknown`, with a null amount. One request uses at most two upstream attempts, and that request does not both retry and fall back.
 
 Read counts on `GET /internal/v1/metrics/summary`, attempt history on `GET /internal/v1/metrics/attempts`, the budget on `GET /internal/v1/budgets/usage`, the limits on `GET /internal/v1/limits`, breaker state on `GET /internal/v1/metrics/breakers`, request characteristics on `GET /internal/v1/request-features`, and sample metadata on `GET /internal/v1/samples`. See [Metrics](metrics.md). The sample routes return no prompt, no completion, and no ciphertext.
+
+## Capture release
+
+Use this order. Do not skip a step.
+
+1. Turn metadata collection on with `--mode metadata_only` and `--content-capture false`. Confirm `GET /internal/v1/request-features` returns characteristics and no prompt or completion.
+2. Leave content capture off. The default sample mode stores no content. Streaming capture defaults to false.
+3. Turn `--mode encrypted_sample` and `--content-capture true` on for one test tenant. Leave every other tenant disabled or metadata-only.
+4. Send synthetic requests only. Do not send approved business data yet.
+5. Open one stored sample with the current key. Confirm a wrong key and a changed ciphertext open nothing. Run `cleanup-expired-samples` on an expired synthetic sample and confirm the row is gone and the deletion reason is `expired`.
+6. Turn capture off with `--mode disabled` and confirm the sample route returns 404 at once. Readiness for `020_stream_samples.sql` stays 200. Historical ciphertext stays until the active policy or the expiry rule deletes it.
+7. Only after those checks, capture approved business data for a tenant whose policy, classification, provider, and deployment list allow it.
+
+`POST /internal/v1/samples/{sampleId}/eligibility-check` reports metadata only. It does not start a replay. This tree adds no automatic model evaluation.
+
+## Docker deployment
+
+Compose runs one `postgres:16` service and one `app` service. The image build context is this directory. The app listens on port 8080. Inference stays off until `INFERENCE_ENABLED` is true. `PROVIDER_CREDENTIAL_KEY` is required when inference is on. The cleanup worker starts inside the app process. It is not a second Compose service. `stop_grace_period` is 20 seconds. The ready check calls `http://127.0.0.1:8080/health/ready`.
+
+Two or more app processes can share one database. Give each process the same `PROVIDER_CREDENTIAL_KEY` and the same previous keys. Each process keeps its own stream slots. Sample rows are shared through PostgreSQL.
+
+To build a local image tag for this tree, use the Colima socket when that is the daemon that has the base image:
+
+```bash
+DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock" docker build -t llm-proxy:slice-06e .
+```
+
+Leave a running Compose app and its volume in place. Do not remove `pgdata` to roll back capture.
 
 ## Tests
 

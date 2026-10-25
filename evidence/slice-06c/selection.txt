@@ -1,0 +1,9 @@
+stable draw 0.558063 keep false
+rate 0 kept 0 of 200
+rate 1 kept 200 of 200
+rate 0.25 kept 985 of 4000
+default cap 100 recent 60 diverse 40 retention 604800
+diverse keys after flood 4 retained 10
+hard cap retained 10
+fingerprint differs by tenant and differs from the raw prompt hash
+unauthorized request was not selected

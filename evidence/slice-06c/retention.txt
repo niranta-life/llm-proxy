@@ -1,0 +1,5 @@
+race retained 4 of cap 4
+
+expiry cleanup removed one row and the retry did not write a second audit
+
+revocation hid the row before cleanup and a restored row stayed unreadable

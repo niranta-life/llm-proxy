@@ -58,19 +58,21 @@ The cost reference is the attempt id and the stored cost status. It is not a new
 
 ## Encrypted samples
 
-`GET /internal/v1/samples` lists sample metadata for the caller. `GET /internal/v1/samples/{sampleId}` returns one row. Both use the same tenant headers as chat. Another tenant's row is not returned.
+`GET /internal/v1/samples` lists sample metadata for the caller. `GET /internal/v1/samples/{sampleId}` returns one row. `GET /internal/v1/samples/stats` returns counts and task coverage. `DELETE /internal/v1/samples/{sampleId}` deletes one sample for the caller. These routes use the same tenant headers as chat. Another tenant's row is not returned.
 
 The list accepts `limit` from 1 to 50, `provider`, and `cursor`. A bad value is rejected. The next page does not repeat ids from the page before it.
 
-Each row has the sample id, the request id, the policy version, the provider, the deployment, the ciphertext size, and the times. It does not include the prompt, the completion, or the ciphertext.
+Each row has the sample id, the request id, the policy version, the provider, the deployment, the ciphertext size, and the times. It does not include the prompt, the completion, or the ciphertext. A row is returned only while capture is still enabled and the sample has not expired. After capture is turned off, or after the expiry time, the list and the single-sample route stop returning that sample. Stats then report zero retained samples.
 
-A sample is stored only after the operator sets the mode to `encrypted_sample` and turns on content capture. The default is metadata only, which stores no content. Replay and judge disclosure are separate and default to denied. No route returns plaintext for replay or a judge.
+The stats body has the retained count, the cap, the recent share, the recent count, the diverse count, and counts by task category, input-size band, complexity, and deployment. It does not include the prompt, the completion, or the ciphertext.
+
+A sample is stored only after the operator sets the mode to `encrypted_sample` and turns on content capture. The default is metadata only, which stores no content. When capture is enabled and the operator omits the maximum, the tenant keeps at most 100 samples. When capture is enabled and the operator omits retention, each sample expires seven days after it is stored. The default split keeps 60% of the cap for recent samples and the rest for task coverage. Coverage uses the task category, the input size, the complexity, and the deployment. The same approved content is stored once for that tenant. Replay and judge disclosure are separate and default to denied. No route returns plaintext for replay or a judge.
 
 The stored bytes are an AES-256-GCM envelope. Each sample has its own data key. That key is wrapped by `PROVIDER_CREDENTIAL_KEY`. A retained previous wrapping key can open an older sample after rotation. The tenant id, the sample id, and the schema version are bound to the ciphertext.
 
-Capture runs after a completed non-streaming text chat. A streaming chat is not captured. A capture failure does not change the chat response and does not retry the provider. Hidden thinking, credentials, tool secrets, and caller metadata are not stored.
+Capture runs after a completed non-streaming text chat. A streaming chat is not captured. The insert stores a row only when the latest policy still allows encrypted capture. A capture failure does not change the chat response and does not retry the provider. Hidden thinking, credentials, tool secrets, and caller metadata are not stored.
 
-Set the policy with `set-sample-policy`. Set the deployment data class with `set-deployment-data-class`. Show the current policy with `show-sample-policy`. Turn capture off with `--mode disabled` or `--mode metadata_only`.
+Set the policy with `set-sample-policy`. Set the deployment data class with `set-deployment-data-class`. Show the current policy with `show-sample-policy`. Show coverage with `show-sample-stats`. Delete one sample with `delete-sample`. Delete expired and revoked samples with `cleanup-expired-samples`. Turn capture off with `--mode disabled` or `--mode metadata_only`. A cleanup failure does not change the chat response and does not add a provider attempt.
 
 Categories are `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, and `unknown`. A caller may send `task` with one of those values. Any other `task` value is rejected and is not stored. When `task` is absent, local rules choose the category, or the category stays `unknown`. The proxy does not call a model to classify the request.
 

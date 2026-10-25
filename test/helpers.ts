@@ -110,6 +110,7 @@ export async function createTestApp(
     sampleKeyManager?: import('../src/http/app.js').AppDeps['sampleKeyManager'];
     sampleDraw?: number;
     beforeSampleStore?: () => Promise<void> | void;
+    beforeSampleInsert?: () => Promise<void> | void;
     failSampleInsert?: () => boolean;
   } = {},
 ) {
@@ -129,6 +130,7 @@ export async function createTestApp(
     sampleKeyManager: options.sampleKeyManager,
     sampleDraw: options.sampleDraw,
     beforeSampleStore: options.beforeSampleStore,
+    beforeSampleInsert: options.beforeSampleInsert,
     failSampleInsert: options.failSampleInsert,
     maxActiveStreams: options.maxActiveStreams ?? config.maxActiveStreams,
     maxStreamsPerTenant: options.maxStreamsPerTenant ?? config.maxStreamsPerTenant,

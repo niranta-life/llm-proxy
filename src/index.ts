@@ -2,6 +2,7 @@ import { ConfigError, loadConfig, type Config } from './config.js';
 import { createPool } from './db/pools.js';
 import { latestMigrationVersion, migrate } from './db/migrate.js';
 import { buildApp } from './http/app.js';
+import { startSampleCleanupWorker } from './inference/sample-jobs.js';
 import { createLogger, type Logger } from './logger.js';
 
 function errorMessage(error: unknown): string {
@@ -85,10 +86,12 @@ async function main(): Promise<void> {
     maxStreamsPerTenant: config.maxStreamsPerTenant,
   });
 
+  const stopSampleCleanup = startSampleCleanupWorker(runtimePool, logger);
   let shuttingDown = false;
   const onSignal = (signal: string): void => {
     if (shuttingDown) return;
     shuttingDown = true;
+    stopSampleCleanup();
     void shutdownProcess(
       signal,
       logger,

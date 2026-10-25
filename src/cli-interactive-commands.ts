@@ -41,6 +41,8 @@ const UPDATE = {
   'recover-budget': ['tenant-id'],
   'set-sample-policy': ['tenant-id', 'mode', 'content-capture', 'replay', 'judge-disclosure', 'sample-rate', 'max-sample-bytes', 'max-sample-count', 'retention-seconds', 'classifications', 'providers', 'deployments'],
   'set-deployment-data-class': ['tenant-id', 'deployment', 'data-class'],
+  'delete-sample': ['tenant-id', 'sample-id'],
+  'cleanup-expired-samples': ['tenant-id'],
 } as const;
 
 const VALIDATE = {
@@ -53,6 +55,7 @@ const VALIDATE = {
   'show-fallback-policy': ['tenant-id', 'alias'],
   'list-inference': ['tenant-id'],
   'show-sample-policy': ['tenant-id'],
+  'show-sample-stats': ['tenant-id'],
 } as const;
 
 export const INTERACTIVE_GROUPS = {

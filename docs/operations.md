@@ -100,7 +100,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `018`. It drops nothing.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `019`. It drops nothing.
 
 | File | What it adds |
 | --- | --- |
@@ -122,8 +122,9 @@ SQL files in `migrations/` apply in lexical order, once, before the proxy listen
 | `016_fallback_policy.sql` | A versioned fallback policy for the alias `auto`. |
 | `017_request_features.sql` | Characteristics of a completed chat. No prompt or completion text. |
 | `018_sample_capture.sql` | A versioned sample policy and encrypted samples. The table stores ciphertext only. |
+| `019_sample_retention.sql` | Sample expiry, a metadata deletion audit, and a durable cleanup job. |
 
-Readiness for this tree checks for `018_sample_capture.sql`. An image that expects `017_request_features.sql` stays ready on this database because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
+Readiness for this tree checks for `019_sample_retention.sql`. An image that expects `018_sample_capture.sql` stays ready on this database because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
 
 An older image can start on this database when `schema_migrations` still contains the latest file that image knows. Later rows can stay. Do not delete migration rows. Do not delete provider, price, policy, or breaker rows to roll back a behavior. Turn the behavior off with the CLI.
 

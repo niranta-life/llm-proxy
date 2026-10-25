@@ -1,0 +1,7 @@
+{"cap":100,"recent":60,"diverse":40,"retained":100,"sizeBands":{"l":22,"s":78},"categories":{"coding":13,"writing":12,"reasoning":11,"extraction":12,"general_qa":13,"translation":13,"summarization":13,"classification":13},"complexity":{"low":78,"medium":22},"deployments":{"chat":100},"recentShare":0.6}
+
+{"deleted":true}
+
+{"cap":100,"recent":60,"diverse":40,"retained":100,"sizeBands":{"l":22,"s":78},"categories":{"coding":13,"writing":11,"reasoning":12,"extraction":12,"general_qa":13,"translation":13,"summarization":13,"classification":13},"complexity":{"low":78,"medium":22},"deployments":{"chat":100},"recentShare":0.6}
+
+{"deleted":true}

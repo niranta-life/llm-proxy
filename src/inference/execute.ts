@@ -135,6 +135,7 @@ export async function executeChat(input: {
   sampleKeyManager?: SampleKeyManager | null;
   sampleDraw?: number;
   beforeSampleStore?: () => Promise<void> | void;
+  beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
@@ -319,6 +320,7 @@ export async function executeChat(input: {
           nowMs: input.nowMs,
           draw: input.sampleDraw,
           beforeStore: input.beforeSampleStore,
+          beforeInsert: input.beforeSampleInsert,
           failInsert: input.failSampleInsert,
         });
         return completion.response;

@@ -54,6 +54,9 @@ export const COMMAND_HELP: Readonly<Record<string, string>> = {
   'set-sample-policy': 'Set whether a tenant stores encrypted chat samples',
   'set-deployment-data-class': 'Set the data class of a deployment',
   'show-sample-policy': 'Show the sample policy for a tenant',
+  'delete-sample': 'Delete one encrypted sample for a tenant',
+  'cleanup-expired-samples': 'Delete expired and revoked samples for a tenant',
+  'show-sample-stats': 'Show retained sample counts and task coverage',
 };
 
 // Commands whose result includes a tenant secret that is shown only once.
@@ -110,8 +113,10 @@ const FIELD_HINTS: Readonly<Record<string, string>> = {
   'judge-disclosure': 'true or false. false denies future judge disclosure.',
   'sample-rate': 'A rate from 0 to 1. Use at most 6 decimal places.',
   'max-sample-bytes': 'Largest sample in bytes, from 0 to 1000000.',
-  'max-sample-count': 'Most open samples, from 0 to 1000000.',
-  'retention-seconds': 'How long a sample is kept, in seconds.',
+  'max-sample-count': 'Most open samples, from 0 to 1000000. Omit it on encrypted capture to keep 100.',
+  'retention-seconds': 'How long a sample is kept, in seconds. Omit it on encrypted capture to keep samples for seven days.',
+  'recent-share': 'Share of the cap kept for recent samples, from 0 to 1. The default is 0.6.',
+  'sample-id': 'Sample id from the sample list.',
   classifications: 'Approved data classes, comma-separated.',
   'data-class': 'public, internal, confidential, restricted, or none.',
 };

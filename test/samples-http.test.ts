@@ -540,6 +540,35 @@ describe('encrypted samples over HTTP', () => {
     failureNotes.push('revocation before storage kept the chat and stored no sample');
   });
 
+  it('stores nothing when capture is revoked after the in-transaction policy read', async () => {
+    const { a } = tenantPair('revoke-after-read');
+    enableCapture(a.tenantId);
+    const before = await sampleCount(a.tenantId);
+    let revoke = true;
+    await withApp(
+      {
+        beforeSampleInsert: () => {
+          if (!revoke) return;
+          revoke = false;
+          setPolicy(a.tenantId, 'disabled');
+        },
+      },
+      async (app) => {
+        const response = await post(app, a);
+        expect(response.statusCode).toBe(200);
+        expect(response.json().choices[0].message.content).toBe(COMPLETION);
+        expect(response.headers['x-attempt-count']).toBe('1');
+        const attempts = await admin.query<{ count: number }>(
+          'SELECT count(*)::int AS count FROM model_attempts WHERE request_id = $1',
+          [String(response.headers['x-request-id'])],
+        );
+        expect(attempts.rows[0]?.count).toBe(1);
+        expect(await sampleCount(a.tenantId)).toBe(before);
+      },
+    );
+    failureNotes.push('revocation after the policy read stored no sample');
+  });
+
   it('returns the chat when the sample insert fails', async () => {
     const { a } = tenantPair('insert-fail');
     enableCapture(a.tenantId);

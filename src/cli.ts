@@ -48,8 +48,10 @@ import {
   showFallbackPolicy,
 } from './db/fallback-policy.js';
 import { reconcileAttemptCost, registerPrice, setDeploymentServiceTier } from './db/prices.js';
-import { setDeploymentDataClass, setSamplePolicy, showSamplePolicy } from './db/sample-policy.js';
+import { deleteTenantSample, setDeploymentDataClass, setSamplePolicy, showSamplePolicy, showSampleStats } from './db/sample-policy.js';
+import { runSampleCleanup } from './inference/sample-jobs.js';
 import { isDataClass, isSampleMode } from './inference/sample-policy.js';
+import { resolveCaptureBounds } from './inference/sample-selection.js';
 import { addTenantKey, provisionTenant, revokeTenantKey } from './db/provision.js';
 import { createLogger, type Logger } from './logger.js';
 
@@ -161,6 +163,8 @@ type Flags = {
   'max-sample-bytes'?: string;
   'max-sample-count'?: string;
   'retention-seconds'?: string;
+  'recent-share'?: string;
+  'sample-id'?: string;
   classifications?: string;
   'data-class'?: string;
 };
@@ -183,6 +187,12 @@ function parseDefaultFalse(value: string | undefined): boolean | undefined {
 
 function parseSampleRate(value: string | undefined): string | undefined {
   const text = value ?? '0';
+  if (!/^(?:0(?:\.[0-9]{1,6})?|1(?:\.0{1,6})?)$/.test(text)) return undefined;
+  return text;
+}
+
+function parseRecentShare(value: string | undefined): string | undefined {
+  const text = value ?? '0.600000';
   if (!/^(?:0(?:\.[0-9]{1,6})?|1(?:\.0{1,6})?)$/.test(text)) return undefined;
   return text;
 }
@@ -1274,8 +1284,13 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     const judgeDisclosure = parseDefaultFalse(values['judge-disclosure']);
     const sampleRate = parseSampleRate(values['sample-rate']);
     const maxSampleBytes = parseDefaultBounded(values['max-sample-bytes'], 0, 0, 1_000_000);
-    const maxSampleCount = parseDefaultBounded(values['max-sample-count'], 0, 0, 1_000_000);
-    const retentionSeconds = parseDefaultBounded(values['retention-seconds'], 0, 0, 315_360_000);
+    const maxSampleCount = values['max-sample-count'] === undefined
+      ? null
+      : parseBounded(values['max-sample-count'], 0, 1_000_000);
+    const retentionSeconds = values['retention-seconds'] === undefined
+      ? null
+      : parseBounded(values['retention-seconds'], 0, 315_360_000);
+    const recentShare = parseRecentShare(values['recent-share']);
     const classifications = parseCsv(values.classifications, true);
     const providers = parseCsv(values.providers, true);
     const deployments = parseCsv(values.deployments, true);
@@ -1287,8 +1302,11 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       || judgeDisclosure === undefined
       || sampleRate === undefined
       || maxSampleBytes === undefined
+      || (values['max-sample-count'] !== undefined && maxSampleCount === undefined)
+      || (values['retention-seconds'] !== undefined && retentionSeconds === undefined)
       || maxSampleCount === undefined
       || retentionSeconds === undefined
+      || recentShare === undefined
       || classifications === undefined
       || providers === undefined
       || deployments === undefined
@@ -1297,6 +1315,12 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
+    const bounds = resolveCaptureBounds({
+      mode,
+      contentCapture,
+      maxSampleCount,
+      retentionSeconds,
+    });
     const stored = await setSamplePolicy(
       pool,
       tenantId,
@@ -1306,11 +1330,12 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       judgeDisclosure,
       sampleRate,
       maxSampleBytes,
-      maxSampleCount,
-      retentionSeconds,
+      bounds.maxSampleCount,
+      bounds.retentionSeconds,
       classifications,
       providers,
       deployments,
+      recentShare,
     );
     process.stdout.write(`${JSON.stringify(stored)}\n`);
     return;
@@ -1345,6 +1370,48 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     }
     const stored = await showSamplePolicy(pool, tenantId);
     process.stdout.write(`${JSON.stringify(stored ?? { attached: false })}\n`);
+    return;
+  }
+
+  if (command === 'delete-sample') {
+    const tenantId = requireTenant(values);
+    const sampleId = values['sample-id'] ?? '';
+    if (tenantId === undefined || !UUID.test(sampleId)) {
+      logger.error('sample arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const deleted = await deleteTenantSample(pool, tenantId, sampleId);
+    process.stdout.write(`${JSON.stringify({ deleted })}\n`);
+    return;
+  }
+
+  if (command === 'cleanup-expired-samples') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const bucket = new Date().toISOString().slice(0, 16);
+    const result = await runSampleCleanup(pool, {
+      idempotencyKey: `expire-cleanup:${tenantId}:${bucket}`,
+      tenantId,
+    });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (result.status === 'failed') process.exitCode = 1;
+    return;
+  }
+
+  if (command === 'show-sample-stats') {
+    const tenantId = requireTenant(values);
+    if (tenantId === undefined) {
+      logger.error('tenant-id is required');
+      process.exitCode = 1;
+      return;
+    }
+    const stats = await showSampleStats(pool, tenantId);
+    process.stdout.write(`${JSON.stringify(stats ?? { attached: false })}\n`);
     return;
   }
 
@@ -1501,6 +1568,8 @@ async function main(): Promise<void> {
         'retention-seconds': { type: 'string' },
         classifications: { type: 'string' },
         'data-class': { type: 'string' },
+        'recent-share': { type: 'string' },
+        'sample-id': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -1599,6 +1668,8 @@ async function main(): Promise<void> {
     || (values['retention-seconds'] !== undefined && command !== 'set-sample-policy')
     || (values.classifications !== undefined && command !== 'set-sample-policy')
     || (values['data-class'] !== undefined && command !== 'set-deployment-data-class')
+    || (values['recent-share'] !== undefined && command !== 'set-sample-policy')
+    || (values['sample-id'] !== undefined && command !== 'delete-sample')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');

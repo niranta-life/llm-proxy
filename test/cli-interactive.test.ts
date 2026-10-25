@@ -53,6 +53,9 @@ const COMMANDS = [
   'set-sample-policy',
   'set-deployment-data-class',
   'show-sample-policy',
+  'delete-sample',
+  'cleanup-expired-samples',
+  'show-sample-stats',
 ] as const;
 
 const VERTEX_KEY = '{"private_key":"abc"}';
@@ -856,6 +859,27 @@ const specs: Spec[] = [
       ]);
       return { 'tenant-id': tenantId };
     },
+  },
+  {
+    action: 'update',
+    command: 'delete-sample',
+    configuration: 'missing sample',
+    prepare: async () => ({
+      'tenant-id': (await provision()).tenantId,
+      'sample-id': '00000000-0000-4000-8000-000000000000',
+    }),
+  },
+  {
+    action: 'update',
+    command: 'cleanup-expired-samples',
+    configuration: 'expired sample cleanup',
+    prepare: async () => ({ 'tenant-id': (await provision()).tenantId }),
+  },
+  {
+    action: 'validate',
+    command: 'show-sample-stats',
+    configuration: 'empty sample stats',
+    prepare: async () => ({ 'tenant-id': (await provision()).tenantId }),
   },
 ];
 

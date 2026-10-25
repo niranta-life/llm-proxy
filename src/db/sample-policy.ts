@@ -10,6 +10,7 @@ export type StoredSamplePolicy = {
   maxSampleBytes: number;
   maxSampleCount: number;
   retentionSeconds: number;
+  recentShare: string | number;
   classifications: string[];
   providers: string[];
   deployments: string[];
@@ -29,10 +30,11 @@ export async function setSamplePolicy(
   classifications: string[],
   providers: string[],
   deployments: string[],
+  recentShare: string,
 ): Promise<{ policyId: string; policyVersion: number }> {
   const result = await pool.query<{ policy_id: string; policy_version: number }>(
     `SELECT policy_id, policy_version
-     FROM set_sample_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+     FROM set_sample_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       tenantId,
       mode,
@@ -46,6 +48,7 @@ export async function setSamplePolicy(
       classifications,
       providers,
       deployments,
+      recentShare,
     ],
   );
   const row = result.rows[0];
@@ -59,6 +62,22 @@ export async function showSamplePolicy(pool: Pool, tenantId: string): Promise<St
     [tenantId],
   );
   return result.rows[0]?.show_sample_policy ?? null;
+}
+
+export async function deleteTenantSample(pool: Pool, tenantId: string, sampleId: string): Promise<boolean> {
+  const result = await pool.query<{ delete_request_sample: boolean }>(
+    `SELECT delete_request_sample($1, $2, 'manual') AS delete_request_sample`,
+    [tenantId, sampleId],
+  );
+  return result.rows[0]?.delete_request_sample === true;
+}
+
+export async function showSampleStats(pool: Pool, tenantId: string): Promise<unknown> {
+  const result = await pool.query<{ show_sample_stats: unknown }>(
+    `SELECT show_sample_stats($1) AS show_sample_stats`,
+    [tenantId],
+  );
+  return result.rows[0]?.show_sample_stats ?? null;
 }
 
 export async function setDeploymentDataClass(

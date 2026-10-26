@@ -104,7 +104,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `022`. It drops no table and no column.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `023`. It drops no table and no column.
 
 | File | What it adds |
 | --- | --- |
@@ -130,8 +130,9 @@ SQL files in `migrations/` apply in lexical order, once, before the proxy listen
 | `020_stream_samples.sql` | Streaming capture flag and metadata columns for replay eligibility. Sample rows still store ciphertext only. |
 | `021_evaluation_orchestration.sql` | Evaluation definitions, runs, items, and dry-run worker jobs. The rows store metadata only. |
 | `022_evaluation_replay.sql` | Replay jobs, replay attempts, and evaluation traffic on `proxy_requests`. Challenger output is ciphertext. Dry-run rows stay valid. |
+| `023_evaluation_validators.sql` | Evaluation profiles, profile versions, trusted references, and validator results. An approved version is immutable. Output stays ciphertext. |
 
-Readiness for this tree checks for `022_evaluation_replay.sql`. An image that expects `021_evaluation_orchestration.sql` stays ready on this database because that row remains recorded. An image that expects `020_stream_samples.sql` stays ready on this database because that row remains recorded. An image that expects `019_sample_retention.sql` stays ready on this database because that row remains recorded. An image that expects `018_sample_capture.sql` stays ready because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
+Readiness for this tree checks for `023_evaluation_validators.sql`. An image that expects `022_evaluation_replay.sql` stays ready on this database because that row remains recorded. An image that expects `021_evaluation_orchestration.sql` stays ready on this database because that row remains recorded. An image that expects `020_stream_samples.sql` stays ready on this database because that row remains recorded. An image that expects `019_sample_retention.sql` stays ready on this database because that row remains recorded. An image that expects `018_sample_capture.sql` stays ready because that row remains recorded. An image that expects `017_request_features.sql` stays ready because that row remains recorded. The image `fb62fa7` stays ready because `016_fallback_policy.sql` remains recorded. Its latest migration file is `016_fallback_policy.sql`.
 
 An older image can start on this database when `schema_migrations` still contains the latest file that image knows. Later rows can stay. Do not delete migration rows. Do not delete provider, price, policy, or breaker rows to roll back a behavior. Turn the behavior off with the CLI.
 
@@ -173,15 +174,21 @@ Use this order. Do not skip a step.
 
 `POST /internal/v1/samples/{sampleId}/eligibility-check` reports metadata only. It does not start a replay.
 
+## Evaluation
+
 `POST /internal/v1/evaluations/preflight` checks a plan. `POST /internal/v1/evaluations` stores a queued run when the check passes. The routes do not decrypt a sample and do not call a model. `mode` is `dry_run` or `replay`. Cancel a queued run with `POST /internal/v1/evaluations/{id}/cancel`. The run stays `cancelled` and the worker does not complete its items.
 
 A replay worker decrypts one approved sample in that tenant. It calls the pinned challenger through the provider adapter. It does not call `POST /v1/chat/completions`. It does not use `model=auto`. It does not run tools. It stores the challenger output as ciphertext. Operator JSON has cost, latency, usage, and status. It has no prompt and no completion text. The worker reads breaker state. It does not claim a production probe and it does not change the breaker row.
 
 A replay call runs only when `EVALUATION_EXECUTION_ENABLED` is `true`, the tenant id is in `EVALUATION_REPLAY_TENANTS`, and the job kind is `replay`. Dry-run jobs stay on the dry-run path. That path does not call a model.
 
+`POST /internal/v1/evaluation-profiles` stores a profile, a task category, and a validator configuration. `POST /internal/v1/evaluation-profiles/{id}/versions` stores a later version. `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/approve` approves that version. Approval freezes the configuration. A later version does not change an approved version. `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/references` stores a trusted reference while the version is a draft. The reference is not a model output.
+
+A replay run can pin one approved profile version. The worker checks the original output and the challenger output with that same version. Each result is `pass`, `fail`, `not_applicable`, or `unknown`. A missing reference is `unknown`. A task category that does not match the sample is `not_applicable`. A draft profile does not produce `pass` or `fail`. The item JSON lists the validator id, the version, the candidate, the result, the measured value, the evidence code, the error classification, the reference flag, and the time. It has no prompt and no completion text. The checks do not call a judge. Output stays ciphertext.
+
 ## Evaluation rollback
 
-Stop the evaluation worker. Leave `EVALUATION_EXECUTION_ENABLED` unset or `false`. Leave `EVALUATION_REPLAY_TENANTS` empty. Leave `022_evaluation_replay.sql` applied. Do not delete that version row. The inference process does not start the evaluation worker. Readiness for an image that expects `021_evaluation_orchestration.sql` still finds that version row. Readiness for an image that expects `020_stream_samples.sql` still finds that version row.
+Stop the evaluation worker. Leave `EVALUATION_EXECUTION_ENABLED` unset or `false`. Leave `EVALUATION_REPLAY_TENANTS` empty. Leave `023_evaluation_validators.sql` applied. Do not delete that version row. Leave `022_evaluation_replay.sql` and `021_evaluation_orchestration.sql` applied. The inference process does not start the evaluation worker. Readiness for this tree checks for `023_evaluation_validators.sql`. Readiness for an image that expects `022_evaluation_replay.sql` still finds that version row. Readiness for an image that expects `021_evaluation_orchestration.sql` still finds that version row. Readiness for an image that expects `020_stream_samples.sql` still finds that version row.
 
 To run the worker as a second process:
 

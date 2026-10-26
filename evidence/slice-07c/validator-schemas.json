@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "resultStates": ["pass", "fail", "not_applicable", "unknown"],
+  "limits": {
+    "maxInputChars": { "min": 1, "max": 65536 },
+    "timeBudgetMs": { "min": 0, "max": 1000 },
+    "maxSchemaDepth": { "min": 1, "max": 8 },
+    "compareDepth": { "min": 1, "max": 8 }
+    "maxSchemaNodes": { "min": 1, "max": 200 }
+  },
+  "validators": [
+    { "id": "json_parse", "version": 1, "needsReference": false, "factual": false },
+    { "id": "json_schema", "version": 1, "needsReference": false, "factual": false, "schemaKeys": ["type", "properties", "required", "additionalProperties", "items", "enum", "minLength", "maxLength", "minimum", "maximum", "minItems", "maxItems"] },
+    { "id": "required_fields", "version": 1, "needsReference": false, "factual": false },
+    { "id": "exact_label", "version": 1, "needsReference": true, "factual": true },
+    { "id": "accepted_labels", "version": 1, "needsReference": false, "factual": false },
+    { "id": "reference_fields", "version": 1, "needsReference": true, "factual": true },
+    { "id": "format_length", "version": 1, "needsReference": false, "factual": false }
+  ],
+  "rejected": ["$ref", "pattern", "format", "allOf", "anyOf", "oneOf", "not", "userCode", "userUrl", "shell"],
+  "approvedOnly": true
+}

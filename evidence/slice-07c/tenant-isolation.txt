@@ -1,0 +1,22 @@
+Source: test/evaluations-validators.test.ts.
+
+The first tenant read GET /internal/v1/evaluations/{id}/items for its run.
+Actual status: 200.
+
+The second tenant called GET /internal/v1/evaluations/{id}/items for that run.
+Actual status: 404.
+
+The second tenant called GET /internal/v1/evaluation-profiles/{id}/versions/1.
+Actual status: 404.
+That request uses the second tenant header. It is not a read by the profile owner.
+
+The first tenant read GET /internal/v1/evaluation-profiles/{id}/versions/1 for its approved version.
+Actual status: 200.
+That read is in the history case.
+
+A tenant-scoped SELECT of evaluation_validator_results for the second tenant returned zero rows.
+
+The first tenant production chat with model auto still used the source deployment.
+The alias rows did not change.
+One extra provider call was the production chat.
+Attempt ciphertext length stayed above zero.

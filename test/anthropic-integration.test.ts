@@ -301,6 +301,7 @@ describe('Anthropic integration', () => {
       '020_stream_samples.sql',
       '021_evaluation_orchestration.sql',
       '022_evaluation_replay.sql',
+      '023_evaluation_validators.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',
@@ -755,7 +756,7 @@ describe('Anthropic integration', () => {
       expect(telemetry.anthropic.hits).toHaveLength(1);
       const logs = telemetry.ctx.lines.join('\n');
       expect(logs).toContain('attempt result was not recorded');
-      expect(logs).toContain('"severity":"critical"');
+      expect(logs).toContain('"severity":"CRITICAL"');
       expect(logs).not.toContain('telemetry-fail-prompt');
       expect(logs).not.toContain('sk-ant-telemetry');
       const stored = await telemetry.admin.query<{ status: string }>(

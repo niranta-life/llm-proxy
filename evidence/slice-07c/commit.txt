@@ -1,0 +1,4 @@
+Parent: ed12921d66601a20d3d0aca6750fc5ade103306f
+Subject: feat(proxy): score replay output with deterministic checks
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

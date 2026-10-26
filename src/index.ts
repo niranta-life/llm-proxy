@@ -84,6 +84,7 @@ async function main(): Promise<void> {
     previousCredentialKeys: config.previousCredentialKeys,
     maxActiveStreams: config.maxActiveStreams,
     maxStreamsPerTenant: config.maxStreamsPerTenant,
+    keepAliveTimeoutMs: config.httpKeepAliveTimeoutMs,
   });
 
   const stopSampleCleanup = startSampleCleanupWorker(runtimePool, logger);

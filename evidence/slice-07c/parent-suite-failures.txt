@@ -1,0 +1,384 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose test/anthropic-integration.test.ts test/cli-api-key-stdin.test.ts test/gke-hardening.test.ts
+
+(node:45491) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /privateparent-worktree
+
+runtime v24.22.1
+(node:45570) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/gke-hardening.test.ts > configuration for deployment > defaults migration timeouts and the http keep-alive 1ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > reads overrides 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects MIGRATION_LOCK_TIMEOUT_MS=0 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects MIGRATION_LOCK_TIMEOUT_MS=3600001 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects MIGRATION_STATEMENT_TIMEOUT_MS=abc 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects MIGRATION_STATEMENT_TIMEOUT_MS=-5 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects HTTP_KEEP_ALIVE_TIMEOUT_MS=999 0ms
+ ✓ test/gke-hardening.test.ts > configuration for deployment > rejects HTTP_KEEP_ALIVE_TIMEOUT_MS=3600001 0ms
+ ✓ test/gke-hardening.test.ts > database pools > keeps the 5 s client timeout for runtime and auth, and sets tcp keep-alive delay 0ms
+ ✓ test/gke-hardening.test.ts > database pools > keeps the 5 s client timeout and no server timeouts for the migrator role used by admin commands 10ms
+ ✓ test/gke-hardening.test.ts > database pools > gives the migration policy no client timeout and server-side lock and statement timeouts 4ms
+ ✓ test/gke-hardening.test.ts > database pools > lets the migration policy run a query longer than 5 s 5513ms
+ ✓ test/gke-hardening.test.ts > database pools > fails a migration that waits on the advisory lock past the lock timeout 1023ms
+ ✓ test/gke-hardening.test.ts > database pools > applies the server-side statement timeout to the migration policy 1005ms
+ × test/gke-hardening.test.ts > http server timeouts > defaults keep-alive above the Google load balancer and bounds slow headers at 60 s 46ms
+   → expected 72000 to be 620000 // Object.is equality
+ × test/gke-hardening.test.ts > http server timeouts > takes the keep-alive from the app dependencies without moving headersTimeout 5ms
+   → expected 72000 to be 90000 // Object.is equality
+ × test/gke-hardening.test.ts > admission during shutdown > refuses a request that arrives after shutdown began, but still answers health 10ms
+   → expected 401 to be 503 // Object.is equality
+ × test/gke-hardening.test.ts > admission during shutdown > closes the connection after a request admitted before shutdown finishes during the drain 4ms
+   → app.drain is not a function
+ × test/gke-hardening.test.ts > admission during shutdown > does not report idle while an admitted request is still active 2ms
+   → app.drain is not a function
+ × test/gke-hardening.test.ts > admission during shutdown > keeps a request in flight after the client disconnects until its handler settles 105ms
+   → app.drainRequests is not a function
+ × test/gke-hardening.test.ts > shutdown > turns readiness to 503 as soon as draining begins 7ms
+   → expected 200 to be 503 // Object.is equality
+ × test/gke-hardening.test.ts > shutdown > waits for in-flight requests within the drain window and gives up after it 2ms
+   → app.drainRequests is not a function
+ × test/gke-hardening.test.ts > shutdown of the process > reports not ready while draining, then closes the pools and exits 0 8534ms
+   → fetch failed
+ ✓ test/gke-hardening.test.ts > logger severity > adds a Cloud Logging severity beside level and msg 1ms
+ ✓ test/gke-hardening.test.ts > logger severity > still redacts secrets 0ms
+ ✓ test/gke-hardening.test.ts > logger severity > emits the Cloud Logging message beside msg 0ms
+ ✓ test/gke-hardening.test.ts > logger severity > never lets caller fields overwrite core keys 0ms
+ ✓ test/gke-hardening.test.ts > logger severity > maps a caller severity of critical to Cloud Logging CRITICAL 1ms
+ ✓ test/gke-hardening.test.ts > logger severity > keeps any other caller severity out of the core severity 0ms
+(node:45686) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 1645ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 1063ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 780ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 859ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 935ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 973ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 844ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 815ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 1292ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 1894ms
+ × test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 1541ms
+   → expected '{"time":"2026-10-26T01:07:04.299Z","l…' to contain '"severity":"critical"'
+(node:45902) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > registers an openai connection from stdin and trims the trailing newline 248ms
+   → expected 1 to be +0 // Object.is equality
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > rotates an openai credential from stdin with a CRLF ending 243ms
+   → expected 1 to be +0 // Object.is equality
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > registers an anthropic connection from stdin 247ms
+   → expected 1 to be +0 // Object.is equality
+ ✓ test/cli-api-key-stdin.test.ts > --api-key-stdin > keeps interior newlines of multi-line key material and strips only trailing ones 1ms
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects empty input 248ms
+   → expected '{"time":"2026-10-26T01:07:05.555Z","l…' to contain 'api key from stdin is empty'
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects --api-key together with --api-key-stdin without reading the key 239ms
+   → expected '{"time":"2026-10-26T01:07:05.795Z","l…' to contain '--api-key and --api-key-stdin cannot …'
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects the flag on a command that takes no api key 99ms
+   → expected '{"time":"2026-10-26T01:07:05.894Z","l…' to contain 'invalid command arguments: --api-key-…'
+ ✓ test/cli-api-key-stdin.test.ts > --api-key-stdin > accepts input exactly at the size limit 0ms
+ ✓ test/cli-api-key-stdin.test.ts > --api-key-stdin > stops reading and rejects multi-chunk input over 64 KiB 1ms
+ × test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects oversize input from the command line 240ms
+   → expected '{"time":"2026-10-26T01:07:06.135Z","l…' to contain 'api key from stdin is larger than 64 …'
+ ✓ test/cli-api-key-stdin.test.ts > --api-key-stdin > turns a stdin read failure into a sanitized input error 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure
+AssertionError: expected '{"time":"2026-10-26T01:07:04.299Z","l…' to contain '"severity":"critical"'
+
+- Expected
++ Received
+
+- "severity":"critical"
++ {"time":"2026-10-26T01:07:04.299Z","level":"error","severity":"CRITICAL","msg":"attempt result was not recorded","message":"attempt result was not recorded","requestId":"a55738e6-7c60-4a98-acaa-8bb5eccd6c94","attemptId":"f9c5500b-1024-491c-8dcf-b130fe87ae00","outcome":"succeeded","error_message":"permission denied for table model_attempts"}
++
+
+ ❯ test/anthropic-integration.test.ts:758:20
+    756|       const logs = telemetry.ctx.lines.join('\n');
+    757|       expect(logs).toContain('attempt result was not recorded');
+    758|       expect(logs).toContain('"severity":"critical"');
+       |                    ^
+    759|       expect(logs).not.toContain('telemetry-fail-prompt');
+    760|       expect(logs).not.toContain('[redacted]');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > registers an openai connection from stdin and trims the trailing newline
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/cli-api-key-stdin.test.ts:39:27
+     37|     const key = '[redacted]';
+     38|     const result = cli(['register-openai-connection', '--tenant-id', t…
+     39|     expect(result.status).toBe(0);
+       |                           ^
+     40|     expect(result.stdout + result.stderr).not.toContain(key);
+     41|     expect(await storedKey(tenant.tenantId, 'openai')).toBe(key);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > rotates an openai credential from stdin with a CRLF ending
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/cli-api-key-stdin.test.ts:47:26
+     45|     const tenant = provisionTenant(db, 'Stdin Rotate');
+     46|     const first = cli(['register-openai-connection', '--tenant-id', te…
+     47|     expect(first.status).toBe(0);
+       |                          ^
+     48|     const rotated = cli(['set-openai-credential', '--tenant-id', tenan…
+     49|     expect(rotated.status).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > registers an anthropic connection from stdin
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/cli-api-key-stdin.test.ts:66:27
+     64|       '[redacted]\n',
+     65|     );
+     66|     expect(result.status).toBe(0);
+       |                           ^
+     67|     expect(await storedKey(tenant.tenantId, 'anthropic')).toBe('[redacted]…
+     68|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects empty input
+AssertionError: expected '{"time":"2026-10-26T01:07:05.555Z","l…' to contain 'api key from stdin is empty'
+
+- Expected
++ Received
+
+- api key from stdin is empty
++ {"time":"2026-10-26T01:07:05.555Z","level":"error","severity":"ERROR","msg":"invalid command arguments","message":"invalid command arguments"}
++
+
+ ❯ test/cli-api-key-stdin.test.ts:85:29
+     83|       const result = cli(['register-openai-connection', '--tenant-id',…
+     84|       expect(result.status).toBe(1);
+     85|       expect(result.stderr).toContain('api key from stdin is empty');
+       |                             ^
+     86|     }
+     87|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects --api-key together with --api-key-stdin without reading the key
+AssertionError: expected '{"time":"2026-10-26T01:07:05.795Z","l…' to contain '--api-key and --api-key-stdin cannot …'
+
+- Expected
++ Received
+
+- --api-key and --api-key-stdin cannot be combined
++ {"time":"2026-10-26T01:07:05.795Z","level":"error","severity":"ERROR","msg":"invalid command arguments","message":"invalid command arguments"}
++
+
+ ❯ test/cli-api-key-stdin.test.ts:96:27
+     94|     );
+     95|     expect(result.status).toBe(1);
+     96|     expect(result.stderr).toContain('--api-key and --api-key-stdin can…
+       |                           ^
+     97|     expect(result.stderr).not.toContain('[redacted]');
+     98|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects the flag on a command that takes no api key
+AssertionError: expected '{"time":"2026-10-26T01:07:05.894Z","l…' to contain 'invalid command arguments: --api-key-…'
+
+- Expected
++ Received
+
+- invalid command arguments: --api-key-stdin only works with commands that take an API key
++ {"time":"2026-10-26T01:07:05.894Z","level":"error","severity":"ERROR","msg":"invalid command arguments","message":"invalid command arguments"}
++
+
+ ❯ test/cli-api-key-stdin.test.ts:103:27
+    101|     const result = cli(['provision-tenant', '--name', 'x', '--api-key-…
+    102|     expect(result.status).toBe(1);
+    103|     expect(result.stderr).toContain(
+       |                           ^
+    104|       'invalid command arguments: --api-key-stdin only works with comm…
+    105|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯
+
+ FAIL  test/cli-api-key-stdin.test.ts > --api-key-stdin > rejects oversize input from the command line
+AssertionError: expected '{"time":"2026-10-26T01:07:06.135Z","l…' to contain 'api key from stdin is larger than 64 …'
+
+- Expected
++ Received
+
+- api key from stdin is larger than 64 KiB
++ {"time":"2026-10-26T01:07:06.135Z","level":"error","severity":"ERROR","msg":"invalid command arguments","message":"invalid command arguments"}
++
+
+ ❯ test/cli-api-key-stdin.test.ts:138:27
+    136|     );
+    137|     expect(result.status).toBe(1);
+    138|     expect(result.stderr).toContain('api key from stdin is larger than…
+       |                           ^
+    139|   });
+    140| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > http server timeouts > defaults keep-alive above the Google load balancer and bounds slow headers at 60 s
+AssertionError: expected 72000 to be 620000 // Object.is equality
+
+- Expected
++ Received
+
+- 620000
++ 72000
+
+ ❯ test/gke-hardening.test.ts:137:43
+    135|     const { app, authPool, runtimePool } = await createTestApp(db);
+    136|     try {
+    137|       expect(app.server.keepAliveTimeout).toBe(620_000);
+       |                                           ^
+    138|       expect(app.server.headersTimeout).toBe(60_000);
+    139|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > http server timeouts > takes the keep-alive from the app dependencies without moving headersTimeout
+AssertionError: expected 72000 to be 90000 // Object.is equality
+
+- Expected
++ Received
+
+- 90000
++ 72000
+
+ ❯ test/gke-hardening.test.ts:149:43
+    147|     const { app, authPool, runtimePool } = await createTestApp(db, { k…
+    148|     try {
+    149|       expect(app.server.keepAliveTimeout).toBe(90_000);
+       |                                           ^
+    150|       expect(app.server.headersTimeout).toBe(60_000);
+    151|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > admission during shutdown > refuses a request that arrives after shutdown began, but still answers health
+AssertionError: expected 401 to be 503 // Object.is equality
+
+- Expected
++ Received
+
+- 503
++ 401
+
+ ❯ test/gke-hardening.test.ts:177:31
+    175|       const draining = app.drainStreams(50);
+    176|       const late = await app.inject({ method: 'GET', url: '/v1/models'…
+    177|       expect(late.statusCode).toBe(503);
+       |                               ^
+    178|       expect(late.headers.connection).toBe('close');
+    179|       expect(late.headers['retry-after']).toBe('1');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > admission during shutdown > closes the connection after a request admitted before shutdown finishes during the drain
+TypeError: app.drain is not a function
+ ❯ test/gke-hardening.test.ts:204:25
+    202|       const admitted = app.inject({ method: 'GET', url: '/held' });
+    203|       await gate.startedPromise;
+    204|       const drain = app.drain(2_000);
+       |                         ^
+    205|       gate.release();
+    206|       const response = await admitted;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > admission during shutdown > does not report idle while an admitted request is still active
+TypeError: app.drain is not a function
+ ❯ test/gke-hardening.test.ts:228:32
+    226|       const admitted = app.inject({ method: 'GET', url: '/held' });
+    227|       await gate.startedPromise;
+    228|       const result = await app.drain(50);
+       |                                ^
+    229|       expect(result.requestsIdle).toBe(false);
+    230|       gate.release();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > admission during shutdown > keeps a request in flight after the client disconnects until its handler settles
+TypeError: app.drainRequests is not a function
+ ❯ test/gke-hardening.test.ts:258:24
+    256|       socket.destroy();
+    257|       await new Promise((resolve) => setTimeout(resolve, 100));
+    258|       expect(await app.drainRequests(100)).toBe(false);
+       |                        ^
+    259|       gate.release();
+    260|       expect(await app.drainRequests(2_000)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > shutdown > turns readiness to 503 as soon as draining begins
+AssertionError: expected 200 to be 503 // Object.is equality
+
+- Expected
++ Received
+
+- 503
++ 200
+
+ ❯ test/gke-hardening.test.ts:277:33
+    275|       const draining = app.drainStreams(50);
+    276|       const during = await app.inject({ method: 'GET', url: '/health/r…
+    277|       expect(during.statusCode).toBe(503);
+       |                                 ^
+    278|       expect(during.json()).toEqual({ status: 'not_ready', reason: 'sh…
+    279|       await draining;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > shutdown > waits for in-flight requests within the drain window and gives up after it
+TypeError: app.drainRequests is not a function
+ ❯ test/gke-hardening.test.ts:306:24
+    304|       const url = `http://127.0.0.1:${address.port}/slow`;
+    305| 
+    306|       expect(await app.drainRequests(100)).toBe(true);
+       |                        ^
+    307| 
+    308|       const finished = fetch(url).then((response) => response.json());
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/17]⎯
+
+ FAIL  test/gke-hardening.test.ts > shutdown of the process > reports not ready while draining, then closes the pools and exits 0
+TypeError: fetch failed
+Caused by: Error: read ECONNRESET
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -54, code: 'ECONNRESET', syscall: 'read' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/17]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  17 failed | 34 passed (51)
+   Start at  18:06:31
+   Duration  34.32s (transform 177ms, setup 2ms, collect 626ms, tests 30.48s, environment 0ms, prepare 86ms)
+
+(node:45943) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:1

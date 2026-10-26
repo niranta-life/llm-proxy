@@ -1,0 +1,10 @@
+This file records the repair of the 17 parent failures.
+
+Before the repair, the three files below failed on the parent.
+The FAIL names matched. The log of the parent run is parent-suite-failures.txt.
+
+After the repair, npm test on a clean worktree with Node v24.22.1 exited 0.
+Test Files 60 passed | 2 skipped (62).
+Tests 542 passed | 4 skipped (546).
+The log is regression.txt.
+The three files are test/anthropic-integration.test.ts, test/cli-api-key-stdin.test.ts, and test/gke-hardening.test.ts.

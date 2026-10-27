@@ -1,0 +1,94 @@
+29.9.2 29.2.1
+default
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 454B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 102B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 39.18kB done
+#4 DONE 0.0s
+
+#5 [build 1/6] FROM docker.io/library/node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 0.0s done
+#5 DONE 0.0s
+
+#6 [build 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [build 3/6] COPY package.json package-lock.json tsconfig.json ./
+#7 CACHED
+
+#8 [build 4/6] COPY src ./src
+#8 DONE 0.1s
+
+#9 [build 5/6] RUN npm ci
+#9 1.829 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#9 1.929 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#9 2.392 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#9 3.865 
+#9 3.865 added 344 packages, and audited 345 packages in 4s
+#9 3.865 
+#9 3.865 67 packages are looking for funding
+#9 3.865   run `npm fund` for details
+#9 3.870 
+#9 3.870 7 vulnerabilities (5 moderate, 2 critical)
+#9 3.870 
+#9 3.870 To address all issues (including breaking changes), run:
+#9 3.870   npm audit fix --force
+#9 3.870 
+#9 3.870 Run `npm audit` for details.
+#9 3.871 npm warn install-scripts 4 packages have install scripts not yet covered by allowScripts:
+#9 3.871 npm warn install-scripts   @google/genai@2.30.0 (preinstall: echo 'preinstall: no-op')
+#9 3.871 npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+#9 3.871 npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+#9 3.871 npm warn install-scripts   ssh2@1.17.0 (install: node install.js)
+#9 3.871 npm warn install-scripts
+#9 3.871 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#9 3.872 npm notice
+#9 3.872 npm notice New major version of npm available! 11.19.1 -> 12.2.1
+#9 3.872 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+#9 3.872 npm notice To update run: npm install -g npm@12.2.1
+#9 3.872 npm notice
+#9 DONE 4.0s
+
+#10 [build 6/6] RUN npm run build
+#10 0.333 
+#10 0.333 > llm-proxy@0.0.0 build
+#10 0.333 > tsc -p tsconfig.json
+#10 0.333 
+#10 DONE 2.1s
+
+#11 [stage-1 3/6] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [stage-1 4/6] RUN npm ci --omit=dev && npm cache clean --force
+#12 CACHED
+
+#13 [stage-1 5/6] COPY --from=build /app/dist ./dist
+#13 DONE 0.0s
+
+#14 [stage-1 6/6] COPY migrations ./migrations
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 exporting manifest sha256:527bfe5c2081ea5d5675bb492bf0b14cdce62948f290d125700de68ea91d747a done
+#15 exporting config sha256:3eb070de2c3962fb4f2117744550883cfb685c6f967834b2e2311dbea3b9ec3c done
+#15 exporting attestation manifest sha256:f4a13e4a2ffd6d59fa691e1d1f826aed1def8dda5596fdcd549646cb62d0b26b done
+#15 exporting manifest list sha256:513af2e0d757736581518723cf533ca868c9eacea3605efc4f65531e3d08b819 done
+#15 naming to docker.io/library/llm-proxy:slice-07e done
+#15 unpacking to docker.io/library/llm-proxy:slice-07e 0.0s done
+#15 DONE 0.2s
+INSPECT CMD=["node","dist/index.js"] ENTRYPOINT=["docker-entrypoint.sh"] USER=node ID=sha256:513af2e0d757736581518723cf533ca868c9eacea3605efc4f65531e3d08b819
+indexMentionsWorker false
+pkgScript node dist/evaluation-worker.js
+DOCKER_EXIT:0

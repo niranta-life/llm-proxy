@@ -13,6 +13,11 @@ import {
   storeEvaluationReference,
 } from '../inference/evaluation-profiles.js';
 import {
+  listEvaluationRecommendations,
+  parseRecommendationQuery,
+  readEvaluationReport,
+} from '../inference/evaluation-report.js';
+import {
   cancelEvaluation,
   createEvaluation,
   listEvaluationItems,
@@ -820,6 +825,25 @@ export function buildApp(deps: AppDeps): ProxyApp {
     }
   });
 
+  app.get<{ Querystring: { limit?: string; cursor?: string; tenantId?: string } }>(
+    '/internal/v1/evaluations/recommendations',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const query = parseRecommendationQuery(request.query);
+        if (query.tenantId !== null && query.tenantId !== auth.tenantId) {
+          return { recommendations: [], nextCursor: null };
+        }
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          listEvaluationRecommendations(client, query, new Date().toISOString()),
+        );
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
   app.get<{ Params: { evaluationId: string } }>('/internal/v1/evaluations/:evaluationId', async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);
     if (auth === null) return;
@@ -856,6 +880,30 @@ export function buildApp(deps: AppDeps): ProxyApp {
             );
         }
         return page;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { evaluationId: string } }>(
+    '/internal/v1/evaluations/:evaluationId/report',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const evaluationId = parseEvaluationId(request.params.evaluationId);
+        const report = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          readEvaluationReport(client, evaluationId, new Date().toISOString()),
+        );
+        if (report === null) {
+          return reply
+            .code(404)
+            .send(
+              proxyError(404, 'invalid_request_error', 'not_found', 'evaluation_id', 'The evaluation was not found.').body(),
+            );
+        }
+        return report;
       } catch (error) {
         return sendEvaluationError(reply, error);
       }

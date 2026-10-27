@@ -1,0 +1,4 @@
+Parent: 1115a7cc7d4eed139373c1ecd183efbe5a8432e4
+Subject: feat(proxy): report paired evaluation evidence without a route change
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

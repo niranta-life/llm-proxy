@@ -56,6 +56,8 @@ Replay is not a step on this path. The evaluation worker reads a queued job, dec
 | `POST /internal/v1/samples/{sampleId}/eligibility-check` | Metadata-only replay eligibility for one target deployment. It does not decrypt the sample or start a replay. |
 | `POST /internal/v1/evaluations/preflight`, `POST /internal/v1/evaluations` | Check a plan, then store a queued run. `mode` is `dry_run` or `replay`. These routes do not decrypt a sample and do not call a model. |
 | `GET /internal/v1/evaluations`, `GET /internal/v1/evaluations/{id}`, `GET /internal/v1/evaluations/{id}/items` | Run and item status. The JSON has cost, latency, usage, status, and validator results. It has no prompt and no completion text. |
+| `GET /internal/v1/evaluations/{id}/report` | Read-only comparison of one run. Matched samples only. It has counts, quality, cost, latency, reliability, model versions, and one recommendation. It has no prompt and no completion text. |
+| `GET /internal/v1/evaluations/recommendations` | One recommendation per completed run for the caller. The page is bounded. A tenant filter that does not match the caller returns an empty page. |
 | `POST /internal/v1/evaluations/{id}/cancel` | Cancel a queued run. The worker does not complete its items. |
 | `POST /internal/v1/evaluation-profiles`, `POST /internal/v1/evaluation-profiles/{id}/versions`, `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/approve` | Store a profile version and approve it. Approval freezes that version. |
 | `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/references`, `GET /internal/v1/evaluation-profiles/{id}/versions/{version}` | Store a trusted reference on a draft version, or read one profile version. The read has no model output. |
@@ -93,7 +95,7 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 
 ## Replay
 
-History, pinned replay, deterministic checks, and an optional pinned judge are in this release. Rankings are not.
+History, pinned replay, deterministic checks, an optional pinned judge, and a read-only evaluation report are in this release. The report recommends further testing or canary consideration. It does not change a route. Rankings that the router reads are not.
 
 - **History.** `proxy_requests`, `model_attempts`, `attempt_costs`, and `request_features` store the outcome. An operator can also store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on. Capture is off by default. An eligibility check reports whether that sample may be replayed later. The check reads metadata only.
 - **Run.** `POST /internal/v1/evaluations` stores one bounded run. `mode` is `dry_run` or `replay`. The challenger is one deployment name. `model=auto` is rejected for replay execution. The same idempotency key returns the stored run. A different body for that key returns HTTP 409.

@@ -1,0 +1,30 @@
+source: report-tests.txt
+The fixtures are the stored rows each test seeds, then reads through the shipped GET.
+✓ test/evaluations-report.test.ts > evaluation analysis reports > counts every valid pair 95ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > counts excluded samples and stored failure reasons 88ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > reports zero valid pairs as inconclusive 67ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > keeps a small sample below canary eligibility 113ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > stays inconclusive when judge wins have no pass or fail result 274ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > stays inconclusive when every objective result is not applicable 295ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not pool mixed task categories into one quality rate 82ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not pool different evaluation profiles 81ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not pool different rubric versions 77ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > treats missing quality results as inconclusive 73ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not count inconclusive judgments as wins 75ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not count judge position disagreement as a win 78ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > keeps a missing cost missing 89ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > keeps a provisional expense provisional 82ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not pool different model configurations 77ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > blocks a challenger that misses the quality gate 86ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > recommends canary consideration when the gate and the interval agree 219ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > keeps a slower and cheaper challenger eligible when quality holds 219ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not recommend canary for a faster model that misses the quality gate 92ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > recommends retaining the original when the evidence favors model A 187ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not call a tie equal quality 209ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > stays inconclusive when the evidence is insufficient 76ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > returns only the caller tenant and an empty page for another tenant filter 144ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > does not change a routing alias or a fallback policy 63ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > returns the same counts and recommendation on a second read 48ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > pages recommendations and omits a run that is not finished 182ms
+✓ test/evaluations-report.test.ts > evaluation analysis reports > boots the real API twice against one completed evaluation 810ms
+REPORT_EXIT:0

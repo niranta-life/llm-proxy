@@ -1,0 +1,32 @@
+{
+  "source": "test/evaluations-validators.test.ts",
+  "candidates": ["original", "challenger"],
+  "cases": [
+    { "name": "valid-json", "validatorId": "json_parse", "result": "pass", "evidenceCode": "json_parsed", "referencePresent": true },
+    { "name": "invalid-json", "validatorId": "json_parse", "result": "fail", "evidenceCode": "json_invalid", "errorClassification": "parse_error", "referencePresent": true },
+    { "name": "invalid-json-schema", "validatorId": "json_schema", "result": "not_applicable", "evidenceCode": "not_json", "referencePresent": true },
+    { "name": "correct-extraction", "validatorId": "reference_fields", "result": "pass", "evidenceCode": "fields_match", "referencePresent": true },
+    { "name": "missing-extraction-field", "validatorId": "required_fields", "result": "fail", "evidenceCode": "field_missing", "measured": { "missing": ["amount"] }, "referencePresent": true },
+    { "name": "incorrect-extraction-value", "validatorId": "json_parse", "result": "pass", "evidenceCode": "json_parsed", "referencePresent": true },
+    { "name": "incorrect-extraction-value", "validatorId": "json_schema", "result": "pass", "evidenceCode": "schema_valid", "referencePresent": true },
+    { "name": "incorrect-extraction-value", "validatorId": "reference_fields", "result": "fail", "evidenceCode": "field_mismatch", "measured": { "mismatched": ["amount"] }, "referencePresent": true },
+    { "name": "correct-classification", "validatorId": "exact_label", "result": "pass", "evidenceCode": "label_match", "referencePresent": true },
+    { "name": "correct-classification", "validatorId": "accepted_labels", "result": "pass", "evidenceCode": "label_accepted", "referencePresent": true },
+    { "name": "incorrect-classification", "validatorId": "exact_label", "result": "fail", "evidenceCode": "label_mismatch", "referencePresent": true },
+    { "name": "incorrect-classification", "validatorId": "accepted_labels", "result": "fail", "evidenceCode": "label_rejected", "referencePresent": true },
+    { "name": "missing-reference", "validatorId": "reference_fields", "result": "unknown", "evidenceCode": "reference_absent", "referencePresent": false },
+    { "name": "missing-reference", "validatorId": "exact_label", "result": "unknown", "evidenceCode": "reference_absent", "referencePresent": false },
+    { "name": "incompatible-profile", "validatorId": "all", "result": "not_applicable", "evidenceCode": "profile_incompatible", "referencePresent": false },
+    { "name": "validator-timeout", "validatorId": "all", "result": "unknown", "evidenceCode": "validator_timeout", "errorClassification": "timeout" },
+    { "name": "validator-size", "validatorId": "all", "result": "unknown", "evidenceCode": "validator_size", "errorClassification": "size_exceeded" },
+    { "name": "deep-nest-under-char-limit", "validatorId": "reference_fields", "result": "unknown", "evidenceCode": "validator_size", "errorClassification": "size_exceeded", "measured": { "maxSchemaDepth": 8 }, "referencePresent": true, "maxInputChars": 8192, "nestDepth": 3000, "chars": 6011, "completed": true },
+    { "name": "deep-nest-under-char-limit", "validatorId": "exact_label", "result": "unknown", "evidenceCode": "validator_size", "errorClassification": "size_exceeded", "referencePresent": true },
+    { "name": "deep-nest-under-char-limit", "validatorId": "json_schema", "result": "unknown", "evidenceCode": "validator_size", "errorClassification": "size_exceeded", "referencePresent": true },
+    { "name": "deep-nest-under-char-limit", "validatorId": "json_parse", "result": "pass", "evidenceCode": "json_parsed", "referencePresent": true },
+    { "name": "deep-nest-under-char-limit", "validatorId": "format_length", "result": "pass", "evidenceCode": "length_within", "referencePresent": true },
+    { "name": "malformed-configuration", "httpStatus": 400, "ran": false },
+    { "name": "draft-profile", "httpStatus": 400, "code": "profile_not_approved", "passOrFail": false },
+    { "name": "duplicate-execution", "secondRow": false, "conflictingInsert": "duplicate key", "kept": "pass" },
+    { "name": "historical-version", "version1Keeps": "reference_fields", "version2Only": "json_parse", "version2Count": 2 }
+  ]
+}

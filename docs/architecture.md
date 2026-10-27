@@ -20,7 +20,8 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | Usage + Cost Tracking | Prices each attempt from registered prices. Settles the budget reservation. | `src/inference/cost.ts`, `src/inference/cost-store.ts`, `src/db/prices.ts` |
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |
 | Key custody | Encrypts provider keys with AES-256-GCM. The key comes from `PROVIDER_CREDENTIAL_KEY`. | `src/credentials.ts` |
-| Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. The proxy process runs the cleanup job. Metadata routes return no content. An eligibility check reads metadata and does not run a replay. A capture failure does not change the chat result. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
+| Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. The proxy process runs the cleanup job. Metadata routes return no content. An eligibility check reads metadata and does not start a replay. A capture failure does not change the chat result. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
+| Evaluation | Stores a bounded run of approved samples against one challenger. A dry run changes item state and does not call a model. A replay calls that pinned deployment through the adapter. An approved profile runs deterministic checks on the original output and the challenger output. The inference process does not start the worker. | `src/inference/evaluations.ts`, `src/inference/evaluation-profiles.ts`, `src/inference/validators.ts`, `src/inference/evaluation-worker.ts`, `src/inference/replay-request.ts`, `src/inference/replay-execution.ts`, `src/evaluation-worker.ts` |
 | Logging | Removes secrets, prompts, and chat messages from logs. | `src/logger.ts`, `src/redact.ts` |
 | Admin | All config changes. There is no HTTP admin API. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts` |
 
@@ -37,6 +38,8 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 
 Fallback is allowed only before the proxy sends a response header or a response byte. After that, a failure ends the stream with an error. The proxy never joins output from two models.
 
+Replay is not a step on this path. The evaluation worker reads a queued job, decrypts one approved sample, and calls the pinned challenger through the adapter. See [Replay](#replay).
+
 ## HTTP routes
 
 | Route | Purpose |
@@ -51,6 +54,11 @@ Fallback is allowed only before the proxy sends a response header or a response 
 | `GET /internal/v1/samples`, `GET /internal/v1/samples/{sampleId}`, `GET /internal/v1/samples/stats` | Metadata and coverage counts for encrypted samples. No prompt, completion, or ciphertext. See [Metrics](metrics.md). |
 | `DELETE /internal/v1/samples/{sampleId}` | Deletes one sample for the calling tenant. |
 | `POST /internal/v1/samples/{sampleId}/eligibility-check` | Metadata-only replay eligibility for one target deployment. It does not decrypt the sample or start a replay. |
+| `POST /internal/v1/evaluations/preflight`, `POST /internal/v1/evaluations` | Check a plan, then store a queued run. `mode` is `dry_run` or `replay`. These routes do not decrypt a sample and do not call a model. |
+| `GET /internal/v1/evaluations`, `GET /internal/v1/evaluations/{id}`, `GET /internal/v1/evaluations/{id}/items` | Run and item status. The JSON has cost, latency, usage, status, and validator results. It has no prompt and no completion text. |
+| `POST /internal/v1/evaluations/{id}/cancel` | Cancel a queued run. The worker does not complete its items. |
+| `POST /internal/v1/evaluation-profiles`, `POST /internal/v1/evaluation-profiles/{id}/versions`, `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/approve` | Store a profile version and approve it. Approval freezes that version. |
+| `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/references`, `GET /internal/v1/evaluation-profiles/{id}/versions/{version}` | Store a trusted reference on a draft version, or read one profile version. The read has no model output. |
 
 ## Data model
 
@@ -61,6 +69,7 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 | Tenants | `tenants`, `tenant_api_keys` |
 | Providers and routing | `provider_connections`, `model_deployments`, `model_aliases`, `private_endpoint_allowlist` |
 | Requests | `proxy_requests`, `model_attempts`, `request_features`, `request_samples`, `sample_deletions` |
+| Evaluation | `evaluation_definitions`, `evaluation_definition_versions`, `evaluation_runs`, `evaluation_items`, `evaluation_jobs`, `evaluation_attempts`, `evaluation_profiles`, `evaluation_profile_versions`, `evaluation_references`, `evaluation_validator_results` |
 | Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations`, `sample_policies`, `sample_jobs` |
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |
@@ -68,6 +77,10 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 A policy change stores a new version. The proxy does not edit a stored policy in place.
 
 `request_samples` stores ciphertext and metadata. It does not store a second copy of the prompt as plaintext. `sample_deletions` records that a sample was removed and the reason. `sample_jobs` records one cleanup run. The cleanup worker is not a separate Compose service. `src/index.ts` starts it in the proxy process. The interval is 60 seconds. Each automatic run uses one idempotency key for the current hour and for every tenant. `cleanup-expired-samples` uses one key per tenant per minute.
+
+`proxy_requests.traffic_class` is `production` or `evaluation`. A production chat stays `production`. A replay insert is `evaluation`.
+
+`evaluation_attempts` stores the source sample, the original deployment, the challenger, the config and adapter versions, the execution parameters, the provider response id, the latency, the token counts, the cost, and the status. Challenger output is ciphertext. The attempt id is bound into that ciphertext. A log line names the attempt, the item, the status, and the reason. It does not name the prompt or the completion.
 
 ## Trust boundaries
 
@@ -78,11 +91,23 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 - **Key custody for samples.** `PROVIDER_CREDENTIAL_KEY` seals a new provider credential and wraps a new sample. `PROVIDER_CREDENTIAL_KEY_PREVIOUS` is an optional comma-separated list of retained 32-byte keys. Those keys open an older provider credential and an older sample. The HTTP server and the operator CLI both pass that list when they open a stored credential. A wrong key opens nothing. A changed ciphertext opens nothing. The current key still seals new values.
 - **TLS.** The proxy does not terminate TLS. Put it behind a load balancer or reverse proxy that does. Each proxy process has its own stream slots. Two processes share one PostgreSQL database and the same sample rows.
 
-## Planned: Continuous Learning System
+## Replay
 
-Not built. The design:
+History and pinned replay are in this release. A judge and rankings are not.
 
-- **History.** Reuse `proxy_requests`, `model_attempts`, and `attempt_costs` as the outcome record. An operator can store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on, and delete it when it expires or capture is turned off. An eligibility check reports whether that sample may be replayed later. Replay, a judge, rankings, and automatic model evaluation are not built.
-- **Evaluator.** Workers take jobs from a durable queue, replay stored requests on other deployments, and score them with a judge model.
-- **Optimizer.** Writes per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches.
-- **Infra.** Redis for hot counters and the job queue, and an external secret manager for provider keys.
+- **History.** `proxy_requests`, `model_attempts`, `attempt_costs`, and `request_features` store the outcome. An operator can also store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on. Capture is off by default. An eligibility check reports whether that sample may be replayed later. The check reads metadata only.
+- **Run.** `POST /internal/v1/evaluations` stores one bounded run. `mode` is `dry_run` or `replay`. The challenger is one deployment name. `model=auto` is rejected for replay execution. The same idempotency key returns the stored run. A different body for that key returns HTTP 409.
+- **Dry run.** The worker advances item state only when `EVALUATION_DRY_RUN` is true. That path does not call a model.
+- **Replay.** A call runs only when `EVALUATION_EXECUTION_ENABLED` is true, the tenant id is in `EVALUATION_REPLAY_TENANTS`, and the job kind is `replay`. The worker uses that tenant's context. Before each provider call it rechecks expiry, ownership, replay permission, target approval, capability, residency, budget, rate, concurrency, and deployment health. A failed check does not call the provider. The worker reads breaker admission. It does not claim a production probe and it does not change the breaker row.
+- **Call.** The worker rebuilds the canonical request from the sample and keeps the original parameters that the challenger supports. It calls the provider adapter. It does not call `POST /v1/chat/completions`. It does not resolve aliases. It does not run tools. It writes the attempt before the cost reservation, and the reservation before the provider call. A crash before dispatch does not call the provider. A crash after dispatch does not send the call again.
+- **Record.** The challenger output uses the same tenant-scoped sample encryption. The operator JSON has cost, latency, usage, and status. It has no prompt and no completion text. `EVALUATION_EXECUTION_ENABLED=false` stops new replay calls. A call that already left the worker is not sent again.
+- **Checks.** An approved profile version pins the validators for that run. The worker checks the original output and the challenger output. Each result is `pass`, `fail`, `not_applicable`, or `unknown`. A missing trusted reference is `unknown`. The checks do not call a judge. Output stays ciphertext.
+- **Routing.** Active aliases and fallback policy stay unchanged. A later production chat still follows the existing route.
+
+The worker command is `node dist/evaluation-worker.js`. The image command stays `node dist/index.js`. The inference process does not start the worker. The queue is PostgreSQL. See [Operations](operations.md#evaluation-rollback).
+
+## Planned
+
+- **Judge.** Score a replay with a model. This release does not call a judge and does not rank outputs. Deterministic checks are not a judge.
+- **Optimizer.** Write per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches. The router does not use a quality score today.
+- **Infra.** Redis for hot counters, and an external secret manager for provider keys. Evaluation jobs do not need Redis.

@@ -4,6 +4,15 @@ import { authenticate } from '../auth/authenticate.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
 import {
+  addEvaluationProfileVersion,
+  approveEvaluationProfile,
+  createEvaluationProfile,
+  parseProfileId,
+  parseProfileVersion,
+  readEvaluationProfileVersion,
+  storeEvaluationReference,
+} from '../inference/evaluation-profiles.js';
+import {
   cancelEvaluation,
   createEvaluation,
   listEvaluationItems,
@@ -34,6 +43,7 @@ import {
   type FeatureExtractInput,
 } from '../inference/request-features.js';
 import { listAttemptHistory, listVisibleModels, summarizeMetrics } from '../inference/store.js';
+import { createRequestAdmission } from './request-admission.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
 import type { Logger } from '../logger.js';
@@ -61,11 +71,14 @@ export type AppDeps = {
   afterAdmit?: () => Promise<void> | void;
   beforeSettle?: () => Promise<void> | void;
   extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
+  keepAliveTimeoutMs?: number;
 };
 
 export type ProxyApp = FastifyInstance & {
   streamGate: StreamGate;
   drainStreams(drainMs: number): Promise<DrainResult>;
+  drain(drainMs: number): Promise<{ requestsIdle: boolean }>;
+  drainRequests(timeoutMs: number): Promise<boolean>;
 };
 
 function errorMessage(error: unknown): string {
@@ -114,9 +127,51 @@ export function buildApp(deps: AppDeps): ProxyApp {
         ? null
         : createSampleKeyManager(deps.credentialKey, deps.previousCredentialKeys ?? []);
   const streamGate = createStreamGate(deps.maxActiveStreams, deps.maxStreamsPerTenant);
+  const admission = createRequestAdmission();
   const nowMs = deps.now ?? ((): number => Date.now());
+  const leaves = new WeakMap<object, () => void>();
   app.streamGate = streamGate;
-  app.drainStreams = (drainMs: number) => drainStreams(streamGate, drainMs);
+  app.drain = (drainMs: number) => admission.drain(drainMs);
+  app.drainRequests = (timeoutMs: number) => admission.drainRequests(timeoutMs);
+  app.drainStreams = async (drainMs: number) => {
+    const httpDrain = admission.drain(drainMs);
+    const streamDrain = drainStreams(streamGate, drainMs);
+    const httpResult = await httpDrain;
+    if (!httpResult.requestsIdle) app.server.closeAllConnections();
+    return streamDrain;
+  };
+  app.server.keepAliveTimeout = deps.keepAliveTimeoutMs ?? 620_000;
+  app.server.headersTimeout = 60_000;
+
+  app.addHook('onRequest', async (request, reply) => {
+    const path = request.url.split('?')[0] ?? '';
+    if (admission.shuttingDown()) {
+      if (path === '/health/live') return;
+      reply.header('connection', 'close');
+      if (path === '/health/ready') {
+        return reply.code(503).send({ status: 'not_ready', reason: 'shutting_down' });
+      }
+      reply.header('retry-after', '1');
+      return reply
+        .code(503)
+        .send(proxyError(503, 'server_error', 'shutting_down', null, 'The server is shutting down.').body());
+    }
+    leaves.set(request, admission.enter());
+  });
+  app.addHook('preSerialization', async (request, _reply, payload) => {
+    leaves.get(request)?.();
+    return payload;
+  });
+  app.addHook('onResponse', async (request) => {
+    leaves.get(request)?.();
+  });
+  app.addHook('onError', async (request) => {
+    leaves.get(request)?.();
+  });
+  app.addHook('onSend', async (_request, reply, payload) => {
+    if (admission.shuttingDown()) reply.header('connection', 'close');
+    return payload;
+  });
 
   async function rejectUnauthenticated(
     request: FastifyRequest,
@@ -546,6 +601,97 @@ export function buildApp(deps: AppDeps): ProxyApp {
       .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
   }
 
+  app.post('/internal/v1/evaluation-profiles', { bodyLimit: 65_536 }, async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const profile = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+        createEvaluationProfile(client, auth.tenantId, request.body),
+      );
+      return reply.code(201).send(profile);
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.post<{ Params: { profileId: string } }>(
+    '/internal/v1/evaluation-profiles/:profileId/versions',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const profileId = parseProfileId(request.params.profileId);
+        const profile = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          addEvaluationProfileVersion(client, auth.tenantId, profileId, request.body),
+        );
+        return reply.code(201).send(profile);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { profileId: string; version: string } }>(
+    '/internal/v1/evaluation-profiles/:profileId/versions/:version/approve',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const profileId = parseProfileId(request.params.profileId);
+        const version = parseProfileVersion(request.params.version);
+        const profile = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          approveEvaluationProfile(client, profileId, version),
+        );
+        return profile;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { profileId: string; version: string } }>(
+    '/internal/v1/evaluation-profiles/:profileId/versions/:version/references',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const profileId = parseProfileId(request.params.profileId);
+        const version = parseProfileVersion(request.params.version);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          storeEvaluationReference(client, auth.tenantId, profileId, version, request.body),
+        );
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { profileId: string; version: string } }>(
+    '/internal/v1/evaluation-profiles/:profileId/versions/:version',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const profileId = parseProfileId(request.params.profileId);
+        const version = parseProfileVersion(request.params.version);
+        const profile = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          readEvaluationProfileVersion(client, profileId, version),
+        );
+        if (profile === null) {
+          return reply
+            .code(404)
+            .send(proxyError(404, 'invalid_request_error', 'not_found', 'profile_id', 'The profile was not found.').body());
+        }
+        return profile;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
   app.post('/internal/v1/evaluations/preflight', { bodyLimit: 65_536 }, async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);
     if (auth === null) return;
@@ -668,7 +814,10 @@ export function buildApp(deps: AppDeps): ProxyApp {
     const statusCode =
       typeof error === 'object' && error !== null && 'statusCode' in error ? Number(error.statusCode) : 500;
     const path = request.url.split('?')[0] ?? '';
-    if (path.startsWith('/internal/v1/evaluations') && statusCode === 413) {
+    if (
+      (path.startsWith('/internal/v1/evaluations') || path.startsWith('/internal/v1/evaluation-profiles')) &&
+      statusCode === 413
+    ) {
       reply
         .code(413)
         .send(proxyError(413, 'invalid_request_error', 'request_too_large', null, 'The request is too large.').body());

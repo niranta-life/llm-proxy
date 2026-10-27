@@ -27,6 +27,7 @@ import { ProxyError } from './errors.js';
 import type { ClaimedEvaluationJob, EvaluationWorkerOptions } from './evaluation-worker.js';
 import { admissionItemReason, providerItemReason, rebuildReplayRequest, recheckReplayItem } from './replay-request.js';
 import { routeForDeployment, type ResolvedRoute } from './resolve.js';
+import { scoreCompletedReplay } from './evaluation-profiles.js';
 import { finishAttempt, insertEvaluationPending, loadCatalog } from './store.js';
 import { isTaskCategory, type TaskCategory } from './task-categories.js';
 import { vertexAdapter } from './vertex.js';
@@ -479,6 +480,22 @@ async function storeCompletion(
     if (reason === 'replay_completed') {
       await applyStoredItemTransition(client, claimed.itemId, 'completed', reason);
       await syncRunProgress(client, claimed.runId);
+      if (manager !== null) {
+        const sample = await client.query<{ sample_id: string }>(
+          `SELECT sample_id::text AS sample_id FROM evaluation_attempts WHERE id = $1`,
+          [call.evaluationAttemptId],
+        );
+        const sampleId = sample.rows[0]?.sample_id;
+        if (sampleId !== undefined) {
+          await scoreCompletedReplay(client, manager, {
+            tenantId: claimed.tenantId,
+            runId: claimed.runId,
+            itemId: claimed.itemId,
+            sampleId,
+            attemptId: call.evaluationAttemptId,
+          });
+        }
+      }
     } else {
       await failItem(client, claimed, reason);
     }
@@ -816,6 +833,7 @@ function replayPlan(
     requiredCapabilities: Array.isArray(required) && required.every((item) => typeof item === 'string') ? required : null,
     budgetEstimate: canonicalBudget(run.budgetEstimate),
     mode: 'replay',
+    profileVersionId: null,
   };
 }
 

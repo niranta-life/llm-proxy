@@ -112,6 +112,7 @@ export async function createTestApp(
     beforeSampleStore?: () => Promise<void> | void;
     beforeSampleInsert?: () => Promise<void> | void;
     failSampleInsert?: () => boolean;
+    keepAliveTimeoutMs?: number;
   } = {},
 ) {
   const config = configFor(db);
@@ -141,6 +142,7 @@ export async function createTestApp(
     afterAdmit: options.afterAdmit,
     beforeSettle: options.beforeSettle,
     extractFeatures: options.extractFeatures,
+    keepAliveTimeoutMs: options.keepAliveTimeoutMs ?? config.httpKeepAliveTimeoutMs,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

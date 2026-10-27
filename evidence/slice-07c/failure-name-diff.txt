@@ -1,0 +1,21 @@
+Node v24.22.1.
+
+Parent ed12921d66601a20d3d0aca6750fc5ade103306f, three files only:
+test/anthropic-integration.test.ts, test/cli-api-key-stdin.test.ts, and test/gke-hardening.test.ts.
+Test Files 3 failed (3).
+Tests 17 failed | 34 passed (51).
+EXIT:1.
+Log: parent-suite-failures.txt.
+
+Those 17 FAIL lines had the same assertion diffs on this commit before the repair.
+The repair is in this commit.
+The CLI reads an API key from stdin for a command that stores a key.
+Shutdown refuses a new request, answers readiness as shutting down, and waits for an admitted request.
+The keep-alive timeout is 620000 ms. The header timeout stays 60000 ms.
+A caller severity of critical is stored as CRITICAL.
+
+Full suite after the repair on a clean worktree. Log: regression.txt.
+Test Files 60 passed | 2 skipped (62).
+Tests 542 passed | 4 skipped (546).
+EXIT:0.
+npm test exited 0.

@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { parseArgs } from 'node:util';
+import { ApiKeyInputError, resolveApiKeyFlag } from './cli-api-key.js';
 import { openInteractiveInput, runInteractiveSession } from './cli-interactive.js';
 import { ConfigError, loadConfig, type Config } from './config.js';
 import { createCredentialStore } from './credentials.js';
@@ -88,6 +89,7 @@ type Flags = {
   'key-id'?: string;
   label?: string;
   'api-key'?: string;
+  'api-key-stdin'?: boolean;
   'upstream-model'?: string;
   'timeout-ms'?: string;
   capabilities?: string;
@@ -1495,6 +1497,7 @@ async function main(): Promise<void> {
         'key-id': { type: 'string' },
         label: { type: 'string' },
         'api-key': { type: 'string' },
+        'api-key-stdin': { type: 'boolean' },
         'upstream-model': { type: 'string' },
         'timeout-ms': { type: 'string' },
         capabilities: { type: 'string' },
@@ -1680,6 +1683,16 @@ async function main(): Promise<void> {
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');
     process.exit(1);
+  }
+
+  try {
+    values = await resolveApiKeyFlag(command, values, process.stdin);
+  } catch (error) {
+    if (error instanceof ApiKeyInputError) {
+      logger.error(error.message);
+      process.exit(1);
+    }
+    throw error;
   }
 
   const pool = createPool(config, 'migrator', logger, 1);

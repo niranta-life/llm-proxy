@@ -52,6 +52,7 @@ export type EvaluationPlan = {
   requiredCapabilities: string[] | null;
   budgetEstimate: string;
   mode: 'dry_run' | 'replay';
+  profileVersionId: string | null;
 };
 
 export type EvaluationRunView = {
@@ -76,6 +77,21 @@ export type EvaluationRunView = {
   createdAt: string;
   updatedAt: string;
   configSnapshot: Record<string, unknown>;
+  profileVersionId: string | null;
+  profileName: string | null;
+  profileVersion: number | null;
+};
+
+export type ValidatorResultView = {
+  validatorId: string;
+  version: number;
+  candidate: 'original' | 'challenger';
+  result: 'pass' | 'fail' | 'not_applicable' | 'unknown';
+  measured: Record<string, unknown>;
+  evidenceCode: string;
+  errorClassification: string | null;
+  referencePresent: boolean;
+  createdAt: string;
 };
 
 export type EvaluationItemView = {
@@ -95,6 +111,7 @@ export type EvaluationItemView = {
   totalTokens?: number | null;
   costAmount?: string | null;
   costStatus?: string | null;
+  validators: ValidatorResultView[];
 };
 
 type RunRow = {
@@ -117,6 +134,9 @@ type RunRow = {
   definition_version: number;
   definition_id: string;
   definition_name: string;
+  profile_version_id: string | null;
+  profile_name: string | null;
+  profile_version: number | null;
 };
 
 const PLAN_KEYS = new Set([
@@ -128,6 +148,7 @@ const PLAN_KEYS = new Set([
   'requiredCapabilities',
   'budgetEstimate',
   'mode',
+  'profileVersionId',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -202,6 +223,16 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
   if (body.mode !== 'dry_run' && body.mode !== 'replay') {
     throw invalidRequest('mode', 'invalid_parameter', 'mode must be dry_run or replay.');
   }
+  let profileVersionId: string | null = null;
+  if (body.profileVersionId !== undefined) {
+    if (body.mode !== 'replay') {
+      throw invalidRequest('profile_version_id', 'invalid_parameter', 'A profile applies to replay only.');
+    }
+    if (typeof body.profileVersionId !== 'string' || !UUID.test(body.profileVersionId)) {
+      throw invalidRequest('profile_version_id', 'invalid_parameter', 'profileVersionId is invalid.');
+    }
+    profileVersionId = body.profileVersionId.toLowerCase();
+  }
   return {
     name,
     sampleCategory,
@@ -211,6 +242,7 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
     requiredCapabilities,
     budgetEstimate,
     mode: body.mode,
+    profileVersionId,
   };
 }
 
@@ -259,6 +291,7 @@ export function evaluationRequestHash(plan: EvaluationPlan): string {
     requiredCapabilities: plan.requiredCapabilities === null ? null : [...plan.requiredCapabilities].sort(),
     budgetEstimate: plan.budgetEstimate,
     mode: plan.mode,
+    profileVersionId: plan.profileVersionId,
   };
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
@@ -274,6 +307,7 @@ export function snapshotFor(plan: EvaluationPlan): Record<string, unknown> {
     judgeDeployment: plan.judgeDeployment,
     requiredCapabilities: plan.requiredCapabilities,
     budgetEstimate: plan.budgetEstimate,
+    profileVersionId: plan.profileVersionId,
   };
 }
 
@@ -311,15 +345,25 @@ export async function createEvaluation(
   }
 
   await preflightStoredPlan(client, plan);
+  if (plan.profileVersionId !== null) {
+    const approved = await client.query(
+      `SELECT 1 FROM evaluation_profile_versions WHERE id = $1 AND status = 'approved'`,
+      [plan.profileVersionId],
+    );
+    if ((approved.rowCount ?? 0) !== 1) {
+      throw invalidRequest('profile_version_id', 'profile_not_approved', 'The evaluation profile is not approved.');
+    }
+  }
   const definitionId = await upsertDefinition(client, tenantId, plan.name);
   const versionId = await insertVersion(client, tenantId, definitionId, plan);
   const snapshot = snapshotFor(plan);
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO evaluation_runs (
        tenant_id, definition_version_id, status, idempotency_key, request_hash, config_snapshot,
-       sample_category, challenger_deployment, judge_deployment, budget_estimate, item_count
+       sample_category, challenger_deployment, judge_deployment, budget_estimate, item_count,
+       profile_version_id
      )
-     VALUES ($1, $2, 'created', $3, $4, $5::jsonb, $6, $7, $8, $9, $10)
+     VALUES ($1, $2, 'created', $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11)
      RETURNING id::text AS id`,
     [
       tenantId,
@@ -332,6 +376,7 @@ export async function createEvaluation(
       plan.judgeDeployment,
       plan.budgetEstimate,
       plan.sampleIds.length,
+      plan.profileVersionId,
     ],
   );
   const runId = inserted.rows[0]?.id;
@@ -448,6 +493,37 @@ export async function listEvaluationItems(
     [evaluationId, query.cursor, query.limit + 1],
   );
   const page = result.rows.slice(0, query.limit).map(itemFromRow);
+  const ids = page.map((item) => item.id);
+  const grouped = new Map<string, ValidatorResultView[]>();
+  if (ids.length > 0) {
+    const validators = await client.query<{
+      item_id: string;
+      validator_id: string;
+      validator_version: number;
+      candidate: string;
+      result: string;
+      measured: unknown;
+      evidence_code: string;
+      error_classification: string | null;
+      reference_present: boolean;
+      created_at: Date | string;
+    }>(
+      `SELECT item_id::text AS item_id, validator_id, validator_version, candidate, result, measured,
+              evidence_code, error_classification, reference_present, created_at
+       FROM evaluation_validator_results
+       WHERE item_id = ANY($1::uuid[])
+       ORDER BY candidate, validator_id`,
+      [ids],
+    );
+    for (const row of validators.rows) {
+      const view = validatorFromRow(row);
+      if (view === null) continue;
+      const list = grouped.get(row.item_id) ?? [];
+      list.push(view);
+      grouped.set(row.item_id, list);
+    }
+  }
+  for (const item of page) item.validators = grouped.get(item.id) ?? [];
   const last = page.at(-1);
   const nextCursor = result.rows.length > query.limit && last !== undefined ? last.id : null;
   return { items: page, nextCursor };
@@ -806,12 +882,17 @@ async function cancelOpenItems(client: PoolClient, runId: string): Promise<void>
 const RUN_SELECT = `SELECT r.id::text AS id, r.status, r.sample_category, r.challenger_deployment, r.judge_deployment,
             r.budget_estimate::text AS budget_estimate, r.item_count, r.pending_count, r.queued_count,
             r.running_count, r.completed_count, r.failed_count, r.cancelled_count, r.created_at, r.updated_at,
-            r.config_snapshot, v.version AS definition_version, d.id::text AS definition_id, d.name AS definition_name
+            r.config_snapshot, v.version AS definition_version, d.id::text AS definition_id, d.name AS definition_name,
+            r.profile_version_id::text AS profile_version_id, ep.name AS profile_name, pv.version AS profile_version
      FROM evaluation_runs r
      JOIN evaluation_definition_versions v
        ON v.tenant_id = r.tenant_id AND v.id = r.definition_version_id
      JOIN evaluation_definitions d
-       ON d.tenant_id = r.tenant_id AND d.id = v.definition_id`;
+       ON d.tenant_id = r.tenant_id AND d.id = v.definition_id
+     LEFT JOIN evaluation_profile_versions pv
+       ON pv.tenant_id = r.tenant_id AND pv.id = r.profile_version_id
+     LEFT JOIN evaluation_profiles ep
+       ON ep.tenant_id = r.tenant_id AND ep.id = pv.profile_id`;
 
 function runFromRow(row: RunRow): EvaluationRunView {
   if (!isRunStatus(row.status)) {
@@ -839,6 +920,9 @@ function runFromRow(row: RunRow): EvaluationRunView {
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     configSnapshot: row.config_snapshot,
+    profileVersionId: row.profile_version_id,
+    profileName: row.profile_name,
+    profileVersion: row.profile_version,
   };
 }
 
@@ -870,6 +954,7 @@ function itemFromRow(row: {
     ordinal: row.ordinal,
     status: row.status,
     reasonCode: isReason(row.reason_code) ? row.reason_code : null,
+    validators: [],
   };
   if (row.attempt_id === null) return view;
   view.originalDeployment = row.original_deployment ?? undefined;
@@ -884,6 +969,53 @@ function itemFromRow(row: {
   view.costAmount = row.cost_amount === null ? null : canonicalBudget(row.cost_amount);
   view.costStatus = row.cost_status;
   return view;
+}
+
+function validatorFromRow(row: {
+  validator_id: string;
+  validator_version: number;
+  candidate: string;
+  result: string;
+  measured: unknown;
+  evidence_code: string;
+  error_classification: string | null;
+  reference_present: boolean;
+  created_at: Date | string;
+}): ValidatorResultView | null {
+  if (row.candidate !== 'original' && row.candidate !== 'challenger') return null;
+  if (row.result !== 'pass' && row.result !== 'fail' && row.result !== 'not_applicable' && row.result !== 'unknown') return null;
+  return {
+    validatorId: row.validator_id,
+    version: row.validator_version,
+    candidate: row.candidate,
+    result: row.result,
+    measured: publicMeasured(row.measured),
+    evidenceCode: row.evidence_code,
+    errorClassification: row.error_classification,
+    referencePresent: row.reference_present === true,
+    createdAt: iso(row.created_at),
+  };
+}
+
+function publicMeasured(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+  const measured: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === 'prompt' || key === 'messages' || key === 'content' || key === 'ciphertext') continue;
+    if (typeof entry === 'string') {
+      if (entry.length > 64 || entry.includes('://')) continue;
+      measured[key] = entry;
+      continue;
+    }
+    if (typeof entry === 'number' || typeof entry === 'boolean' || entry === null) {
+      measured[key] = entry;
+      continue;
+    }
+    if (Array.isArray(entry) && entry.every((item) => typeof item === 'string' && item.length <= 64)) {
+      measured[key] = entry;
+    }
+  }
+  return measured;
 }
 
 function snapshotMode(snapshot: Record<string, unknown>): {

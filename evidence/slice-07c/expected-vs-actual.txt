@@ -1,0 +1,50 @@
+Fixture file test/evaluations-validators.test.ts.
+Expected outcomes are listed in fixtures.json.
+Actual: Test Files 1 passed. Tests 5 passed. EXIT:0.
+The log is validator-tests.txt.
+Both candidates received the same profile version.
+A parsed document that differs from the reference stays pass for json_parse and fail for reference_fields.
+A nested value of depth 3000 is 6011 characters. That is under the 8192 character limit. json_parse stays pass. format_length stays pass. reference_fields, exact_label, and json_schema are unknown. The error class is size exceeded. The replay stays completed. The provider call count stays 1.
+A second score kept the first result rows.
+A later profile version did not change the earlier run.
+The static scan found no judge call, no user code, no user URL, and no shell.
+
+Launch of node dist/index.js twice, then the shipped worker.
+The launch used the clean worktree of this commit.
+Expected operator states: pass, fail, and unknown.
+Actual states in api-launch.txt: pass, fail, and unknown.
+Both API status reads agreed.
+Ciphertext length was above zero. attempts is 3. encrypted is true.
+The first worker drain recorded replayHits 3.
+The second worker drain kept the same rows and recorded modelCalls 0.
+Production chat with model auto stayed on gpt-07c-source.
+Alias rows stayed unchanged.
+Evaluation execution stayed unset on both API processes.
+Worker log is worker-launch.txt. EXIT of that launch is 0.
+
+Docker image from the same clean worktree.
+Base image node:24-bookworm-slim. Context colima.
+Image id sha256:5f838f29656fc83064f1d87bf069ec6716aba149b959d531c5c0140772a48298.
+CMD is node dist/index.js. USER is node. Node version is v24.22.1.
+The image contains migration 023_evaluation_validators.sql.
+indexMentionsWorker is false. keepAlive is true. admission is true. profiles is true.
+Log: docker-build.txt. EXIT:0.
+
+Fresh database apply is migration-results.txt.
+Versions 001 through 023 are present.
+Hashes of 018, 019, 020, 021, and 022 match the files in this commit.
+Rollback is rollback.txt.
+apiStartsWorker is false.
+Readiness after the worker stop is ready.
+schema_migrations still contains 021, 022, and 023.
+
+Full suite on a clean worktree of this commit with Node v24.22.1.
+The RUN line in regression.txt names clean-worktree.
+Log: regression.txt.
+Test Files 60 passed | 2 skipped (62).
+Tests 542 passed | 4 skipped (546).
+EXIT:0.
+The five validator tests passed.
+Parent commit ed12921 fails 17 tests in test/anthropic-integration.test.ts, test/cli-api-key-stdin.test.ts, and test/gke-hardening.test.ts.
+This commit repairs those three files. See failure-name-diff.txt.
+npm test exited 0.

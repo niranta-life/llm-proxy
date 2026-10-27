@@ -1059,6 +1059,7 @@ describe('interactive CLI', () => {
     const posts = [...source.matchAll(/app\.post\('([^']+)'/g)].map((match) => match[1]);
     expect(posts).toEqual([
       '/v1/chat/completions',
+      '/internal/v1/evaluation-profiles',
       '/internal/v1/evaluations/preflight',
       '/internal/v1/evaluations',
     ]);

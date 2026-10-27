@@ -24,6 +24,14 @@ import {
   preflightStoredPlan,
   readEvaluation,
 } from '../inference/evaluations.js';
+import {
+  addEvaluationRubricVersion,
+  approveEvaluationRubric,
+  createEvaluationRubric,
+  parseRubricId,
+  parseRubricVersion,
+  readEvaluationRubricVersion,
+} from '../inference/judge-rubrics.js';
 import { parseEligibilityBody, readSampleEligibility } from '../inference/sample-eligibility.js';
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
@@ -692,6 +700,79 @@ export function buildApp(deps: AppDeps): ProxyApp {
     },
   );
 
+  app.post('/internal/v1/evaluation-rubrics', { bodyLimit: 65_536 }, async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      const rubric = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+        createEvaluationRubric(client, auth.tenantId, request.body),
+      );
+      return reply.code(201).send(rubric);
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.post<{ Params: { rubricId: string } }>(
+    '/internal/v1/evaluation-rubrics/:rubricId/versions',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const rubricId = parseRubricId(request.params.rubricId);
+        const rubric = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          addEvaluationRubricVersion(client, auth.tenantId, rubricId, request.body),
+        );
+        return reply.code(201).send(rubric);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { rubricId: string; version: string } }>(
+    '/internal/v1/evaluation-rubrics/:rubricId/versions/:version/approve',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const rubricId = parseRubricId(request.params.rubricId);
+        const version = parseRubricVersion(request.params.version);
+        const rubric = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          approveEvaluationRubric(client, rubricId, version),
+        );
+        return rubric;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { rubricId: string; version: string } }>(
+    '/internal/v1/evaluation-rubrics/:rubricId/versions/:version',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const rubricId = parseRubricId(request.params.rubricId);
+        const version = parseRubricVersion(request.params.version);
+        const rubric = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          readEvaluationRubricVersion(client, rubricId, version),
+        );
+        if (rubric === null) {
+          return reply
+            .code(404)
+            .send(proxyError(404, 'invalid_request_error', 'not_found', 'rubric_id', 'The rubric was not found.').body());
+        }
+        return rubric;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
   app.post('/internal/v1/evaluations/preflight', { bodyLimit: 65_536 }, async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);
     if (auth === null) return;
@@ -815,7 +896,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
       typeof error === 'object' && error !== null && 'statusCode' in error ? Number(error.statusCode) : 500;
     const path = request.url.split('?')[0] ?? '';
     if (
-      (path.startsWith('/internal/v1/evaluations') || path.startsWith('/internal/v1/evaluation-profiles')) &&
+      (path.startsWith('/internal/v1/evaluations') ||
+        path.startsWith('/internal/v1/evaluation-profiles') ||
+        path.startsWith('/internal/v1/evaluation-rubrics')) &&
       statusCode === 413
     ) {
       reply

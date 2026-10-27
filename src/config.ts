@@ -47,6 +47,7 @@ export type Config = {
   streamShutdownDrainMs: number;
   evaluationExecutionEnabled: boolean;
   evaluationReplayTenantIds: readonly string[];
+  evaluationJudgeTenantIds: readonly string[];
   migrationLockTimeoutMs: number;
   migrationStatementTimeoutMs: number;
   httpKeepAliveTimeoutMs: number;
@@ -193,6 +194,26 @@ function readEvaluationReplayTenants(env: NodeJS.ProcessEnv, errors: string[]): 
   return ids;
 }
 
+function readEvaluationJudgeTenants(env: NodeJS.ProcessEnv, errors: string[]): readonly string[] {
+  const value = env.EVALUATION_JUDGE_TENANTS;
+  if (value === undefined || value.trim() === '') return [];
+  const ids: string[] = [];
+  for (const part of value.split(',')) {
+    const id = part.trim().toLowerCase();
+    if (id === '') continue;
+    if (!TENANT_ID.test(id)) {
+      errors.push('EVALUATION_JUDGE_TENANTS accepts one tenant id');
+      return [];
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  if (ids.length > 1) {
+    errors.push('EVALUATION_JUDGE_TENANTS accepts one tenant id');
+    return [];
+  }
+  return ids;
+}
+
 function readMillisecondWindow(env: NodeJS.ProcessEnv, name: string, fallback: string, errors: string[]): number {
   const text = env[name];
   const value = text === undefined || text.trim() === '' ? fallback : text.trim();
@@ -255,6 +276,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const streamShutdownDrainMs = readStreamShutdownDrainMs(env, errors);
   const evaluationExecutionEnabled = readEvaluationExecutionEnabled(env, errors);
   const evaluationReplayTenantIds = readEvaluationReplayTenants(env, errors);
+  const evaluationJudgeTenantIds = readEvaluationJudgeTenants(env, errors);
   const migrationLockTimeoutMs = readMillisecondWindow(env, 'MIGRATION_LOCK_TIMEOUT_MS', '60000', errors);
   const migrationStatementTimeoutMs = readMillisecondWindow(env, 'MIGRATION_STATEMENT_TIMEOUT_MS', '600000', errors);
   const httpKeepAliveTimeoutMs = readMillisecondWindow(env, 'HTTP_KEEP_ALIVE_TIMEOUT_MS', '620000', errors);
@@ -291,6 +313,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     streamShutdownDrainMs,
     evaluationExecutionEnabled,
     evaluationReplayTenantIds,
+    evaluationJudgeTenantIds,
     migrationLockTimeoutMs,
     migrationStatementTimeoutMs,
     httpKeepAliveTimeoutMs,

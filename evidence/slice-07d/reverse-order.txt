@@ -1,0 +1,9 @@
+source: judge-tests.txt and judge-launch.txt
+{"key": "model-a", "finding": "model_a", "stop": null, "judgeCalls": 2}
+{"key": "model-b", "finding": "model_b", "stop": null, "judgeCalls": 2}
+{"key": "tie", "finding": "tie", "stop": null, "judgeCalls": 2}
+{"key": "inconclusive", "finding": "inconclusive", "stop": null, "judgeCalls": 2}
+{"key": "bias", "finding": "unstable", "stop": null, "judgeCalls": 2}
+launch mapped ["original", "original"]
+reversed-order bias test passed: True
+EXIT:0

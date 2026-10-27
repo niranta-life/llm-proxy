@@ -1060,6 +1060,7 @@ describe('interactive CLI', () => {
     expect(posts).toEqual([
       '/v1/chat/completions',
       '/internal/v1/evaluation-profiles',
+      '/internal/v1/evaluation-rubrics',
       '/internal/v1/evaluations/preflight',
       '/internal/v1/evaluations',
     ]);

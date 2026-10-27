@@ -1,0 +1,18 @@
+source: judge-tests.txt
+{"key": "malformed", "finding": "inconclusive", "stop": "parse_rejected", "judgeCalls": 2}
+{"key": "missing-field", "finding": "inconclusive", "stop": "parse_rejected", "judgeCalls": 2}
+{"key": "bad-confidence", "finding": "inconclusive", "stop": "parse_rejected", "judgeCalls": 2}
+{"key": "injection", "finding": "model_a", "stop": null, "judgeCalls": 2}
+{"key": "tool-call", "finding": "inconclusive", "stop": "parse_rejected", "judgeCalls": 2}
+{"key": "visible-0", "finding": "model_a", "stop": null, "judgeCalls": 0}
+{"key": "visible-1", "finding": "model_a", "stop": null, "judgeCalls": 0}
+malformed JSON passed: True
+missing rubric field passed: True
+invalid confidence passed: True
+prompt injection passed: True
+tool invocation passed: True
+duplicate passed: True
+repeated persistence passed: True
+legal judge model visible on the operator items route: True
+live judge smoke skipped unless EVALUATION_JUDGE_LIVE=true
+EXIT:0

@@ -25,6 +25,7 @@ import {
   type ItemStatus,
   type RunStatus,
 } from './evaluation-state.js';
+import { judgeBudgetAllowed } from './judge.js';
 import { isTaskCategory, type TaskCategory } from './task-categories.js';
 
 export const EVALUATION_PAGE_CAP = 50;
@@ -53,6 +54,7 @@ export type EvaluationPlan = {
   budgetEstimate: string;
   mode: 'dry_run' | 'replay';
   profileVersionId: string | null;
+  rubricVersionId: string | null;
 };
 
 export type EvaluationRunView = {
@@ -80,6 +82,9 @@ export type EvaluationRunView = {
   profileVersionId: string | null;
   profileName: string | null;
   profileVersion: number | null;
+  rubricVersionId: string | null;
+  rubricName: string | null;
+  rubricVersion: number | null;
 };
 
 export type ValidatorResultView = {
@@ -112,6 +117,35 @@ export type EvaluationItemView = {
   costAmount?: string | null;
   costStatus?: string | null;
   validators: ValidatorResultView[];
+  judgment: JudgeFindingView | null;
+};
+
+export type JudgeOrderView = {
+  order: 'forward' | 'reverse';
+  mappedCandidate: 'original' | 'challenger' | 'tie' | 'inconclusive' | null;
+  confidence: number | null;
+  latencyMs: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  costAmount: string | null;
+  costStatus: string | null;
+  rejectionCode: string | null;
+};
+
+export type JudgeFindingView = {
+  finding: 'model_a' | 'model_b' | 'tie' | 'inconclusive' | 'unstable';
+  judgeModel: string;
+  rubricVersionId: string;
+  rubricVersion: number;
+  stopReason: string | null;
+  latencyMs: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  costAmount: string | null;
+  costStatus: string | null;
+  orders: JudgeOrderView[];
 };
 
 type RunRow = {
@@ -137,6 +171,9 @@ type RunRow = {
   profile_version_id: string | null;
   profile_name: string | null;
   profile_version: number | null;
+  rubric_version_id: string | null;
+  rubric_name: string | null;
+  rubric_version: number | null;
 };
 
 const PLAN_KEYS = new Set([
@@ -149,6 +186,7 @@ const PLAN_KEYS = new Set([
   'budgetEstimate',
   'mode',
   'profileVersionId',
+  'rubricVersionId',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -233,6 +271,22 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
     }
     profileVersionId = body.profileVersionId.toLowerCase();
   }
+  let rubricVersionId: string | null = null;
+  if (body.rubricVersionId !== undefined && body.rubricVersionId !== null) {
+    if (body.mode !== 'replay') {
+      throw invalidRequest('rubric_version_id', 'invalid_parameter', 'A rubric applies to replay only.');
+    }
+    if (judgeDeployment === null) {
+      throw invalidRequest('judge_deployment', 'invalid_parameter', 'A rubric requires a judge deployment.');
+    }
+    if (typeof body.rubricVersionId !== 'string' || !UUID.test(body.rubricVersionId)) {
+      throw invalidRequest('rubric_version_id', 'invalid_parameter', 'rubricVersionId is invalid.');
+    }
+    if (!judgeBudgetAllowed(budgetEstimate)) {
+      throw invalidRequest('budget_estimate', 'invalid_parameter', 'budgetEstimate exceeds the judge ceiling.');
+    }
+    rubricVersionId = body.rubricVersionId.toLowerCase();
+  }
   return {
     name,
     sampleCategory,
@@ -243,6 +297,7 @@ export function parseEvaluationPlan(body: unknown): EvaluationPlan {
     budgetEstimate,
     mode: body.mode,
     profileVersionId,
+    rubricVersionId,
   };
 }
 
@@ -292,11 +347,12 @@ export function evaluationRequestHash(plan: EvaluationPlan): string {
     budgetEstimate: plan.budgetEstimate,
     mode: plan.mode,
     profileVersionId: plan.profileVersionId,
+    rubricVersionId: plan.rubricVersionId,
   };
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
-export function snapshotFor(plan: EvaluationPlan): Record<string, unknown> {
+export function snapshotFor(plan: EvaluationPlan, judgeModel: string | null = null): Record<string, unknown> {
   return {
     mode: plan.mode,
     modelExecution: plan.mode === 'replay' ? 'pinned' : 'off',
@@ -308,6 +364,8 @@ export function snapshotFor(plan: EvaluationPlan): Record<string, unknown> {
     requiredCapabilities: plan.requiredCapabilities,
     budgetEstimate: plan.budgetEstimate,
     profileVersionId: plan.profileVersionId,
+    rubricVersionId: plan.rubricVersionId,
+    judgeModel,
   };
 }
 
@@ -354,16 +412,17 @@ export async function createEvaluation(
       throw invalidRequest('profile_version_id', 'profile_not_approved', 'The evaluation profile is not approved.');
     }
   }
+  const judgeModel = await requirePinnedJudge(client, plan);
   const definitionId = await upsertDefinition(client, tenantId, plan.name);
-  const versionId = await insertVersion(client, tenantId, definitionId, plan);
-  const snapshot = snapshotFor(plan);
+  const versionId = await insertVersion(client, tenantId, definitionId, plan, judgeModel);
+  const snapshot = snapshotFor(plan, judgeModel);
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO evaluation_runs (
        tenant_id, definition_version_id, status, idempotency_key, request_hash, config_snapshot,
        sample_category, challenger_deployment, judge_deployment, budget_estimate, item_count,
-       profile_version_id
+       profile_version_id, rubric_version_id
      )
-     VALUES ($1, $2, 'created', $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11)
+     VALUES ($1, $2, 'created', $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id::text AS id`,
     [
       tenantId,
@@ -377,6 +436,7 @@ export async function createEvaluation(
       plan.budgetEstimate,
       plan.sampleIds.length,
       plan.profileVersionId,
+      plan.rubricVersionId,
     ],
   );
   const runId = inserted.rows[0]?.id;
@@ -524,6 +584,7 @@ export async function listEvaluationItems(
     }
   }
   for (const item of page) item.validators = grouped.get(item.id) ?? [];
+  await attachJudgments(client, page);
   const last = page.at(-1);
   const nextCursor = result.rows.length > query.limit && last !== undefined ? last.id : null;
   return { items: page, nextCursor };
@@ -810,11 +871,36 @@ export async function lockEvaluationRow(client: PoolClient, id: string): Promise
   await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, [id]);
 }
 
+async function requirePinnedJudge(client: PoolClient, plan: EvaluationPlan): Promise<string | null> {
+  if (plan.rubricVersionId === null) return null;
+  const approved = await client.query<{ task_category: string }>(
+    `SELECT task_category FROM evaluation_rubric_versions WHERE id = $1 AND status = 'approved'`,
+    [plan.rubricVersionId],
+  );
+  const rubric = approved.rows[0];
+  if (rubric === undefined) {
+    throw invalidRequest('rubric_version_id', 'rubric_not_approved', 'The evaluation rubric is not approved.');
+  }
+  if (rubric.task_category !== plan.sampleCategory) {
+    throw invalidRequest('sample_category', 'sample_category_mismatch', 'The rubric category does not match the samples.');
+  }
+  const model = await client.query<{ upstream_model: string; enabled: boolean }>(
+    `SELECT upstream_model, enabled FROM model_deployments WHERE name = $1`,
+    [plan.judgeDeployment],
+  );
+  const row = model.rows[0];
+  if (row === undefined || !row.enabled || row.upstream_model.trim() === '' || row.upstream_model === 'auto') {
+    throw invalidRequest('judge_deployment', 'deployment_unauthorized', 'The judge deployment is not a pinned model.');
+  }
+  return row.upstream_model;
+}
+
 async function insertVersion(
   client: PoolClient,
   tenantId: string,
   definitionId: string,
   plan: EvaluationPlan,
+  judgeModel: string | null,
 ): Promise<string> {
   await lockEvaluationRow(client, definitionId);
   await client.query(`SELECT id FROM evaluation_definitions WHERE id = $1`, [definitionId]);
@@ -830,7 +916,7 @@ async function insertVersion(
     `INSERT INTO evaluation_definition_versions (tenant_id, definition_id, version, config)
      VALUES ($1, $2, $3, $4::jsonb)
      RETURNING id::text AS id`,
-    [tenantId, definitionId, version, JSON.stringify(snapshotFor(plan))],
+    [tenantId, definitionId, version, JSON.stringify(snapshotFor(plan, judgeModel))],
   );
   const id = inserted.rows[0]?.id;
   if (id === undefined) throw proxyError(500, 'server_error', 'internal_error', null, 'The request failed.');
@@ -883,7 +969,8 @@ const RUN_SELECT = `SELECT r.id::text AS id, r.status, r.sample_category, r.chal
             r.budget_estimate::text AS budget_estimate, r.item_count, r.pending_count, r.queued_count,
             r.running_count, r.completed_count, r.failed_count, r.cancelled_count, r.created_at, r.updated_at,
             r.config_snapshot, v.version AS definition_version, d.id::text AS definition_id, d.name AS definition_name,
-            r.profile_version_id::text AS profile_version_id, ep.name AS profile_name, pv.version AS profile_version
+            r.profile_version_id::text AS profile_version_id, ep.name AS profile_name, pv.version AS profile_version,
+            r.rubric_version_id::text AS rubric_version_id, er.name AS rubric_name, rv.version AS rubric_version
      FROM evaluation_runs r
      JOIN evaluation_definition_versions v
        ON v.tenant_id = r.tenant_id AND v.id = r.definition_version_id
@@ -892,7 +979,11 @@ const RUN_SELECT = `SELECT r.id::text AS id, r.status, r.sample_category, r.chal
      LEFT JOIN evaluation_profile_versions pv
        ON pv.tenant_id = r.tenant_id AND pv.id = r.profile_version_id
      LEFT JOIN evaluation_profiles ep
-       ON ep.tenant_id = r.tenant_id AND ep.id = pv.profile_id`;
+       ON ep.tenant_id = r.tenant_id AND ep.id = pv.profile_id
+     LEFT JOIN evaluation_rubric_versions rv
+       ON rv.tenant_id = r.tenant_id AND rv.id = r.rubric_version_id
+     LEFT JOIN evaluation_rubrics er
+       ON er.tenant_id = r.tenant_id AND er.id = rv.rubric_id`;
 
 function runFromRow(row: RunRow): EvaluationRunView {
   if (!isRunStatus(row.status)) {
@@ -923,6 +1014,9 @@ function runFromRow(row: RunRow): EvaluationRunView {
     profileVersionId: row.profile_version_id,
     profileName: row.profile_name,
     profileVersion: row.profile_version,
+    rubricVersionId: row.rubric_version_id,
+    rubricName: row.rubric_name,
+    rubricVersion: row.rubric_version,
   };
 }
 
@@ -955,6 +1049,7 @@ function itemFromRow(row: {
     status: row.status,
     reasonCode: isReason(row.reason_code) ? row.reason_code : null,
     validators: [],
+    judgment: null,
   };
   if (row.attempt_id === null) return view;
   view.originalDeployment = row.original_deployment ?? undefined;
@@ -995,6 +1090,147 @@ function validatorFromRow(row: {
     referencePresent: row.reference_present === true,
     createdAt: iso(row.created_at),
   };
+}
+
+async function attachJudgments(client: PoolClient, items: EvaluationItemView[]): Promise<void> {
+  const ids = items.map((item) => item.id);
+  if (ids.length === 0) return;
+  const findings = await client.query<{
+    item_id: string;
+    outcome: string;
+    judge_model: string;
+    rubric_version_id: string;
+    rubric_version: number;
+    stop_reason: string | null;
+    latency_ms: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    cost_amount: string | null;
+    cost_status: string | null;
+  }>(
+    `SELECT item_id::text AS item_id, outcome, judge_model, rubric_version_id::text AS rubric_version_id,
+            rubric_version, stop_reason, latency_ms, prompt_tokens, completion_tokens, total_tokens,
+            cost_amount::text AS cost_amount, cost_status
+     FROM evaluation_judge_findings
+     WHERE item_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  const calls = await client.query<{
+    item_id: string;
+    comparison_order: string;
+    mapped_candidate: string | null;
+    confidence: string | null;
+    latency_ms: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    cost_amount: string | null;
+    cost_status: string | null;
+    rejection_code: string | null;
+  }>(
+    `SELECT item_id::text AS item_id, comparison_order, mapped_candidate, confidence::text AS confidence,
+            latency_ms, prompt_tokens, completion_tokens, total_tokens,
+            cost_amount::text AS cost_amount, cost_status, rejection_code
+     FROM evaluation_judge_calls
+     WHERE item_id = ANY($1::uuid[])
+     ORDER BY comparison_order`,
+    [ids],
+  );
+  const byItem = new Map(findings.rows.map((row) => [row.item_id, row]));
+  const orders = new Map<string, JudgeOrderView[]>();
+  for (const row of calls.rows) {
+    const order = orderView(row);
+    if (order === null) continue;
+    const list = orders.get(row.item_id) ?? [];
+    list.push(order);
+    orders.set(row.item_id, list);
+  }
+  for (const item of items) {
+    const row = byItem.get(item.id);
+    if (row === undefined) continue;
+    const finding = findingView(row, orders.get(item.id) ?? []);
+    if (finding !== null) item.judgment = finding;
+  }
+}
+
+function findingView(
+  row: {
+    outcome: string;
+    judge_model: string;
+    rubric_version_id: string;
+    rubric_version: number;
+    stop_reason: string | null;
+    latency_ms: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    cost_amount: string | null;
+    cost_status: string | null;
+  },
+  orders: JudgeOrderView[],
+): JudgeFindingView | null {
+  if (
+    row.outcome !== 'model_a' &&
+    row.outcome !== 'model_b' &&
+    row.outcome !== 'tie' &&
+    row.outcome !== 'inconclusive' &&
+    row.outcome !== 'unstable'
+  ) {
+    return null;
+  }
+  return {
+    finding: row.outcome,
+    judgeModel: row.judge_model,
+    rubricVersionId: row.rubric_version_id,
+    rubricVersion: row.rubric_version,
+    stopReason: row.stop_reason,
+    latencyMs: row.latency_ms,
+    promptTokens: row.prompt_tokens,
+    completionTokens: row.completion_tokens,
+    totalTokens: row.total_tokens,
+    costAmount: row.cost_amount === null ? null : canonicalBudget(row.cost_amount),
+    costStatus: row.cost_status,
+    orders,
+  };
+}
+
+function orderView(row: {
+  comparison_order: string;
+  mapped_candidate: string | null;
+  confidence: string | null;
+  latency_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cost_amount: string | null;
+  cost_status: string | null;
+  rejection_code: string | null;
+}): JudgeOrderView | null {
+  if (row.comparison_order !== 'forward' && row.comparison_order !== 'reverse') return null;
+  const mapped = row.mapped_candidate;
+  if (mapped !== null && mapped !== 'original' && mapped !== 'challenger' && mapped !== 'tie' && mapped !== 'inconclusive') {
+    return null;
+  }
+  return {
+    order: row.comparison_order,
+    mappedCandidate: mapped,
+    confidence: readConfidence(row.confidence),
+    latencyMs: row.latency_ms,
+    promptTokens: row.prompt_tokens,
+    completionTokens: row.completion_tokens,
+    totalTokens: row.total_tokens,
+    costAmount: row.cost_amount === null ? null : canonicalBudget(row.cost_amount),
+    costStatus: row.cost_status,
+    rejectionCode: row.rejection_code,
+  };
+}
+
+function readConfidence(value: string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) return null;
+  return parsed;
 }
 
 function publicMeasured(value: unknown): Record<string, unknown> {

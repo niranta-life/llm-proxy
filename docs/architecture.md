@@ -69,7 +69,7 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 | Tenants | `tenants`, `tenant_api_keys` |
 | Providers and routing | `provider_connections`, `model_deployments`, `model_aliases`, `private_endpoint_allowlist` |
 | Requests | `proxy_requests`, `model_attempts`, `request_features`, `request_samples`, `sample_deletions` |
-| Evaluation | `evaluation_definitions`, `evaluation_definition_versions`, `evaluation_runs`, `evaluation_items`, `evaluation_jobs`, `evaluation_attempts`, `evaluation_profiles`, `evaluation_profile_versions`, `evaluation_references`, `evaluation_validator_results` |
+| Evaluation | `evaluation_definitions`, `evaluation_definition_versions`, `evaluation_runs`, `evaluation_items`, `evaluation_jobs`, `evaluation_judge_jobs`, `evaluation_attempts`, `evaluation_profiles`, `evaluation_profile_versions`, `evaluation_references`, `evaluation_validator_results`, `evaluation_rubrics`, `evaluation_rubric_versions`, `evaluation_judge_calls`, `evaluation_judge_findings` |
 | Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations`, `sample_policies`, `sample_jobs` |
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |
@@ -93,7 +93,7 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 
 ## Replay
 
-History and pinned replay are in this release. A judge and rankings are not.
+History, pinned replay, deterministic checks, and an optional pinned judge are in this release. Rankings are not.
 
 - **History.** `proxy_requests`, `model_attempts`, `attempt_costs`, and `request_features` store the outcome. An operator can also store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on. Capture is off by default. An eligibility check reports whether that sample may be replayed later. The check reads metadata only.
 - **Run.** `POST /internal/v1/evaluations` stores one bounded run. `mode` is `dry_run` or `replay`. The challenger is one deployment name. `model=auto` is rejected for replay execution. The same idempotency key returns the stored run. A different body for that key returns HTTP 409.
@@ -102,12 +102,12 @@ History and pinned replay are in this release. A judge and rankings are not.
 - **Call.** The worker rebuilds the canonical request from the sample and keeps the original parameters that the challenger supports. It calls the provider adapter. It does not call `POST /v1/chat/completions`. It does not resolve aliases. It does not run tools. It writes the attempt before the cost reservation, and the reservation before the provider call. A crash before dispatch does not call the provider. A crash after dispatch does not send the call again.
 - **Record.** The challenger output uses the same tenant-scoped sample encryption. The operator JSON has cost, latency, usage, and status. It has no prompt and no completion text. `EVALUATION_EXECUTION_ENABLED=false` stops new replay calls. A call that already left the worker is not sent again.
 - **Checks.** An approved profile version pins the validators for that run. The worker checks the original output and the challenger output. Each result is `pass`, `fail`, `not_applicable`, or `unknown`. A missing trusted reference is `unknown`. The checks do not call a judge. Output stays ciphertext.
+- **Judge.** Judging is off by default. A judge job is its own row in `evaluation_judge_jobs`. One tenant id in `EVALUATION_JUDGE_TENANTS`, together with a budget of at most 1, turns it on for a replay run that pins an approved rubric and a judge deployment. The judge model is the pinned upstream model of that deployment. The worker sends the task, the rubric, Candidate X, Candidate Y, and a trusted reference when one exists. It does not send candidate model names, provider names, cost, latency, or routing recommendations. It compares the pair again in reverse order. A material disagreement is `unstable` or `inconclusive`. The judge cannot execute a tool. A judging failure does not change routing. Protected judge evidence stays ciphertext.
 - **Routing.** Active aliases and fallback policy stay unchanged. A later production chat still follows the existing route.
 
 The worker command is `node dist/evaluation-worker.js`. The image command stays `node dist/index.js`. The inference process does not start the worker. The queue is PostgreSQL. See [Operations](operations.md#evaluation-rollback).
 
 ## Planned
 
-- **Judge.** Score a replay with a model. This release does not call a judge and does not rank outputs. Deterministic checks are not a judge.
-- **Optimizer.** Write per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches. The router does not use a quality score today.
+- **Optimizer.** Write per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches. The router does not use a quality score today. A judge finding does not change that route.
 - **Infra.** Redis for hot counters, and an external secret manager for provider keys. Evaluation jobs do not need Redis.

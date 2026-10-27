@@ -1,0 +1,107 @@
+(node:85545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:85587) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:85804) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/evaluations-judge.test.ts > independent model judging > keeps judge execution off the inference process and off production routing helpers 2ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Model A wins consistently
+{"key":"model-a","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Model A wins consistently 2920ms
+stdout | test/evaluations-judge.test.ts > independent model judging > keeps a stored finding visible for a legal judge model
+{"key":"visible-0","finding":"model_a","stop":null,"judgeCalls":0}
+
+stdout | test/evaluations-judge.test.ts > independent model judging > keeps a stored finding visible for a legal judge model
+{"key":"visible-1","finding":"model_a","stop":null,"judgeCalls":0}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > keeps a stored finding visible for a legal judge model 4111ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Model B wins consistently
+{"key":"model-b","finding":"model_b","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Model B wins consistently 1584ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Tie
+{"key":"tie","finding":"tie","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Tie 1828ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Inconclusive
+{"key":"inconclusive","finding":"inconclusive","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Inconclusive 1648ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Reversed-order bias
+{"key":"bias","finding":"unstable","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Reversed-order bias 1589ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Malformed judge JSON
+{"key":"malformed","finding":"inconclusive","stop":"parse_rejected","judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Malformed judge JSON 1593ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Missing rubric field
+{"key":"missing-field","finding":"inconclusive","stop":"parse_rejected","judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Missing rubric field 1594ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Invalid confidence
+{"key":"bad-confidence","finding":"inconclusive","stop":"parse_rejected","judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Invalid confidence 1581ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Prompt injection in candidate content
+{"key":"injection","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Prompt injection in candidate content 1618ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Judge tries to invoke tool
+{"key":"tool-call","finding":"inconclusive","stop":"parse_rejected","judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Judge tries to invoke tool 1664ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > Judge identity matches unapproved deployment 1545ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > Judge disclosure revoked 1686ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > Wrong tenant judge 2889ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > Judge budget exhausted 1527ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > Model C unavailable 1539ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Judge timeout
+{"key":"timeout","finding":"inconclusive","stop":"provider_timeout","judgeCalls":1}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Judge timeout 1782ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Duplicate worker delivery
+{"key":"duplicate","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Duplicate worker delivery 1643ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Repeated judgment persistence
+{"key":"repeat","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Repeated judgment persistence 1613ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Calibration fixtures
+[{"finding":"model_a","stop":null},{"finding":"model_b","stop":null},{"finding":"tie","stop":null},{"finding":"inconclusive","stop":null},{"finding":"unstable","stop":null}]
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Calibration fixtures 2210ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Cost accounting
+{"key":"cost","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Cost accounting 1605ms
+stdout | test/evaluations-judge.test.ts > independent model judging > Encryption
+{"key":"encryption","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > Encryption 1583ms
+stdout | test/evaluations-judge.test.ts > independent model judging > leaves judging off by default
+{"key":"ceiling","status":400}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > leaves judging off by default 1547ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > does not enqueue a judge when the run has no rubric 1424ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > rejects a draft rubric and a category mismatch before a run exists 1471ms
+stdout | test/evaluations-judge.test.ts > independent model judging > does not change production routing
+{"key":"routing","finding":"model_a","stop":null,"judgeCalls":2}
+
+ ✓ test/evaluations-judge.test.ts > independent model judging > does not change production routing 1658ms
+ ✓ test/evaluations-judge.test.ts > independent model judging > sends a trusted reference and stops a cancelled run before the judge call 1849ms
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  12:55:09
+   Duration  55.00s (transform 365ms, setup 2ms, collect 617ms, tests 49.84s, environment 0ms, prepare 42ms)
+
+(node:86412) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

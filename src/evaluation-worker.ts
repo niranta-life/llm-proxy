@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     dryRun,
     executionEnabled: config.evaluationExecutionEnabled,
     replayTenantIds: config.evaluationReplayTenantIds,
+    judgeTenantIds: config.evaluationJudgeTenantIds,
     upstreamBaseUrl: config.openAiBaseUrl,
     credentialStore,
     sampleKeyManager,

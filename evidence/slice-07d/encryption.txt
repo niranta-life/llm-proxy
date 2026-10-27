@@ -1,0 +1,5 @@
+source: judge-launch.txt and judge-tests.txt
+launch-1 ciphertext True
+launch-2 ciphertext True
+encryption test passed: True
+EXIT:0

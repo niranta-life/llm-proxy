@@ -1,0 +1,4 @@
+Parent: 51da97c185455f79e0fa3674f88de8427d8ae522
+Subject: feat(proxy): compare replay output with a pinned judge
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

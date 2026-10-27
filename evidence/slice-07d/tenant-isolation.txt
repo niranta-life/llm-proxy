@@ -1,0 +1,5 @@
+source: judge-launch.txt and judge-tests.txt
+launch-1 foreign item read status 404
+launch-2 foreign item read status 404
+wrong tenant judge test passed: True
+EXIT:0

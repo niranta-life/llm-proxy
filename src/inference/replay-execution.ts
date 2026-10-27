@@ -28,6 +28,7 @@ import type { ClaimedEvaluationJob, EvaluationWorkerOptions } from './evaluation
 import { admissionItemReason, providerItemReason, rebuildReplayRequest, recheckReplayItem } from './replay-request.js';
 import { routeForDeployment, type ResolvedRoute } from './resolve.js';
 import { scoreCompletedReplay } from './evaluation-profiles.js';
+import { enqueueJudgeJob } from './judge-rubrics.js';
 import { finishAttempt, insertEvaluationPending, loadCatalog } from './store.js';
 import { isTaskCategory, type TaskCategory } from './task-categories.js';
 import { vertexAdapter } from './vertex.js';
@@ -496,6 +497,7 @@ async function storeCompletion(
           });
         }
       }
+      await enqueueJudgeJob(client, claimed.tenantId, claimed.runId, claimed.itemId);
     } else {
       await failItem(client, claimed, reason);
     }
@@ -834,6 +836,7 @@ function replayPlan(
     budgetEstimate: canonicalBudget(run.budgetEstimate),
     mode: 'replay',
     profileVersionId: null,
+    rubricVersionId: null,
   };
 }
 

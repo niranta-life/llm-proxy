@@ -9,6 +9,7 @@ import {
   syncRunProgress,
 } from './evaluations.js';
 import { isItemStatus, isRunStatus } from './evaluation-state.js';
+import { advanceJudge } from './judge-execution.js';
 import { advanceReplay } from './replay-execution.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 
@@ -26,6 +27,7 @@ export type EvaluationWorkerOptions = {
   signal?: AbortSignal;
   pollMs?: number;
   replayTenantIds?: readonly string[];
+  judgeTenantIds?: readonly string[];
   upstreamBaseUrl?: string;
   credentialStore?: ProviderCredentialStore | null;
   sampleKeyManager?: SampleKeyManager | null;
@@ -90,6 +92,22 @@ export async function claimReplayEvaluationJob(
   return { jobId: row.job_id, tenantId: row.tenant_id, runId: row.run_id, itemId: row.item_id };
 }
 
+export async function claimJudgeEvaluationJob(
+  pool: Pool,
+  workerId: string,
+  tenantIds: readonly string[],
+): Promise<ClaimedEvaluationJob | null> {
+  if (tenantIds.length === 0) return null;
+  const result = await pool.query<{ job_id: string; tenant_id: string; run_id: string; item_id: string }>(
+    `SELECT job_id::text AS job_id, tenant_id::text AS tenant_id, run_id::text AS run_id, item_id::text AS item_id
+     FROM claim_judge_evaluation_job($1, $2::uuid[])`,
+    [workerId, tenantIds],
+  );
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  return { jobId: row.job_id, tenantId: row.tenant_id, runId: row.run_id, itemId: row.item_id };
+}
+
 export async function pollEvaluationOnce(pool: Pool, options: EvaluationWorkerOptions): Promise<EvaluationPollResult> {
   if (options.signal?.aborted) return { claimed: false, outcome: 'idle' };
   if (options.dryRun) {
@@ -104,14 +122,26 @@ export async function pollEvaluationOnce(pool: Pool, options: EvaluationWorkerOp
   const replayTenantIds = options.replayTenantIds ?? [];
   if (!options.executionEnabled || replayTenantIds.length === 0) return { claimed: false, outcome: 'skipped' };
   const claimed = await claimReplayEvaluationJob(pool, options.workerId, replayTenantIds);
-  if (claimed === null) return { claimed: false, outcome: 'idle' };
-  if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
-  await heartbeatEvaluationJob(pool, claimed.jobId, options.workerId);
-  const advance = await advanceReplay(pool, claimed, options);
-  if (advance.finish !== null) {
-    await finishEvaluationJob(pool, claimed.jobId, options.workerId, advance.finish);
+  if (claimed !== null) {
+    if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
+    await heartbeatEvaluationJob(pool, claimed.jobId, options.workerId);
+    const advance = await advanceReplay(pool, claimed, options);
+    if (advance.finish !== null) {
+      await finishEvaluationJob(pool, claimed.jobId, options.workerId, advance.finish);
+    }
+    return { claimed: true, outcome: advance.outcome };
   }
-  return { claimed: true, outcome: advance.outcome };
+  const judgeTenantIds = options.judgeTenantIds ?? [];
+  if (judgeTenantIds.length === 0) return { claimed: false, outcome: 'idle' };
+  const judgeClaimed = await claimJudgeEvaluationJob(pool, options.workerId, judgeTenantIds);
+  if (judgeClaimed === null) return { claimed: false, outcome: 'idle' };
+  if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
+  await heartbeatEvaluationJob(pool, judgeClaimed.jobId, options.workerId);
+  const judged = await advanceJudge(pool, judgeClaimed, options);
+  if (judged.finish !== null) {
+    await finishEvaluationJob(pool, judgeClaimed.jobId, options.workerId, judged.finish);
+  }
+  return { claimed: true, outcome: judged.outcome };
 }
 
 export async function runEvaluationWorker(

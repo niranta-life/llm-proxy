@@ -1,0 +1,4 @@
+source: judge-tests.txt
+[{"finding":"model_a","stop":null},{"finding":"model_b","stop":null},{"finding":"tie","stop":null},{"finding":"inconclusive","stop":null},{"finding":"unstable","stop":null}]
+calibration fixtures test passed: True
+EXIT:0

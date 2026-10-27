@@ -1,0 +1,10 @@
+source: judge-launch.txt and judge-tests.txt
+launch-1 costAmount 0.024 costStatus estimated ledgerSettles 2
+launch-2 costAmount 0.024 costStatus estimated ledgerSettles 2
+tokens positive True latency non-negative True
+run budget estimate 0.25
+monthly hard budget 10
+cost accounting test passed: True
+budget exhausted test passed: True
+{"key":"ceiling","status":400}
+EXIT:0

@@ -1,0 +1,9 @@
+source: judge-launch.txt
+launch-1 {"count": 2, "reports": [{"hasTask": true, "hasRubric": true, "hasX": true, "hasY": true, "hasCandidateText": true, "tools": true, "leaks": []}, {"hasTask": true, "hasRubric": true, "hasX": true, "hasY": true, "hasCandidateText": true, "tools": true, "leaks": []}]}
+launch-2 {"count": 2, "reports": [{"hasTask": true, "hasRubric": true, "hasX": true, "hasY": true, "hasCandidateText": true, "tools": true, "leaks": []}, {"hasTask": true, "hasRubric": true, "hasX": true, "hasY": true, "hasCandidateText": true, "tools": true, "leaks": []}]}
+operator hides task and candidate text: True and True
+A blind request contains TASK, RUBRIC, CANDIDATE_X, and CANDIDATE_Y.
+It omits candidate model names, provider names, cost, latency, and routing recommendations.
+The request has no tools field.
+trusted reference and cancellation test passed: True
+EXIT:0

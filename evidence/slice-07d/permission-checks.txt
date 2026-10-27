@@ -1,0 +1,13 @@
+source: judge-tests.txt and judge-launch.txt
+unapproved deployment passed: True
+disclosure revoked passed: True
+wrong tenant passed: True
+budget exhausted passed: True
+model unavailable passed: True
+{"key": "timeout", "finding": "inconclusive", "stop": "provider_timeout", "judgeCalls": 1}
+timeout passed: True
+judging off by default passed: True
+cancel before judge call passed: True
+launch foreign status 404 and 404
+routing model gpt-07d-source
+EXIT:0

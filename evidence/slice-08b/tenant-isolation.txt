@@ -1,0 +1,9 @@
+Tenant B called GET /internal/v1/routing/evidence with its own secret.
+The page was {"snapshots":[]}.
+The same call with tenantId set to Tenant A also returned {"snapshots":[]}.
+Tenant B refresh of Tenant A's profile version returned HTTP 404.
+The 404 body did not contain Tenant A's snapshot id.
+
+EVIDENCE isolation {"otherSnapshots":0,"otherRefreshStatus":404}
+
+Row-level security hides the other tenant. The test does not use a superuser read to tell a missing row from another tenant's row. The superuser is used only to seed grants and to prove that UPDATE and DELETE still raise immutable.

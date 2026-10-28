@@ -305,6 +305,7 @@ describe('Anthropic integration', () => {
       '024_evaluation_judgments.sql',
       '025_evaluation_schedules.sql',
       '026_routing_policies.sql',
+      '027_evidence_qualification.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

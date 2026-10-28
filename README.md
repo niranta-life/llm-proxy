@@ -76,11 +76,14 @@ flowchart TB
         schedule["Schedule<br/>off until named"]
         replay["Replay<br/>pinned challenger"]
         judge["Judge<br/>off until named"]
+        evidence["Evidence<br/>offline snapshot"]
         optimizer["Optimizer<br/>model rankings"]
         history --> schedule
         schedule --> replay
         replay --> judge
-        judge -.-> optimizer
+        replay --> evidence
+        judge --> evidence
+        evidence -.-> optimizer
     end
 
     infra["PostgreSQL 16 · evaluation jobs"]
@@ -99,21 +102,21 @@ flowchart TB
     class optimizer,infraPlanned planned
 ```
 
-Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. None of them change production routing. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
+Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. The router does not read it. None of them change production routing. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
 
 ### How a request flows
 
 1. **API + Authentication.** The caller sends `X-Tenant-ID` and a tenant secret. The proxy checks the secret against a scrypt verifier. From here, every database query runs as that tenant under PostgreSQL row-level security.
 2. **Request Normalization.** The body becomes one standard request format. The same JSON works for every provider.
 3. **Capability Validation.** Each deployment lists the fields it accepts, such as `temperature` or `stop`. The proxy refuses a field the deployment does not accept. It does not drop the field and continue.
-4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. See [Routing policy](docs/operations.md#routing-policy).
+4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. An evidence snapshot records candidate quality for one task segment. The router does not read that snapshot. See [Routing policy](docs/operations.md#routing-policy) and [Evidence qualification](docs/operations.md#evidence-qualification).
 5. **Circuit breaker and limits.** An open circuit breaker rejects the attempt before any provider call. Then rate, concurrency, and budget limits are checked, and the proxy sets aside budget for this call.
 6. **Provider Adapters.** One adapter per provider family turns the canonical request into the provider's API and back into an OpenAI chat completion or a streamed response.
 7. **Retries + Failover.** Retry makes at most one more attempt on the same deployment, within one deadline. Fallback moves `auto` to one approved deployment, only before any output. A new attempt goes back to step 5.
 8. **Usage + Cost Tracking.** Each attempt is priced from prices that you registered. The budget reservation is settled.
 9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Each completed chat also stores one [request-characteristics](#request-characteristics) record, without the prompt or the answer. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
 
-Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. They do not sit on this path, and they do not change the router.
+Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. An evidence refresh is a separate offline call. They do not sit on this path, and they do not change the router.
 
 Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, and the trust boundaries.
 
@@ -319,6 +322,7 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Retry](docs/retry.md).** One more attempt on the same deployment, with deadlines. Off until you turn it on.
 - **[Fallback](docs/fallback.md).** One more deployment for the alias `auto`, and only before any output. A named model never switches.
 - **[Routing policy](docs/operations.md#routing-policy).** An operator can store a policy for the alias `auto`. Shadow mode records the decision. It does not change which deployment runs. A named model stays on that model.
+- **[Evidence qualification](docs/operations.md#evidence-qualification).** An operator can store a qualification profile and refresh an immutable snapshot from completed evaluation runs. The snapshot names a status and the reason codes. Chat still uses the alias baseline.
 - **[Limits and budgets](docs/limits.md).** Shared caps on rate, concurrency, and monthly spend. Start in observation mode.
 - **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.

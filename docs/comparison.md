@@ -30,7 +30,7 @@ This page compares llm-proxy with other LLM gateways, proxies, and routers. All 
 - **The gateway is a target.** The LiteLLM backdoor took `.env` files that hold LLM API keys. Everyone who installed it had to rotate every credential [6].
 - **Mid-stream behavior differs.** Some gateways end a broken stream with an error [40]. Others feed the partial text to a second model and continue [41]. llm-proxy does neither after the first byte: it never falls back once output starts.
 - **Database-enforced tenant isolation.** We found no other gateway that documents it.
-- **The learning-loop slot is partly open.** TensorZero was the self-hosted gateway that led with evals and optimization. It is archived. llm-proxy stores outcomes, replays an approved sample on one pinned challenger, runs deterministic checks, and can judge that pair. A schedule refreshes that evidence. Rankings are not in this release. Replay, the judge, and the schedule do not change production routing.
+- **The learning-loop slot is partly open.** TensorZero was the self-hosted gateway that led with evals and optimization. It is archived. llm-proxy stores outcomes, replays an approved sample on one pinned challenger, runs deterministic checks, and can judge that pair. A schedule refreshes that evidence. An offline snapshot can mark a candidate qualified for one task segment. Rankings are not in this release. Replay, the judge, the schedule, and the snapshot do not change production routing.
 - **Analyst coverage.** Gartner published a Market Guide for AI Gateways (2025-10-13) [38] and a Market Overview (2026-05-13) [39]. Data protection and identity are in scope.
 
 ## Where llm-proxy is behind
@@ -39,7 +39,7 @@ This page compares llm-proxy with other LLM gateways, proxies, and routers. All 
 - No admin API or UI, no SSO or RBAC, no TLS on the listen port, no external secret manager.
 - Six providers, at most two attempts, no response cache, no guardrails, no clustering guide.
 - The private endpoint (DGX) is not live-validated.
-- Rankings and quality-based routing are not built. An operator can store a shadow policy for the alias `auto`. That policy records the decision and does not choose a deployment. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant.
+- Rankings and quality-based routing are not built. An operator can store a shadow policy for the alias `auto`. That policy records the decision and does not choose a deployment. An evidence snapshot can mark a candidate qualified for one task segment. That mark does not choose a deployment. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant.
 
 ## Who uses it in an enterprise
 

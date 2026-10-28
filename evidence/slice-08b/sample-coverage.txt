@@ -1,0 +1,16 @@
+Coverage is matched pairs divided by matched pairs plus size mismatches plus complexity mismatches.
+Other mismatch buckets are excluded from the denominator.
+A denominator of 0 yields coverage 0.
+
+Qualified extraction cohort, input size category l, 20 matched pairs, no size or complexity mismatch.
+coverageRate 1
+sampleCount 20
+EVIDENCE coverage {"qualified":1,"sampleCount":20,"inputSizeCategory":"l"}
+
+Short-input evidence, sample input size 64 (band s), profile input size category l.
+The item is input_size_mismatch. Matched pairs are 0. Coverage is 0.
+status invalidated
+reason input_size_mismatch
+EVIDENCE coverage-short {"status":"invalidated","coverageRate":0,"inputSizeCategory":"l"}
+
+Each negative cohort uses its own challenger deployment. The loader reads every completed run for the profile deployment. A shared deployment name would pool a later cohort into the qualified 20/20 run. The sample policy allows at most 8 deployment names, so the test sets the policy to the baseline plus the case deployment before each evaluation create.

@@ -68,6 +68,12 @@ import {
   setRoutingStatus,
   validateRoutingPolicy,
 } from '../inference/routing-policy-store.js';
+import { parseEvidenceQuery, parseQualificationWrite, parseRefreshBody } from '../inference/qualification.js';
+import {
+  createQualificationProfile,
+  listEvidenceSnapshots,
+  refreshEvidenceSnapshot,
+} from '../inference/qualification-store.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
 import { readTenantCapacity } from '../db/admission.js';
@@ -1232,6 +1238,67 @@ export function buildApp(deps: AppDeps): ProxyApp {
         return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
           setRoutingStatus(client, auth.tenantId, policyId, idempotencyKey, change.status, change.expectedEpoch),
         );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/qualification-profiles',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseQualificationWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createQualificationProfile(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.profile);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/evidence/refresh',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const profileVersionId = parseRefreshBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          refreshEvidenceSnapshot(client, auth.tenantId, idempotencyKey, profileVersionId, new Date()),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.snapshot);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string; profileVersionId?: string } }>(
+    '/internal/v1/routing/evidence',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return { snapshots: [] };
+      }
+      try {
+        const profileVersionId = parseEvidenceQuery(request.query);
+        const snapshots = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          listEvidenceSnapshots(client, profileVersionId),
+        );
+        return { snapshots };
       } catch (error) {
         return sendRoutingError(reply, error);
       }

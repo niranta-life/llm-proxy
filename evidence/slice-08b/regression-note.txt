@@ -1,0 +1,5 @@
+regression-before.txt is the pre-change suite. It exited 1. The only failure was test/budgets.test.ts "recognizes overlapping observe closes against settled expense only". Expected settled expense 0.7 and observed 0.3. That assertion was not changed.
+
+Two later full runs failed the same assertion only. An isolated run of that test passed. A later full npm test exited 0.
+
+regression-after.txt is that passing suite. Test Files 65 passed, 3 skipped. Tests 630 passed, 5 skipped. EXIT:0.

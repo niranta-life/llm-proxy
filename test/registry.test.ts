@@ -96,6 +96,7 @@ describe('provider registry', () => {
       '024_evaluation_judgments.sql',
       '025_evaluation_schedules.sql',
       '026_routing_policies.sql',
+      '027_evidence_qualification.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -140,6 +141,9 @@ describe('provider registry', () => {
     const routingPolicies = readFileSync(join(projectRoot, 'migrations', '026_routing_policies.sql'), 'utf8');
     expect(routingPolicies).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     expect(routingPolicies).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const evidenceQualification = readFileSync(join(projectRoot, 'migrations', '027_evidence_qualification.sql'), 'utf8');
+    expect(evidenceQualification).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(evidenceQualification).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

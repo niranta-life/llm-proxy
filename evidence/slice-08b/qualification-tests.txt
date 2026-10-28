@@ -1,0 +1,39 @@
+(node:83068) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:83092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:83130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/qualification.test.ts > qualification decision > qualifies a cohort only when the uncertainty bounds clear every numeric gate 1ms
+ ✓ test/qualification.test.ts > qualification decision > rejects stale, biased, cheap, and incomparable evidence 1ms
+stdout | test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline
+EVIDENCE evidence-api {"id":"f275cc48-df0f-4d11-b6c0-3a8680f7a4ec","profileVersionId":"09589658-c313-40f4-a461-630ea9e221c3","taskCategory":"extraction","complexity":"low","inputSizeCategory":"l","outputRequirementId":"fbe867ad-859a-4fce-8dfe-3f5ce3575935","requiredCapabilities":["temperature"],"candidateDeployment":"qual-chat","modelVersion":"gpt-model-b","deploymentConfigVersion":2,"adapterVersion":1,"status":"qualified","reasonCodes":[],"uncertainty":{"method":"wilson_95_newcombe","lower":0.83887,"upper":1,"differenceLower":-0.16113},"sourceRunIds":["695c79eb-8702-46e5-a688-769ba535289d"],"sampleCount":20,"coverageRate":1,"createdAt":"2026-10-28T21:07:30.860Z"}
+EVIDENCE snapshot {"id":"f275cc48-df0f-4d11-b6c0-3a8680f7a4ec","sourceRunIds":["695c79eb-8702-46e5-a688-769ba535289d"],"status":"qualified","createdAt":"2026-10-28T21:07:30.860Z"}
+EVIDENCE coverage {"qualified":1,"sampleCount":20,"inputSizeCategory":"l"}
+
+stdout | test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline
+EVIDENCE routing-unchanged {"beforeDeployment":"qual-chat","afterDeployment":"qual-chat","upstreamModel":"gpt-baseline","providerCallsEach":1,"qualificationStatusInChat":false}
+
+stdout | test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline
+EVIDENCE coverage-short {"status":"invalidated","coverageRate":0,"inputSizeCategory":"l"}
+
+stdout | test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline
+EVIDENCE isolation {"otherSnapshots":0,"otherRefreshStatus":404}
+
+stdout | test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline
+EVIDENCE history {"firstId":"f275cc48-df0f-4d11-b6c0-3a8680f7a4ec","parallelIds":["0edbdea2-8ca2-4e98-a7bb-73d8f494ca09","ea124643-5f87-4b75-bb7e-3a4d3fc860c7"],"firstUnchanged":true}
+
+ ✓ test/qualification.test.ts > evidence qualification engine > stores immutable evidence and leaves model=auto on the baseline 6706ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  14:07:20
+   Duration  16.30s (transform 214ms, setup 3ms, collect 422ms, tests 12.40s, environment 0ms, prepare 32ms)
+
+(node:83254) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

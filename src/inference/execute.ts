@@ -31,6 +31,7 @@ import {
 import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
+import { recordRoutingDecision } from './routing-policy-store.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
@@ -203,6 +204,7 @@ export async function executeChat(input: {
     const store = input.store;
     const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
       const pending = await insertPending(client, input.tenantId, route);
+      await recordRoutingDecision(client, input.tenantId, pending.requestId, route);
       return {
         requestId: pending.requestId,
         attemptId: pending.attemptId,

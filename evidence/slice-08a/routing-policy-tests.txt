@@ -1,0 +1,40 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose test/routing-policy.test.ts
+
+(node:19721) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:19790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/routing-policy.test.ts > routing policy foundation > stores an immutable version and replays the same idempotency key
+EVIDENCE policy-api {"id":"b15622e6-7379-40b4-a26c-a0cc49783aa5","name":"auto-shadow","alias":"auto","version":1,"versionId":"cabed66d-fd6d-41be-ba5e-6640585f196e","status":"draft","epoch":1,"configDigest":"ab565c1f0c7d122c7169af9903df96a2d89f41d70bc68e428260d9e19ff43603","baselineDeployment":"alpha-chat","candidateDeployments":["alpha-chat","alpha-spare"],"qualityMinPassRate":"0.90000","qualityMinValidPairs":20,"maxCostPerRequest":"0.05000000","maxLatencyMs":4000,"taskSegments":["coding","general_qa"],"events":[{"status":"draft","epoch":1,"versionId":"cabed66d-fd6d-41be-ba5e-6640585f196e"}]}
+
+ ✓ test/routing-policy.test.ts > routing policy foundation > stores an immutable version and replays the same idempotency key 1135ms
+ ✓ test/routing-policy.test.ts > routing policy foundation > rejects an invalid policy, a missing baseline, a disabled deployment, an unknown alias, and a foreign candidate 1613ms
+stdout | test/routing-policy.test.ts > routing policy foundation > rejects a stale update and a second shadow activation
+EVIDENCE activation-conflict {"error":{"message":"Another policy is already in shadow.","type":"invalid_request_error","param":"status","code":"activation_conflict"}}
+
+ ✓ test/routing-policy.test.ts > routing policy foundation > rejects a stale update and a second shadow activation 1114ms
+stdout | test/routing-policy.test.ts > routing policy foundation > keeps auto on the baseline, records the decision, and hides the policy from another tenant
+EVIDENCE decision-trace {"tenantId":"5ab3aece-4947-407d-8c99-ca9aae782ab7","requestId":"4d1780ff-5a19-4c74-a3a6-16b968541cb2","alias":"auto","baselineDeployment":"alpha-chat","selectedDeployment":"alpha-chat","policyVersionId":"e116b638-13ea-4408-bda4-cb131540f1bc","activationEpoch":3,"featureExtractorVersion":1,"routingMode":"shadow","reasonCodes":["shadow_observed"]}
+
+stdout | test/routing-policy.test.ts > routing policy foundation > keeps auto on the baseline, records the decision, and hides the policy from another tenant
+EVIDENCE isolation {"tenantBPolicy":404,"tenantBList":{"policies":[]},"tenantBDecision":404,"tenantBVisiblePolicies":0}
+
+stdout | test/routing-policy.test.ts > routing policy foundation > keeps auto on the baseline, records the decision, and hides the policy from another tenant
+EVIDENCE rollback {"migrationApplied":"026_routing_policies.sql","status":"disabled","deployment":"alpha-chat","providerCallsAdded":1,"upstreamModel":"gpt-baseline","routingMode":"static","selectedDeployment":"alpha-chat"}
+
+ ✓ test/routing-policy.test.ts > routing policy foundation > keeps auto on the baseline, records the decision, and hides the policy from another tenant 2261ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  12:53:08
+   Duration  9.65s (transform 210ms, setup 1ms, collect 437ms, tests 6.12s, environment 0ms, prepare 27ms)
+
+(node:19862) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

@@ -58,6 +58,16 @@ import {
   tickSchedule,
   type ScheduleContext,
 } from '../inference/evaluation-schedule-store.js';
+import { parseDecisionRequestId, parseExpectedEpoch, parsePolicyId, parseRoutingWrite, parseStatusChange } from '../inference/routing-policy.js';
+import {
+  createRoutingPolicy,
+  keyRoutingPermissions,
+  listRoutingPolicies,
+  readRoutingDecision,
+  readRoutingPolicy,
+  setRoutingStatus,
+  validateRoutingPolicy,
+} from '../inference/routing-policy-store.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
 import { readTenantCapacity } from '../db/admission.js';
@@ -1112,6 +1122,140 @@ export function buildApp(deps: AppDeps): ProxyApp {
     },
   );
 
+  async function allowRouting(
+    auth: { tenantId: string; keyId: string },
+    reply: FastifyReply,
+    permission: 'routing:read' | 'routing:admin',
+  ): Promise<boolean> {
+    try {
+      const granted = await keyRoutingPermissions(deps.authPool, auth.tenantId, auth.keyId);
+      if (granted.has(permission)) return true;
+      await reply
+        .code(403)
+        .send(proxyError(403, 'authentication_error', 'forbidden', null, 'The credential cannot use this route.').body());
+      return false;
+    } catch (error) {
+      deps.logger.error('routing permission failed', { message: errorMessage(error) });
+      await reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      return false;
+    }
+  }
+
+  function sendRoutingError(reply: FastifyReply, error: unknown): FastifyReply {
+    if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+    deps.logger.error('routing request failed', { message: errorMessage(error) });
+    return reply
+      .code(500)
+      .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+  }
+
+  app.post(
+    '/internal/v1/routing/policies',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseRoutingWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createRoutingPolicy(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.policy);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/policies', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return { policies: [] };
+    }
+    try {
+      const policies = await withTenant(deps.runtimePool, auth.tenantId, (client) => listRoutingPolicies(client));
+      return { policies };
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/internal/v1/routing/policies/:id', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    try {
+      const policyId = parsePolicyId(request.params.id);
+      return await withTenant(deps.runtimePool, auth.tenantId, (client) => readRoutingPolicy(client, policyId));
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.post(
+    '/internal/v1/routing/policies/:id/validate',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const policyId = parsePolicyId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const expectedEpoch = parseExpectedEpoch(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          validateRoutingPolicy(client, auth.tenantId, policyId, idempotencyKey, expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/policies/:id/status',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const policyId = parsePolicyId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const change = parseStatusChange(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          setRoutingStatus(client, auth.tenantId, policyId, idempotencyKey, change.status, change.expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { requestId: string } }>('/internal/v1/routing/decisions/:requestId', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    try {
+      const requestId = parseDecisionRequestId(request.params.requestId);
+      const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) => readRoutingDecision(client, requestId));
+      if (decision === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The decision was not found.').body());
+      }
+      return decision;
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });
   });
@@ -1125,7 +1269,8 @@ export function buildApp(deps: AppDeps): ProxyApp {
         path.startsWith('/internal/v1/evaluation-profiles') ||
         path.startsWith('/internal/v1/evaluation-rubrics') ||
         path.startsWith('/internal/v1/evaluation-schedules') ||
-        path.startsWith('/internal/v1/evaluation-controls')) &&
+        path.startsWith('/internal/v1/evaluation-controls') ||
+        path.startsWith('/internal/v1/routing')) &&
       statusCode === 413
     ) {
       reply

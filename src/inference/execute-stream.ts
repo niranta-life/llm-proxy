@@ -24,6 +24,7 @@ import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
+import { recordRoutingDecision } from './routing-policy-store.js';
 import {
   deadlineKindOf,
   decideRetry,
@@ -174,6 +175,7 @@ export async function runChatStream(input: {
       const store = input.store;
       const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
         const pending = await insertPending(client, input.tenantId, input.route);
+        await recordRoutingDecision(client, input.tenantId, pending.requestId, input.route);
         return {
           requestId: pending.requestId,
           attemptId: pending.attemptId,

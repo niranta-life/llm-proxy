@@ -1,0 +1,2 @@
+Captured GET /internal/v1/routing/decisions/{requestId} after model=auto while a shadow policy was enabled. The chat still used alpha-chat. The body has no prompt and no completion.
+{"tenantId":"5ab3aece-4947-407d-8c99-ca9aae782ab7","requestId":"4d1780ff-5a19-4c74-a3a6-16b968541cb2","alias":"auto","baselineDeployment":"alpha-chat","selectedDeployment":"alpha-chat","policyVersionId":"e116b638-13ea-4408-bda4-cb131540f1bc","activationEpoch":3,"featureExtractorVersion":1,"routingMode":"shadow","reasonCodes":["shadow_observed"]}

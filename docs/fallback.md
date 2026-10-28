@@ -8,6 +8,8 @@ A request that names a deployment never switches. Retry and fallback do not run 
 
 The proxy uses at most two attempts, even when the stored maximum is higher. It does not ask a model to choose. It does not select a deployment by a quality score. OpenRouter `allow_fallbacks` is a separate stored flag. See [Providers](providers.md).
 
+A routing policy is a separate record. Shadow mode stores the decision for `auto`. It does not choose a deployment. See [Routing policy](operations.md#routing-policy).
+
 There is no HTTP route that writes the policy.
 
 ## Where it fits

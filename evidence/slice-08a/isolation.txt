@@ -1,0 +1,2 @@
+Captured while Tenant B read Tenant A's policy and decision, and while Tenant B's runtime session counted routing_policies.
+{"tenantBPolicy":404,"tenantBList":{"policies":[]},"tenantBDecision":404,"tenantBVisiblePolicies":0}

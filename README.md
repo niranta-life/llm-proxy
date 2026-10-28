@@ -106,7 +106,7 @@ Solid lines are shipped. Dashed lines are planned. Replay stays off until you en
 1. **API + Authentication.** The caller sends `X-Tenant-ID` and a tenant secret. The proxy checks the secret against a scrypt verifier. From here, every database query runs as that tenant under PostgreSQL row-level security.
 2. **Request Normalization.** The body becomes one standard request format. The same JSON works for every provider.
 3. **Capability Validation.** Each deployment lists the fields it accepts, such as `temperature` or `stop`. The proxy refuses a field the deployment does not accept. It does not drop the field and continue.
-4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes.
+4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. See [Routing policy](docs/operations.md#routing-policy).
 5. **Circuit breaker and limits.** An open circuit breaker rejects the attempt before any provider call. Then rate, concurrency, and budget limits are checked, and the proxy sets aside budget for this call.
 6. **Provider Adapters.** One adapter per provider family turns the canonical request into the provider's API and back into an OpenAI chat completion or a streamed response.
 7. **Retries + Failover.** Retry makes at most one more attempt on the same deployment, within one deadline. Fallback moves `auto` to one approved deployment, only before any output. A new attempt goes back to step 5.
@@ -174,7 +174,7 @@ There are many LLM gateways. Most of them compete on breadth: more models, more 
 | Who sees the provider keys? | Only the proxy. AES-256-GCM ciphertext; the key is not in Postgres. | Gateway config, env vars, or the vendor's secret store. |
 | How are tenants isolated? | PostgreSQL row-level security on every tenant query. | Teams or virtual keys in app logic. Some tiers are enterprise-only. |
 | Can my model change without notice? | No. A named model never switches. | Often yes: automatic fallbacks, budget fallbacks, or mid-stream continuation. |
-| How do I know what happened? | Headers and per-attempt rows name the deployment, the attempt count, and any fallback. A characteristics record names the task and the outcome, without the prompt. | Logs or a hosted dashboard. |
+| How do I know what happened? | Headers and per-attempt rows name the deployment, the attempt count, and any fallback. A characteristics record names the task and the outcome, without the prompt. A routing decision names the alias, the baseline, and the mode, without the prompt. | Logs or a hosted dashboard. |
 | Is a cost figure ever a guess shown as fact? | No. Each amount is estimated, provisional, or unknown. | Often a public price list; failed calls can show $0. |
 | License | MIT. No paid enterprise tier. | Mixed: open core with paid enterprise features is common. |
 
@@ -318,6 +318,7 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Streaming](docs/streaming.md).** Server-sent events for a text chat. Off until you enable it for the tenant and the deployment.
 - **[Retry](docs/retry.md).** One more attempt on the same deployment, with deadlines. Off until you turn it on.
 - **[Fallback](docs/fallback.md).** One more deployment for the alias `auto`, and only before any output. A named model never switches.
+- **[Routing policy](docs/operations.md#routing-policy).** An operator can store a policy for the alias `auto`. Shadow mode records the decision. It does not change which deployment runs. A named model stays on that model.
 - **[Limits and budgets](docs/limits.md).** Shared caps on rate, concurrency, and monthly spend. Start in observation mode.
 - **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.

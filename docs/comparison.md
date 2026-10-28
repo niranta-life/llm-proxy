@@ -39,7 +39,7 @@ This page compares llm-proxy with other LLM gateways, proxies, and routers. All 
 - No admin API or UI, no SSO or RBAC, no TLS on the listen port, no external secret manager.
 - Six providers, at most two attempts, no response cache, no guardrails, no clustering guide.
 - The private endpoint (DGX) is not live-validated.
-- Rankings and quality-based routing are not built. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant.
+- Rankings and quality-based routing are not built. An operator can store a shadow policy for the alias `auto`. That policy records the decision and does not choose a deployment. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant.
 
 ## Who uses it in an enterprise
 

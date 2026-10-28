@@ -1,0 +1,23 @@
+POST /internal/v1/routing/policies
+Idempotency-Key: policy-create-1
+Permission: routing:admin
+
+Request body sent by test/routing-policy.test.ts:
+
+{
+  "name": "auto-shadow",
+  "alias": "auto",
+  "baselineDeployment": "alpha-chat",
+  "candidateDeployments": ["alpha-chat", "alpha-spare"],
+  "qualityMinPassRate": "0.90000",
+  "qualityMinValidPairs": 20,
+  "maxCostPerRequest": "0.05000000",
+  "maxLatencyMs": 4000,
+  "taskSegments": ["coding", "general_qa"]
+}
+
+HTTP 201 response captured from that call:
+
+{"id":"b15622e6-7379-40b4-a26c-a0cc49783aa5","name":"auto-shadow","alias":"auto","version":1,"versionId":"cabed66d-fd6d-41be-ba5e-6640585f196e","status":"draft","epoch":1,"configDigest":"ab565c1f0c7d122c7169af9903df96a2d89f41d70bc68e428260d9e19ff43603","baselineDeployment":"alpha-chat","candidateDeployments":["alpha-chat","alpha-spare"],"qualityMinPassRate":"0.90000","qualityMinValidPairs":20,"maxCostPerRequest":"0.05000000","maxLatencyMs":4000,"taskSegments":["coding","general_qa"],"events":[{"status":"draft","epoch":1,"versionId":"cabed66d-fd6d-41be-ba5e-6640585f196e"}]}
+
+The same key and the same body returned HTTP 200 and the same id. The same key with maxLatencyMs 1000 returned HTTP 409 idempotency_conflict. A second create with the same name returned HTTP 409 policy_name_conflict. GET /internal/v1/routing/policies listed that one id. GET /internal/v1/routing/policies/{id} returned the same versionId. An UPDATE of routing_policy_versions was rejected because the version is immutable.

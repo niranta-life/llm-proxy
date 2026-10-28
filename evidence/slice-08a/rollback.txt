@@ -1,0 +1,2 @@
+Captured after the shadow policy moved to disabled. Migration 026 stayed applied. model=auto used alpha-chat. The mock provider received one call for gpt-baseline. The decision mode returned to static.
+{"migrationApplied":"026_routing_policies.sql","status":"disabled","deployment":"alpha-chat","providerCallsAdded":1,"upstreamModel":"gpt-baseline","routingMode":"static","selectedDeployment":"alpha-chat"}

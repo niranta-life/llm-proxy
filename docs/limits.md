@@ -40,6 +40,8 @@ Remaining budget is the allocation minus recognized expense, active reservations
 
 A timeout does not become a zero-cost call. An uncertain charge stays provisional until a verified accounting decision. A retry reserves its own amount. The same attempt is not settled twice. How prices become estimated, provisional, or unknown is in [Cost](cost.md).
 
+A schedule reserves evaluation spend in `evaluation_budget_reservations`. It does not settle this monthly budget. When the tenant budget mode is hard, a run whose estimate is above that monthly amount is refused before a provider call. A hard concurrency limit that is already full can also stop a scheduled run. See [Evaluation schedule](cost.md#evaluation-schedule).
+
 ## Commands
 
 ```bash
@@ -81,6 +83,7 @@ docker compose run --rm app node dist/cli.js recover-budget \
 ## Related
 
 - [Cost](cost.md)
+- [Evaluation schedule](cost.md#evaluation-schedule)
 - [Fallback](fallback.md)
 - [Metrics](metrics.md)
 - [Chat](chat.md)

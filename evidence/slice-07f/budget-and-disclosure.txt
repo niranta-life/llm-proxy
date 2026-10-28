@@ -1,0 +1,6 @@
+Extracted from the passing scheduler-tests.txt run.
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when the budget is too small for one sample 74ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when the judge call budget is exhausted 71ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > stops new work when the global kill switch is on 102ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not run when the scheduler is disabled 44ms
+{"step":"schedule-journey","runId":"6a6080c6-fa4f-49f5-93d0-b886d5d573b0","reasonCodes":["bounded_sample","new_samples","version_change","low_coverage","high_uncertainty","workload_volume"],"routingChange":false,"plaintext":false,"providerCallsForRun":1}

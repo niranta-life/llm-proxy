@@ -99,6 +99,8 @@ describe('configuration lookup', () => {
     expect(loadConfig(serviceEnv(db)).evaluationExecutionEnabled).toBe(false);
     expect(loadConfig(serviceEnv(db)).evaluationReplayTenantIds).toEqual([]);
     expect(loadConfig(serviceEnv(db)).evaluationJudgeTenantIds).toEqual([]);
+    expect(loadConfig(serviceEnv(db)).evaluationScheduleTenantIds).toEqual([]);
+    expect(loadConfig(serviceEnv(db)).evaluationGlobalKill).toBe(false);
     const replayTenant = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     expect(loadConfig(serviceEnv(db, { EVALUATION_JUDGE_TENANTS: replayTenant.toUpperCase() })).evaluationJudgeTenantIds).toEqual([
       replayTenant,
@@ -113,6 +115,16 @@ describe('configuration lookup', () => {
     expect(() => loadConfig(serviceEnv(db, { EVALUATION_JUDGE_TENANTS: 'not-a-tenant' }))).toThrow(
       /EVALUATION_JUDGE_TENANTS accepts one tenant id/,
     );
+    expect(
+      loadConfig(serviceEnv(db, { EVALUATION_SCHEDULE_TENANTS: replayTenant.toUpperCase() })).evaluationScheduleTenantIds,
+    ).toEqual([replayTenant]);
+    expect(() =>
+      loadConfig(serviceEnv(db, { EVALUATION_SCHEDULE_TENANTS: `${replayTenant},bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee` })),
+    ).toThrow(/EVALUATION_SCHEDULE_TENANTS accepts one tenant id/);
+    expect(() => loadConfig(serviceEnv(db, { EVALUATION_GLOBAL_KILL: 'yes' }))).toThrow(
+      /EVALUATION_GLOBAL_KILL must be true or false/,
+    );
+    expect(loadConfig(serviceEnv(db, { EVALUATION_GLOBAL_KILL: 'true' })).evaluationGlobalKill).toBe(true);
     expect(
       loadConfig(serviceEnv(db, { EVALUATION_REPLAY_TENANTS: `${replayTenant.toUpperCase()},${replayTenant}` }))
         .evaluationReplayTenantIds,

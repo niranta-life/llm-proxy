@@ -9,6 +9,7 @@ import {
   syncRunProgress,
 } from './evaluations.js';
 import { isItemStatus, isRunStatus } from './evaluation-state.js';
+import { cancelOverdueScheduleRuns, maintainEvaluationSchedule } from './evaluation-schedule-store.js';
 import { advanceJudge } from './judge-execution.js';
 import { advanceReplay } from './replay-execution.js';
 import type { SampleKeyManager } from './sample-crypto.js';
@@ -37,6 +38,8 @@ export type EvaluationWorkerOptions = {
   beforeDispatch?: () => Promise<void> | void;
   logger?: Logger;
   callCounter?: { count: number };
+  scheduleTenantIds?: readonly string[];
+  globalKill?: boolean;
 };
 
 export type EvaluationPollResult = {
@@ -108,6 +111,14 @@ export async function claimJudgeEvaluationJob(
   return { jobId: row.job_id, tenantId: row.tenant_id, runId: row.run_id, itemId: row.item_id };
 }
 
+async function evaluationKilled(pool: Pool, options: EvaluationWorkerOptions): Promise<boolean> {
+  if (options.globalKill === true) return true;
+  const result = await pool.query<{ kill_switch: boolean }>(
+    `SELECT kill_switch FROM evaluation_controls WHERE singleton`,
+  );
+  return result.rows[0]?.kill_switch === true;
+}
+
 export async function pollEvaluationOnce(pool: Pool, options: EvaluationWorkerOptions): Promise<EvaluationPollResult> {
   if (options.signal?.aborted) return { claimed: false, outcome: 'idle' };
   if (options.dryRun) {
@@ -121,6 +132,9 @@ export async function pollEvaluationOnce(pool: Pool, options: EvaluationWorkerOp
   }
   const replayTenantIds = options.replayTenantIds ?? [];
   if (!options.executionEnabled || replayTenantIds.length === 0) return { claimed: false, outcome: 'skipped' };
+  const scheduleTenantIds = options.scheduleTenantIds ?? [];
+  if (scheduleTenantIds.length > 0) await cancelOverdueScheduleRuns(pool, scheduleTenantIds);
+  if (await evaluationKilled(pool, options)) return { claimed: false, outcome: 'skipped' };
   const claimed = await claimReplayEvaluationJob(pool, options.workerId, replayTenantIds);
   if (claimed !== null) {
     if (options.signal?.aborted) return { claimed: true, outcome: 'idle' };
@@ -162,6 +176,8 @@ export async function runEvaluationWorker(
     const result = await pollEvaluationOnce(pool, workerOptions);
     if (aborted()) break;
     if (result.outcome === 'idle' || result.outcome === 'skipped') {
+      const maintained = await maintainEvaluationSchedule(pool, workerOptions);
+      if (maintained.created) continue;
       const stopped = await sleep(pollMs, options.signal);
       if (stopped) break;
     }

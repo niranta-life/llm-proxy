@@ -43,6 +43,21 @@ import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
 import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
+import {
+  disableSchedule,
+  enableSchedule,
+  listScheduleDecisions,
+  manualScheduleRun,
+  parseAsOf,
+  parseKillBody,
+  parseSchedulePage,
+  readSchedule,
+  readScheduleDrift,
+  requireIdempotencyKey,
+  setEvaluationKill,
+  tickSchedule,
+  type ScheduleContext,
+} from '../inference/evaluation-schedule-store.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
 import { readTenantCapacity } from '../db/admission.js';
@@ -85,6 +100,9 @@ export type AppDeps = {
   beforeSettle?: () => Promise<void> | void;
   extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
   keepAliveTimeoutMs?: number;
+  evaluationScheduleTenantIds?: readonly string[];
+  evaluationGlobalKill?: boolean;
+  scheduleNow?: () => Date;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -96,6 +114,10 @@ export type ProxyApp = FastifyInstance & {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
+}
+
+function isEmptyObject(body: unknown): boolean {
+  return body === undefined || body === null || (typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
 }
 
 function streamReply(reply: FastifyReply): StreamHttp {
@@ -935,6 +957,161 @@ export function buildApp(deps: AppDeps): ProxyApp {
     },
   );
 
+  function scheduleContext(): ScheduleContext {
+    return {
+      scheduleTenantIds: deps.evaluationScheduleTenantIds ?? [],
+      globalKill: deps.evaluationGlobalKill === true,
+      now: deps.scheduleNow?.() ?? new Date(),
+    };
+  }
+
+  function emptyScheduleQuery(query: { tenantId?: string }, tenantId: string): boolean {
+    return query.tenantId !== undefined && query.tenantId.toLowerCase() !== tenantId;
+  }
+
+  app.post(
+    '/internal/v1/evaluation-schedules',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          enableSchedule(client, auth.tenantId, idempotencyKey, request.body, scheduleContext()),
+        );
+        return reply.code(saved.replayed ? 200 : 201).send(saved.schedule);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/disable',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const schedule = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          disableSchedule(client, auth.tenantId, scheduleContext()),
+        );
+        return schedule;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/tick',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (!isEmptyObject(request.body)) {
+          return reply
+            .code(400)
+            .send(proxyError(400, 'invalid_request_error', 'invalid_parameter', 'body', 'The schedule body is invalid.').body());
+        }
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          tickSchedule(client, auth.tenantId, idempotencyKey, scheduleContext()),
+        );
+        return reply.code(decision.fresh ? 201 : 200).send(decision);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/runs',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (!isEmptyObject(request.body)) {
+          return reply
+            .code(400)
+            .send(proxyError(400, 'invalid_request_error', 'invalid_parameter', 'body', 'The schedule body is invalid.').body());
+        }
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          manualScheduleRun(client, auth.tenantId, idempotencyKey, scheduleContext()),
+        );
+        return reply.code(decision.fresh ? 201 : 200).send(decision);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/evaluation-schedules', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      if (emptyScheduleQuery(request.query, auth.tenantId)) return { schedule: null };
+      const schedule = await withTenant(deps.runtimePool, auth.tenantId, (client) => readSchedule(client));
+      return { schedule };
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.get<{ Querystring: { limit?: string; cursor?: string; tenantId?: string } }>(
+    '/internal/v1/evaluation-schedules/decisions',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (emptyScheduleQuery(request.query, auth.tenantId)) return { decisions: [], nextCursor: null };
+        const query = parseSchedulePage(request.query);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => listScheduleDecisions(client, query));
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { asOf?: string; tenantId?: string } }>(
+    '/internal/v1/evaluation-schedules/drift',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const asOf = parseAsOf(request.query.asOf);
+        if (emptyScheduleQuery(request.query, auth.tenantId)) {
+          return { asOf, statements: [], workloadMixChange: false, limits: ['insufficient_history'], historical: true };
+        }
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => readScheduleDrift(client, asOf));
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-controls',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const killSwitch = parseKillBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          setEvaluationKill(client, auth.tenantId, killSwitch, scheduleContext()),
+        );
+        return saved;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });
   });
@@ -946,7 +1123,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
     if (
       (path.startsWith('/internal/v1/evaluations') ||
         path.startsWith('/internal/v1/evaluation-profiles') ||
-        path.startsWith('/internal/v1/evaluation-rubrics')) &&
+        path.startsWith('/internal/v1/evaluation-rubrics') ||
+        path.startsWith('/internal/v1/evaluation-schedules') ||
+        path.startsWith('/internal/v1/evaluation-controls')) &&
       statusCode === 413
     ) {
       reply

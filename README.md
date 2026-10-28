@@ -9,7 +9,7 @@ llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent d
 - **Pass your security review.** It runs inside your network. No vendor holds your data, so there is no new third-party risk and no data-residency question.
 - **One place for provider keys.** No keys spread across app `.env` files. If a key leaks, you rotate it once, and no app redeploys.
 - **The approved model is the one that answered.** A named model never switches. Audits and regulated workloads get the model you tested.
-- **See the kind of work, not the prompt.** Each completed chat stores the task category, the model, and the outcome. The prompt and the answer stay out of the database.
+- **See the kind of work, not the prompt.** Each completed chat stores the task category, the model, and the outcome. That record has no prompt and no answer. Encrypted capture is off by default. When you turn it on, an approved chat is stored as ciphertext.
 - **Spend you can defend.** Cost per team and per attempt, with no hidden $0 failures. Budgets stop overspend before the invoice.
 - **Small to run.** One container and PostgreSQL. No vendor control plane and no extra services to patch or staff.
 - **AI where the internet is not allowed.** It can run air-gapped with a model that you host. A live DGX call is not yet validated.
@@ -54,8 +54,10 @@ flowchart TB
         retry["Retries + Failover"]
         cost["Usage + Cost Tracking"]
         telem["Request Telemetry<br/>metrics + characteristics"]
+        capture["Sample Capture<br/>encrypted, off by default"]
         auth --> norm --> cap --> router --> retry --> adapters
         adapters --> cost --> telem
+        telem --> capture
     end
 
     subgraph providers["Model providers"]
@@ -68,29 +70,36 @@ flowchart TB
         dgx["Custom / DGX"]
     end
 
-    subgraph learning["Continuous Learning System (planned)"]
+    subgraph learning["Continuous Learning System"]
         direction LR
-        history["History<br/>Requests + outcomes"]
-        evaluator["Evaluator<br/>Replay + judge"]
-        optimizer["Optimizer<br/>Model rankings"]
-        history --> evaluator --> optimizer
+        history["History<br/>outcomes + encrypted samples"]
+        schedule["Schedule<br/>off until named"]
+        replay["Replay<br/>pinned challenger"]
+        judge["Judge<br/>off until named"]
+        optimizer["Optimizer<br/>model rankings"]
+        history --> schedule
+        schedule --> replay
+        replay --> judge
+        judge -.-> optimizer
     end
 
-    infra["PostgreSQL 16 · Metrics"]
-    infraPlanned["Redis · Durable Job Queue · Secret Manager (planned)"]
+    infra["PostgreSQL 16 · evaluation jobs"]
+    infraPlanned["Redis · Secret Manager (planned)"]
 
     apps --> proxy
     proxy --> providers
-    telem -.-> history
+    telem --> history
+    capture --> history
+    replay -->|"separate traffic"| adapters
     optimizer -.-> router
     proxy --- infra
     proxy -.- infraPlanned
 
     classDef planned stroke-dasharray: 5 5
-    class learning,history,evaluator,optimizer,infraPlanned planned
+    class optimizer,infraPlanned planned
 ```
 
-Solid lines are shipped. Dashed lines are planned. Today the only runtime dependency is PostgreSQL 16.
+Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. None of them change production routing. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
 
 ### How a request flows
 
@@ -104,6 +113,8 @@ Solid lines are shipped. Dashed lines are planned. Today the only runtime depend
 8. **Usage + Cost Tracking.** Each attempt is priced from prices that you registered. The budget reservation is settled.
 9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Each completed chat also stores one [request-characteristics](#request-characteristics) record, without the prompt or the answer. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
 
+Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. They do not sit on this path, and they do not change the router.
+
 Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, and the trust boundaries.
 
 ### Request characteristics
@@ -114,15 +125,22 @@ You can set `task` to `classification`, `extraction`, `summarization`, `reasonin
 
 List and by-id reads use the same tenant headers as chat. A page holds at most 50 rows. Another tenant's rows are not returned. See [Metrics](docs/metrics.md#request-features).
 
-### Continuous Learning System (planned, not built)
+An encrypted sample is a separate store. It is off by default. See [Encrypted samples](docs/metrics.md#encrypted-samples).
 
-The learning system closes the loop from your own traffic:
+### Continuous Learning System
 
-- **History** stores each request and its outcome: the deployment, the latency, the cost, and the result.
-- **Evaluator** replays stored requests against other deployments and scores them with a judge model.
-- **Optimizer** ranks deployments per task. The router can then use these rankings for `auto`, inside the same policy checks that fallback uses today.
+The learning system uses your own traffic. History, pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule are in this release. Rankings are not.
 
-Request characteristics are already stored. Replay, a judge, and rankings are not in this release. They will need Redis and a durable job queue. The router does not choose a model by quality score today.
+- **History** stores each completed chat as characteristics: the deployment, the latency, the cost, and the result. That record has no prompt. When you turn on encrypted capture, an approved chat is also stored as ciphertext. The default stores no content.
+- **Schedule** selects a bounded set of approved samples. It records why a run starts or why it skips. It does not call a model to choose the set. It reserves the estimate before a provider call. The scheduler is off until you name one tenant. It does not change aliases or production routing.
+- **Replay** sends one approved sample to one pinned challenger. The worker calls the provider adapter. It does not call `POST /v1/chat/completions`. It does not use `model=auto`. It does not run tools. It stores the challenger output as ciphertext and records cost, latency, usage, and status. Replay is off until you enable execution for one tenant.
+- **Checks** compare the original output and the challenger output with one approved profile. Each result is pass, fail, unknown, or not applicable. The checks do not call a model.
+- **Report** reads one completed run. It states one recommendation. That recommendation does not change an alias or a fallback policy.
+- **Judge** compares the two outputs when a run pins an approved rubric. Judging is off until you name one tenant. The judge budget is at most 1 USD. A judge finding does not change routing.
+- **Drift** compares stored runs at or before a chosen time. A run counts only after it is completed by that time. Different populations are not pooled into one rate.
+- **Optimizer** is not in this release. The router does not choose a model by a quality score.
+
+Evaluation jobs stay in PostgreSQL. The schedule does not add Redis. See [Evaluation](docs/architecture.md#evaluation).
 
 ### How this architecture compares
 
@@ -144,7 +162,7 @@ The main design differences:
 - **Fallback that never joins two models in one answer.** Some gateways continue a broken stream on another model. llm-proxy never falls back after the first byte, so the answer you audit is the answer one model gave.
 - **Policy-checked fallback.** A fallback target must be in the same tenant, pass a live check, come from an approved provider, match your data-handling rule, sit in an allowed region, and accept the required fields.
 - **Honest cost.** Unknown stays unknown. A hard budget refuses a call whose cost it cannot estimate in advance.
-- **One dependency.** PostgreSQL holds config, policy, keys, costs, the attempt trail, and request characteristics. No vendor control plane.
+- **One dependency.** PostgreSQL holds config, policy, keys, costs, the attempt trail, request characteristics, encrypted samples, and evaluation jobs. No vendor control plane.
 
 ## Why not an existing gateway?
 
@@ -173,7 +191,7 @@ Summary of the market as of October 2026 (full table with sources in [Comparison
 | Envoy AI Gateway / Agent Router | Kubernetes | Not documented | Quota-aware routing | No |
 | TensorZero | Self-host | Not documented | Not documented | Yes, but archived June 2026 |
 | AWS Bedrock / Azure APIM | Managed in your cloud | Not documented | IAM or subscriptions | Bedrock prompt routing (one model family) |
-| **llm-proxy** | **Self-host, Postgres only** | **Never after the first byte** | **Database row-level security** | **Planned** |
+| **llm-proxy** | **Self-host, Postgres only** | **Never after the first byte** | **Database row-level security** | **Replay, checks, optional judge, and a schedule. No rankings.** |
 
 Use a different gateway today if you need tools, images, audio, embeddings, MCP, an admin UI, SSO, or hundreds of models through one hosted key. llm-proxy does not include them yet.
 
@@ -187,7 +205,7 @@ llm-proxy is built for a network that you control. It is one container and one P
 
 In every case, keys, costs, policies, and the attempt trail all stay in your own PostgreSQL. Prompts pass through to the provider that you chose and nowhere else.
 
-- **No prompt storage.** The database stores token counts and request characteristics, not prompt or completion text.
+- **Prompt text stays out of logs and operator JSON.** Each completed chat stores the task, the model, and the outcome. Encrypted capture is off by default. When you turn it on, an approved chat is stored as ciphertext. A sample route returns metadata only.
 - **Small footprint.** One Node.js process and PostgreSQL 16. Seven runtime packages, with a lockfile.
 - **No telemetry.** The proxy calls only the providers that you register. It sends nothing to the maintainers or anyone else.
 - **Caller never holds a provider key.** The caller sends a tenant id and a tenant secret. It cannot send a provider key or a provider URL.
@@ -305,13 +323,16 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
 - **[Metrics](docs/metrics.md).** Counts, latency, stream percentiles, attempts, breaker state, and cost for the caller's own tenant.
 - **[Request characteristics](docs/metrics.md#request-features).** One versioned record per completed chat: the task, the model, the size, and the outcome. The prompt and the answer are not stored.
+- **[Encrypted samples](docs/metrics.md#encrypted-samples).** Optional ciphertext for an approved chat. Off by default. Metadata routes return no prompt and no completion.
+- **[Evaluation](docs/architecture.md#evaluation).** Pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant. None of them change production routing.
+- **[Cost of a schedule](docs/cost.md#evaluation-schedule).** A tick reserves the estimate before a provider call. Daily and monthly ceilings stay small.
 - **[Operations](docs/operations.md).** Configuration, health, shutdown, migrations, incidents, and tests.
 - **[Comparison](docs/comparison.md).** The LLM gateway market, with sources.
 
 ## Roadmap
 
-- **Continuous Learning System:** History, Evaluator, and Optimizer, as shown in the architecture. Request characteristics are already stored. Replay and rankings are not.
-- **Redis and a durable job queue** for replay and evaluation work.
+- **Rankings.** Rank deployments per task. The router may use a ranking for `auto` only, inside the same policy checks as fallback. A named model still never switches. A judge finding does not change that route today.
+- **Redis** for hot counters. Evaluation jobs already use PostgreSQL.
 - **External secret manager** support for provider keys.
 - **A verified live call to a private endpoint** (DGX), so it can be `validated_live`.
 

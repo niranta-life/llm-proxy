@@ -1,0 +1,63 @@
+(node:48313) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:48337) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:48398) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/budgets.test.ts > tenant budgets > keeps observe, hard, and disabled distinct and rejects unknown or unbounded cost before upstream
+BUDGET_CASE {"case":"modes","watch":{"remaining":"0","recognized":"0.01","provisional":"0.02","costStatus":"provisional","reserved":"0.020000000000","estimate":"0.04"},"empty":{"remaining":"0","recognized":"0","provisional":"0.03","costStatus":"provisional","reserved":"0.030000000000"},"tight":"budget_exceeded","missing":"budget_unknown","unbounded":"budget_unbounded","disabled":"tenant_rate_limited","hits":4}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps observe, hard, and disabled distinct and rejects unknown or unbounded cost before upstream 5554ms
+stdout | test/budgets.test.ts > tenant budgets > reserves a finite cache split and rejects a price that has no external rate
+BUDGET_CASE {"case":"bounds","cache":"0.100000000000","high":"budget_exceeded","allocated":"budget_unknown","empty":"budget_unknown","hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > reserves a finite cache split and rejects a price that has no external rate 3082ms
+stdout | test/budgets.test.ts > tenant budgets > settles fixed-precision expense, caps recognized at the reservation, and ignores a second settlement
+BUDGET_CASE {"case":"reconcile","exact":{"recognized":"0.03","remaining":"0.97","again":"settled"},"clamp":{"recognized":"1","remaining":"1"}}
+
+ ✓ test/budgets.test.ts > tenant budgets > settles fixed-precision expense, caps recognized at the reservation, and ignores a second settlement 1789ms
+stdout | test/budgets.test.ts > tenant budgets > gives the next UTC month its own capacity
+BUDGET_CASE {"case":"rollover","january":"0.97","february":"1"}
+
+ ✓ test/budgets.test.ts > tenant budgets > gives the next UTC month its own capacity 925ms
+stdout | test/budgets.test.ts > tenant budgets > admits only the available capacity when two processes reserve together
+BUDGET_CASE {"case":"race","during":"0","after":"0.01","results":[{"status":429,"code":"budget_exceeded"},{"status":200,"code":null}],"hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > admits only the available capacity when two processes reserve together 1159ms
+stdout | test/budgets.test.ts > tenant budgets > recognizes overlapping observe closes against settled expense only
+BUDGET_CASE {"case":"overlap","recognized":"1","provisional":"0.4","remaining":"0","costStatus":"provisional","hits":2,"results":[200,200]}
+
+ ✓ test/budgets.test.ts > tenant budgets > recognizes overlapping observe closes against settled expense only 1096ms
+stdout | test/budgets.test.ts > tenant budgets > reserves a retry on its own and does not settle that attempt twice
+BUDGET_CASE {"case":"retry","recognized":"0.03","provisional":"0.08","settles":"1"}
+
+ ✓ test/budgets.test.ts > tenant budgets > reserves a retry on its own and does not settle that attempt twice 971ms
+stdout | test/budgets.test.ts > tenant budgets > keeps a timeout reservation provisional and does not store a zero charge
+BUDGET_CASE {"case":"timeout","status":504,"reserved":"0.120000000000","remaining":"4.88","hits":1}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps a timeout reservation provisional and does not store a zero charge 1391ms
+stdout | test/budgets.test.ts > tenant budgets > keeps a reservation after a crash and settles a finished attempt once
+BUDGET_CASE {"case":"crash","early":{"exit":86,"status":"active","hits":1},"late":{"exit":86,"recognized":"0.03","remaining":"4.97"}}
+
+ ✓ test/budgets.test.ts > tenant budgets > keeps a reservation after a crash and settles a finished attempt once 2399ms
+stdout | test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant
+BUDGET_CASE {"case":"isolation","alpha":"0.92","beta":"3","visible":[]}
+
+ ✓ test/budgets.test.ts > tenant budgets > does not apply one tenant reservation to another tenant 1639ms
+stdout | test/budgets.test.ts > tenant budgets > fails closed when a hard budget cannot reach PostgreSQL
+BUDGET_CASE {"case":"outage","status":503,"code":"admission_unavailable","hits":0}
+
+ ✓ test/budgets.test.ts > tenant budgets > fails closed when a hard budget cannot reach PostgreSQL 10848ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  15:58:55
+   Duration  34.66s (transform 225ms, setup 1ms, collect 469ms, tests 30.85s, environment 0ms, prepare 29ms)
+
+(node:48670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

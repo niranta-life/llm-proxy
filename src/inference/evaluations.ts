@@ -42,7 +42,8 @@ export const SAMPLE_FACT_SQL = `SELECT id::text AS id,
             source_location,
             content_bytes
      FROM request_samples
-     WHERE id = ANY($1::uuid[])`;
+     WHERE id = ANY($1::uuid[])
+       AND deletion_hold IS FALSE`;
 
 export type EvaluationPlan = {
   name: string;

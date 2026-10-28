@@ -2,6 +2,7 @@ import { ConfigError, loadConfig } from './config.js';
 import { createCredentialStore } from './credentials.js';
 import { createPool } from './db/pools.js';
 import { migrate } from './db/migrate.js';
+import { maintainEvaluationSchedule } from './inference/evaluation-schedule-store.js';
 import { pollEvaluationOnce, runEvaluationWorker } from './inference/evaluation-worker.js';
 import { createSampleKeyManager } from './inference/sample-crypto.js';
 import { createLogger } from './logger.js';
@@ -81,13 +82,18 @@ async function main(): Promise<void> {
     signal: controller.signal,
     logger,
     callCounter,
+    scheduleTenantIds: config.evaluationScheduleTenantIds,
+    globalKill: config.evaluationGlobalKill,
   };
 
   try {
     if (drain) {
       while (!controller.signal.aborted) {
         const result = await pollEvaluationOnce(runtimePool, workerOptions);
-        if (result.outcome === 'idle' || result.outcome === 'skipped') break;
+        if (result.outcome === 'idle' || result.outcome === 'skipped') {
+          const maintained = await maintainEvaluationSchedule(runtimePool, workerOptions);
+          if (!maintained.created) break;
+        }
       }
       logger.info('evaluation worker drain complete', { modelCalls: callCounter.count });
     } else {

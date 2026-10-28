@@ -1,0 +1,90 @@
+(node:66134) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:66168) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:66233) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > enables, reads, and replays one tenant schedule 88ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > schedules one new approved sample and records the reason 80ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > records a model version change when the challenger model differs 70ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > records a price version change when only the price row is newer 240ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when no sample is eligible 74ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when the budget is too small for one sample 74ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when the judge call budget is exhausted 71ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when production capacity is constrained 249ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > skips when the challenger call limit is already reserved 155ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > treats a duplicate tick as the same decision 125ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > lets two replicas create one run 77ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > stops new work when the global kill switch is on 102ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not run when the scheduler is disabled 44ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > isolates schedules and reports across tenants 127ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > replays a scheduled run inside budget and leaves routing unchanged
+{"step":"schedule-journey","runId":"6a6080c6-fa4f-49f5-93d0-b886d5d573b0","reasonCodes":["bounded_sample","new_samples","version_change","low_coverage","high_uncertainty","workload_volume"],"routingChange":false,"plaintext":false,"providerCallsForRun":1}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > replays a scheduled run inside budget and leaves routing unchanged 226ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > returns a decision when the original duration exceeds the int4 product
+{"step":"long-duration","durationMs":2147483647,"latencyMs":1,"status":201,"action":"run"}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > returns a decision when the original duration exceeds the int4 product 71ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > states drift from stored evidence and ignores later runs
+{"step":"drift","workloadMixChange":true,"limits":["insufficient_history","mixed_task_category"],"qualityDrift":true,"schemaValidityRegression":true,"latencyRegression":true,"reliabilityRegression":true,"modelVersionChanged":true,"priceVersionChanged":true,"newModelDeployed":true,"historicalQualityDrift":null}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > states drift from stored evidence and ignores later runs 232ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > ignores a validator and a completion stored after asOf
+{"step":"drift-asof","comparable":true,"qualityDrift":false,"schemaValidityRegression":false}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > ignores a validator and a completion stored after asOf 57ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > schedules again when evidence is stale or quality has regressed 70ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a tenant run before dispatch
+{"step":"cancel-latency-ms","cancelMs":28.849041999999827}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not repeat a provider call after a crash once the call has left the worker 117ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a tenant run before dispatch 80ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a run that exceeds its schedule duration 100ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not call a provider when the database is down 31ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > measures scheduler and replay cost on a synthetic workload
+{"step":"PERF","evaluationThroughputPerSecond":26.253692409547572,"evaluationBacklog":8,"workerMemory":{"heapUsed":41591992,"rss":221757440,"note":"heap and rss are the in-process test worker, which shares the vitest process"},"postgresqlContention":{"locksBefore":2,"waitingBefore":0,"locksAfter":6,"waitingAfter":0,"deadlocks":0},"budgetReservationOverheadMs":58.46087500000067,"schedulerOverheadMs":58.46087500000067,"productionInferenceLatencyMs":{"before":45.153416999999536,"after":44.60462500000085},"evaluationCostPerValidComparison":0.012,"reservedAmount":"0.080000000000","validPairs":8,"completedAttempts":8,"providerCalls":8,"judgeDisagreementRate":null,"judgeDisagreementReason":"the synthetic load does not call a judge","costPerValidComparisonReason":"evaluation expense divided by completed attempt pairs"}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > measures scheduler and replay cost on a synthetic workload 546ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-disabled","skipReason":"scheduler_disabled","runId":null}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-kill","status":200,"action":"skip","skipReason":"global_kill_switch","runId":null,"fresh":false}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-run","status":201,"action":"run","skipReason":null,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982","fresh":true}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-duplicate","status":200,"action":"run","skipReason":null,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982","fresh":false}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-worker-1","code":0,"calls":"1"}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-worker-2","code":0,"calls":"0"}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-read-1","state":"inconclusive","routingChange":false}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-read-2","state":"inconclusive","routingChange":false}
+
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route
+{"step":"launch-compare","sameState":true,"routingChange":false,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982"}
+
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route 1990ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not call a provider after expiry, revocation, or deletion 584ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+   Start at  16:25:31
+   Duration  11.13s (transform 212ms, setup 1ms, collect 413ms, tests 7.39s, environment 0ms, prepare 27ms)
+
+(node:66306) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

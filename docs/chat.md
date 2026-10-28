@@ -60,7 +60,7 @@ A success body has `object` set to `chat.completion`. `model` is the upstream mo
 
 The body includes `provider` when the upstream response names one. Stream frames do not include `provider`.
 
-The proxy does not store the prompt or the completion text.
+The chat response does not write the prompt or the completion as plaintext. Request characteristics omit both. Encrypted capture is off by default. When it is on, an approved chat is stored as ciphertext. A sample route returns metadata only. A schedule and a replay do not run on this path. See [Encrypted samples](metrics.md#encrypted-samples).
 
 Before the provider call, the proxy writes a request row and an attempt row. The two ids are different. The rows keep the deployment, the configuration version, the connection, the connection version, the status, the duration, the provider token counts, the provider response id, and the native stop or error reason. A stream also stores `stream_status`, the time to the first text, the chunk count, and the bytes written.
 

@@ -1,0 +1,10 @@
+model=auto with shadow ranking disabled, then the same request after the policy status is shadow.
+The executed deployment and the upstream model stay the same. Each chat adds one provider call.
+The enabled row stores the recommendation, the baseline, and the actual deployment as separate fields.
+Predicted savings stay an estimate.
+
+Disabled:
+EVIDENCE routing-unchanged {"phase":"disabled","deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"rankingStored":false,"simulateRoutingMode":"static"}
+
+Enabled:
+EVIDENCE routing-unchanged {"phase":"enabled","deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"recommendedDeployment":"rank-tiny","baselineDeployment":"rank-base","actualDeployment":"rank-base","savingsKind":"estimate"}

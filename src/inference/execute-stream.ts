@@ -25,6 +25,7 @@ import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
+import { observeShadowRank } from './shadow-rank-store.js';
 import {
   deadlineKindOf,
   decideRetry,
@@ -122,6 +123,7 @@ export async function runChatStream(input: {
   beforeSampleStore?: () => Promise<void> | void;
   beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
+  rankDeadlineMs?: number;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -190,6 +192,16 @@ export async function runChatStream(input: {
       input.logger.error('request persistence failed', { message: errorMessage(error) });
       throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
     }
+
+    await observeShadowRank({
+      pool: input.runtimePool,
+      logger: input.logger,
+      tenantId: input.tenantId,
+      requestId,
+      route: input.route,
+      request: input.request,
+      deadlineMs: input.rankDeadlineMs,
+    });
 
     const requestStarted = process.hrtime.bigint();
     const { policy, deadlinesActive } = policyFor(input.route);

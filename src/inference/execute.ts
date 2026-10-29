@@ -32,6 +32,7 @@ import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from '.
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
+import { observeShadowRank } from './shadow-rank-store.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
@@ -138,6 +139,7 @@ export async function executeChat(input: {
   beforeSampleStore?: () => Promise<void> | void;
   beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
+  rankDeadlineMs?: number;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   const session = { ...input, featureRequest: featureInputFromChat(request) };
@@ -185,6 +187,7 @@ export async function executeChat(input: {
       beforeSampleStore: input.beforeSampleStore,
       beforeSampleInsert: input.beforeSampleInsert,
       failSampleInsert: input.failSampleInsert,
+      rankDeadlineMs: input.rankDeadlineMs,
     });
     return undefined;
   }
@@ -220,6 +223,16 @@ export async function executeChat(input: {
     input.logger.error('request persistence failed', { message: errorMessage(error) });
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
+
+  await observeShadowRank({
+    pool: input.runtimePool,
+    logger: input.logger,
+    tenantId: input.tenantId,
+    requestId,
+    route,
+    request,
+    deadlineMs: input.rankDeadlineMs,
+  });
 
   const requestStarted = process.hrtime.bigint();
   const { policy, deadlinesActive } = policyFor(route);

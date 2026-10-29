@@ -69,6 +69,8 @@ import {
   validateRoutingPolicy,
 } from '../inference/routing-policy-store.js';
 import { parseEvidenceQuery, parseQualificationWrite, parseRefreshBody } from '../inference/qualification.js';
+import { readShadowMetrics, readShadowRanking, simulateShadowRank } from '../inference/shadow-rank-store.js';
+import { SHADOW_RANK_DEADLINE_MS } from '../inference/shadow-rank.js';
 import {
   createQualificationProfile,
   listEvidenceSnapshots,
@@ -119,6 +121,7 @@ export type AppDeps = {
   evaluationScheduleTenantIds?: readonly string[];
   evaluationGlobalKill?: boolean;
   scheduleNow?: () => Date;
+  rankDeadlineMs?: number;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -366,6 +369,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         beforeSampleStore: deps.beforeSampleStore,
         beforeSampleInsert: deps.beforeSampleInsert,
         failSampleInsert: deps.failSampleInsert,
+        rankDeadlineMs: deps.rankDeadlineMs,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -1322,6 +1326,72 @@ export function buildApp(deps: AppDeps): ProxyApp {
       return sendRoutingError(reply, error);
     }
   });
+
+  app.post(
+    '/internal/v1/routing/simulate',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      try {
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          simulateShadowRank(client, auth.tenantId, request.body, deps.rankDeadlineMs ?? SHADOW_RANK_DEADLINE_MS),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/shadow-metrics', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return {
+        savingsKind: 'estimate',
+        predictedSavings: '0.00000000',
+        predictedSavingsNote: 'estimate',
+        candidateCount: 0,
+        decisionFailures: 0,
+        decisions: 0,
+        cacheHits: 0,
+        cacheHitRate: null,
+      };
+    }
+    try {
+      return await withTenant(deps.runtimePool, auth.tenantId, (client) => readShadowMetrics(client));
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { requestId: string }; Querystring: { tenantId?: string } }>(
+    '/internal/v1/routing/shadow-rankings/:requestId',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The ranking was not found.').body());
+      }
+      try {
+        const requestId = parseDecisionRequestId(request.params.requestId);
+        const ranking = await withTenant(deps.runtimePool, auth.tenantId, (client) => readShadowRanking(client, requestId));
+        if (ranking === null) {
+          return reply
+            .code(404)
+            .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The ranking was not found.').body());
+        }
+        return ranking;
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });

@@ -97,6 +97,7 @@ describe('provider registry', () => {
       '025_evaluation_schedules.sql',
       '026_routing_policies.sql',
       '027_evidence_qualification.sql',
+      '028_shadow_ranking.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -144,6 +145,9 @@ describe('provider registry', () => {
     const evidenceQualification = readFileSync(join(projectRoot, 'migrations', '027_evidence_qualification.sql'), 'utf8');
     expect(evidenceQualification).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     expect(evidenceQualification).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const shadowRanking = readFileSync(join(projectRoot, 'migrations', '028_shadow_ranking.sql'), 'utf8');
+    expect(shadowRanking).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(shadowRanking).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

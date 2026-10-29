@@ -1,0 +1,9 @@
+Migration 028_shadow_ranking.sql is applied. The policy for tenant A is still draft, so shadow ranking is not enabled.
+model=auto uses rank-base. The upstream model is gpt-rank-base. The mock provider receives one call.
+The ranking read returns 404. Simulate returns routingMode static and reason no_shadow_policy, and it makes no provider call.
+
+Rollback leaves 028_shadow_ranking.sql applied. Do not delete that schema_migrations row. Leave every policy out of shadow, or move a shadow policy to disabled. model=auto stays on the alias baseline. Existing ranking rows stay.
+
+Source: test/shadow-routing.test.ts, before the policy status changes to shadow.
+
+EVIDENCE rollback {"migrationApplied":"028_shadow_ranking.sql","shadowEnabled":false,"deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1}

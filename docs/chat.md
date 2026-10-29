@@ -12,7 +12,7 @@ This page covers the whole path. See the [request path](architecture.md#request-
 
 `POST /v1/chat/completions` needs `model` and text `messages`.
 
-`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. It does not change the deployment or the response. An evidence snapshot does not change the deployment. See [Routing policy](operations.md#routing-policy) and [Evidence qualification](operations.md#evidence-qualification).
+`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. It does not change the deployment or the response. An evidence snapshot does not change the deployment. A shadow ranking can name a different deployment. The chat still uses the alias baseline. See [Routing policy](operations.md#routing-policy), [Evidence qualification](operations.md#evidence-qualification), and [Shadow ranking](operations.md#shadow-ranking).
 
 You can omit `stream`, or set it to `false`. `stream: true` works only when streaming is on for that tenant and that deployment. See [Streaming](streaming.md).
 

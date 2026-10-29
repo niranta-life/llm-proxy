@@ -102,21 +102,21 @@ flowchart TB
     class optimizer,infraPlanned planned
 ```
 
-Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. The router does not read it. None of them change production routing. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
+Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router still resolves `auto` to the alias baseline and does not execute that recommendation. None of them change production routing. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
 
 ### How a request flows
 
 1. **API + Authentication.** The caller sends `X-Tenant-ID` and a tenant secret. The proxy checks the secret against a scrypt verifier. From here, every database query runs as that tenant under PostgreSQL row-level security.
 2. **Request Normalization.** The body becomes one standard request format. The same JSON works for every provider.
 3. **Capability Validation.** Each deployment lists the fields it accepts, such as `temperature` or `stop`. The proxy refuses a field the deployment does not accept. It does not drop the field and continue.
-4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. An evidence snapshot records candidate quality for one task segment. The router does not read that snapshot. See [Routing policy](docs/operations.md#routing-policy) and [Evidence qualification](docs/operations.md#evidence-qualification).
+4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. An evidence snapshot records candidate quality for one task segment. When that policy is in shadow, a ranker can read the snapshot and record a recommendation, the baseline, and the deployment that executed. Those are separate fields. The router still resolves `auto` to the alias baseline. It does not execute the recommendation. See [Routing policy](docs/operations.md#routing-policy), [Evidence qualification](docs/operations.md#evidence-qualification), and [Shadow ranking](docs/operations.md#shadow-ranking).
 5. **Circuit breaker and limits.** An open circuit breaker rejects the attempt before any provider call. Then rate, concurrency, and budget limits are checked, and the proxy sets aside budget for this call.
 6. **Provider Adapters.** One adapter per provider family turns the canonical request into the provider's API and back into an OpenAI chat completion or a streamed response.
 7. **Retries + Failover.** Retry makes at most one more attempt on the same deployment, within one deadline. Fallback moves `auto` to one approved deployment, only before any output. A new attempt goes back to step 5.
 8. **Usage + Cost Tracking.** Each attempt is priced from prices that you registered. The budget reservation is settled.
 9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Each completed chat also stores one [request-characteristics](#request-characteristics) record, without the prompt or the answer. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
 
-Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. An evidence refresh is a separate offline call. They do not sit on this path, and they do not change the router.
+Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. An evidence refresh is a separate offline call. A shadow ranker can run after the route is chosen. It does not change the router and it does not call a provider.
 
 Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, and the trust boundaries.
 
@@ -132,7 +132,7 @@ An encrypted sample is a separate store. It is off by default. See [Encrypted sa
 
 ### Continuous Learning System
 
-The learning system uses your own traffic. History, pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule are in this release. Rankings are not.
+The learning system uses your own traffic. History, pinned replay, deterministic checks, a read-only report, an optional judge, a schedule, and a shadow ranking are in this release. The ranking does not change the deployment that executes.
 
 - **History** stores each completed chat as characteristics: the deployment, the latency, the cost, and the result. That record has no prompt. When you turn on encrypted capture, an approved chat is also stored as ciphertext. The default stores no content.
 - **Schedule** selects a bounded set of approved samples. It records why a run starts or why it skips. It does not call a model to choose the set. It reserves the estimate before a provider call. The scheduler is off until you name one tenant. It does not change aliases or production routing.
@@ -141,7 +141,7 @@ The learning system uses your own traffic. History, pinned replay, deterministic
 - **Report** reads one completed run. It states one recommendation. That recommendation does not change an alias or a fallback policy.
 - **Judge** compares the two outputs when a run pins an approved rubric. Judging is off until you name one tenant. The judge budget is at most 1 USD. A judge finding does not change routing.
 - **Drift** compares stored runs at or before a chosen time. A run counts only after it is completed by that time. Different populations are not pooled into one rate.
-- **Optimizer** is not in this release. The router does not choose a model by a quality score.
+- **Optimizer** is not in this release. A shadow ranker can record the lowest qualified expected cost for `auto`. That record is an estimate. The router does not execute it. The router does not choose a model by a quality score.
 
 Evaluation jobs stay in PostgreSQL. The schedule does not add Redis. See [Evaluation](docs/architecture.md#evaluation).
 
@@ -194,7 +194,7 @@ Summary of the market as of October 2026 (full table with sources in [Comparison
 | Envoy AI Gateway / Agent Router | Kubernetes | Not documented | Quota-aware routing | No |
 | TensorZero | Self-host | Not documented | Not documented | Yes, but archived June 2026 |
 | AWS Bedrock / Azure APIM | Managed in your cloud | Not documented | IAM or subscriptions | Bedrock prompt routing (one model family) |
-| **llm-proxy** | **Self-host, Postgres only** | **Never after the first byte** | **Database row-level security** | **Replay, checks, optional judge, and a schedule. No rankings.** |
+| **llm-proxy** | **Self-host, Postgres only** | **Never after the first byte** | **Database row-level security** | **Replay, checks, optional judge, a schedule, and a shadow ranking. The ranking is an estimate and does not change the route.** |
 
 Use a different gateway today if you need tools, images, audio, embeddings, MCP, an admin UI, SSO, or hundreds of models through one hosted key. llm-proxy does not include them yet.
 
@@ -323,6 +323,7 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Fallback](docs/fallback.md).** One more deployment for the alias `auto`, and only before any output. A named model never switches.
 - **[Routing policy](docs/operations.md#routing-policy).** An operator can store a policy for the alias `auto`. Shadow mode records the decision. It does not change which deployment runs. A named model stays on that model.
 - **[Evidence qualification](docs/operations.md#evidence-qualification).** An operator can store a qualification profile and refresh an immutable snapshot from completed evaluation runs. The snapshot names a status and the reason codes. Chat still uses the alias baseline.
+- **[Shadow ranking](docs/operations.md#shadow-ranking).** When a routing policy for `auto` is in shadow, the proxy records the lowest qualified expected cost. The figure is an estimate. The chat still uses the alias baseline.
 - **[Limits and budgets](docs/limits.md).** Shared caps on rate, concurrency, and monthly spend. Start in observation mode.
 - **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
@@ -336,7 +337,7 @@ Compose database passwords are for local development. The proxy listens without 
 
 ## Roadmap
 
-- **Rankings.** Rank deployments per task. The router may use a ranking for `auto` only, inside the same policy checks as fallback. A named model still never switches. A judge finding does not change that route today.
+- **Active ranking.** A shadow ranker already records an estimate for `auto`. A later release may execute that ranking for `auto` only, inside the same policy checks as fallback. A named model still never switches.
 - **Redis** for hot counters. Evaluation jobs already use PostgreSQL.
 - **External secret manager** support for provider keys.
 - **A verified live call to a private endpoint** (DGX), so it can be `validated_live`.

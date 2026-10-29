@@ -116,6 +116,7 @@ export async function createTestApp(
     evaluationScheduleTenantIds?: readonly string[];
     evaluationGlobalKill?: boolean;
     scheduleNow?: () => Date;
+    rankDeadlineMs?: number;
   } = {},
 ) {
   const config = configFor(db);
@@ -149,6 +150,7 @@ export async function createTestApp(
     evaluationScheduleTenantIds: options.evaluationScheduleTenantIds,
     evaluationGlobalKill: options.evaluationGlobalKill,
     scheduleNow: options.scheduleNow,
+    rankDeadlineMs: options.rankDeadlineMs,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

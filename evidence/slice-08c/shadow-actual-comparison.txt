@@ -1,0 +1,7 @@
+One shadow model=auto chat after the policy status is shadow.
+The recommendation, the baseline, and the actual deployment are separate fields.
+The chat executes rank-base. The upstream model is gpt-rank-base. The mock provider receives one call.
+Predicted savings stay an estimate.
+Source: test/shadow-routing.test.ts.
+
+EVIDENCE comparison {"recommendedDeployment":"rank-tiny","baselineDeployment":"rank-base","actualDeployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"savingsKind":"estimate","estimatedSavings":"0.21875000","policyVersionId":"d36fcbd8-5d39-406e-96f8-0438f138c211","evidenceSnapshotIds":["1dc7d7b8-7360-456a-a5a6-5b26a83cff87","00f3a32e-1e7f-4b52-af7d-d64cacd611b2","119c4af7-8f2b-4a27-82de-56a586d80bf5","71d7f380-3899-40d4-b4af-231f38ea8762","eabf2e58-7f83-4a63-b773-b94384d2f2ab","8134e0bb-b95f-4b18-8709-ff4a94b4558c","66f3c477-f5fe-4241-9904-aba0208f4472"]}

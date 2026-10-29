@@ -1,0 +1,19 @@
+Forty calls of the shipped rankShadow function on the eight-candidate fixture.
+The samples are sorted. The percentile index is ceil(p/100*n)-1.
+The first call misses the cache. The next 39 calls hit it.
+providerCallsDuringRank is the mock provider count during those 40 calls.
+addedInferenceOverheadMs is the stored computation_ms of one shadow model=auto chat.
+providerCallsDuringShadowChat is the provider count for that chat.
+Source: test/shadow-routing.test.ts.
+
+EVIDENCE performance {"samples":[0.01,0.01,0.01,0.01,0.01,0.011,0.011,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.013,0.013,0.013,0.013,0.013,0.013,0.013,0.014,0.014,0.014,0.014,0.015,0.015,0.015,0.015,0.016,0.016,0.017,0.017,0.017,0.018,0.018,0.077],"percentileMethod":"ceil","p50Ms":0.013,"p95Ms":0.018,"p99Ms":0.077,"candidateCount":8,"cacheHits":39,"cacheHitRate":"0.97500","decisionFailures":0,"addedInferenceOverheadMs":2,"providerCallsDuringRank":0,"providerCallsDuringShadowChat":1}
+
+P50: 0.013 ms
+P95: 0.018 ms
+P99: 0.077 ms
+Candidate count: 8
+Cache hit rate: 0.97500
+Decision failures: 0
+Added inference overhead: 2 ms
+Provider calls during the rank loop: 0
+Provider calls during the shadow chat: 1

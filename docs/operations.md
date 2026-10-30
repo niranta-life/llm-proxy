@@ -159,7 +159,13 @@ These changes affect one tenant, or one deployment, and do not call the provider
 - If cleanup stops after the delete is committed, the job stays `running` until its lock time. Set `locked_until` in the past for that idempotency key, then run `cleanup-expired-samples` again. The second run deletes nothing that was already audited. Two cleanup commands for the same tenant in the same minute share one job key. One of them claims the job. The expired rows are deleted once.
 - A proxy process can stop after a sample is stored. Another process that uses the same database still serves chat and still sees that sample. `SIGKILL` does not roll the sample back.
 - A hard check that cannot take the admission lock returns HTTP 503 `admission_unavailable` and does not call the provider. The database stays in place. A later chat uses it again. Do not drop the database to clear that error.
+- When the database rejects new connections, readiness returns HTTP 503 and the database field is `unavailable`. A chat returns HTTP 500 `internal_error` and does not call the provider. The response names no deployment. After the database accepts connections, the next `model=auto` request uses that tenant's stored policy.
 - Disable one deployment with `set-deployment-enabled`, `--name`, and `--enabled false`. The next request for that name returns `model_not_found`.
+- Roll back one canary with `POST /internal/v1/routing/rollouts/{id}/rollback`. Send `expectedEpoch` and an idempotency key. `routing:admin` is required. New `model=auto` traffic uses the stored rollback deployment. A named model stays on that model.
+- Stop one rollout at once with `POST /internal/v1/routing/rollouts/{id}/stop`. That stop stores `manual` and writes no violation.
+- Read one decision on `GET /internal/v1/routing/decisions/{requestId}`. Read shadow metrics on `GET /internal/v1/routing/shadow-metrics`. A shadow savings figure is an estimate. `GET /internal/v1/metrics/summary` does not store a routing P99.
+- The guardrail worker log includes `detectionMs` and `rollbackMs` for that pass.
+- Two or more proxy processes can share one database. Give each process the same `PROVIDER_CREDENTIAL_KEY`. Do not start the guardrail worker or the promotion worker inside the proxy process. Run them as separate processes only when you want those checks.
 - Disable one breaker with `set-deployment-breaker`, `--deployment`, and `--enabled false`.
 - Reset one breaker with `reset-deployment-breaker` and `--deployment`. The next chat can reach the upstream.
 - Run `recover-budget` to close a finished attempt that still holds a reservation. A second run does not settle it again. An uncertain charge stays provisional.
@@ -300,6 +306,8 @@ The activation epoch is stored in the database. A stop uses compare-and-swap on 
 
 A guardrail set is off until an operator attaches one to that rollout. `POST /internal/v1/routing/guardrails` attaches one set. `routing:admin` is required. The header `Idempotency-Key` is required. The body names `rolloutId`, `approvedSources`, and `rules`. One rollout has one set. The same key and the same body return the stored set. A second set for that rollout returns HTTP 409. Omitted rule fields use conservative defaults. The default minimum sample count is 30. The default observation window is 3600 seconds. The default feedback maturity is 300 seconds. The default missing-feedback fraction is 0.2. The default comparison margin is 0.05. A small sample does not stop the rollout. Immature feedback does not stop the rollout. Missing feedback is not success.
 
+Raise `minSamples` and `maturitySeconds` when a small sample would stop a healthy canary. Lower them only for a synthetic cohort. A threshold of 1 with `minSamples` 1 stops on the first error.
+
 `GET /internal/v1/routing/guardrails` reads the caller's sets. `routing:read` is required. `routing:admin` does not grant that read. A tenant filter that does not match the caller returns an empty list. Each set includes the rules, the cohort series, and any violation rows. The series keeps the assigned cohort and the executed deployment as separate fields. It reports assignments, executions, error rate, timeout rate, incomplete-stream rate, retry rate, fallback rate, P50 and P95 latency, cost per request, cost per completed request, schema-validation failures, trusted quality, evaluation quality, and feedback maturity. A provider success is not a task success. Error rate and timeout rate count a failure on the assigned cohort deployment. A later fallback that returns success does not clear that failure. Retry rate counts a same-deployment retry. A fallback attempt is not a retry.
 
 `POST /v1/feedback` stores one task result for one chat request. The route uses the same tenant authentication as chat. It does not require a routing grant. The body names `requestId`, `feedbackId`, `source`, `metric`, `result`, `validatorVersion`, and `timestamp`. `supersededFeedbackId` is optional. `metric` is `task_success`, `schema_valid`, or `correctness`. `result` is `pass`, `fail`, or `unknown`. The source must be listed on the guardrail set for that request's rollout. The same feedback id and the same body return the stored row. A different body for that id returns HTTP 409. A second result for the same request, metric, and source returns HTTP 409 unless it names the stored feedback id as superseded. Another tenant's request id returns HTTP 404. A prompt, a completion, or other model output is rejected. The stored row has no prompt and no model output.
@@ -330,7 +338,7 @@ The call stores a new promotion row and one audit event. It does not change the 
 
 When selection is on, `model=auto` in that task segment and inside the stage share uses qualified evidence. The router selects the lowest expected cost that meets the latency limit and the quality threshold. Admission still applies. The response is that model's completion. The same routing key stays on that deployment for later turns of that promotion. A request outside the share stays on the alias baseline. Another task segment stays on the alias baseline. A named deployment stays on that deployment.
 
-When no qualified candidate remains, the router uses the approved baseline when that baseline is permitted. Otherwise the chat returns HTTP 409 `baseline_unavailable`.
+Selection executes a candidate only when the newest snapshot for that task is qualified, fresh, and the profile model version and the deployment config version match the deployment. A pin that fails that check is not reused. The request uses the approved baseline when that baseline is permitted. Otherwise the chat returns HTTP 409 `baseline_unavailable`. A shadow rank can still name the previous model. That rank does not execute it. Change the upstream model or the deployment config only after a new qualified snapshot is the newest snapshot.
 
 A new evidence snapshot proposes a new policy version only when the candidate, the model or config version, the quality, the cost, or the latency changed. The recorded gate uses the live cohort, the budget, the provider policy, and open incidents. An unchanged snapshot does not create a proposal. The proposal does not change the serving promotion. Send `{ "proposalId": "..." }` on the promote route to reject an open proposal. Approval is a later manual promotion of a qualified rollout.
 
@@ -395,7 +403,7 @@ npm test
 - Production control of a database role password or a provider key.
 - A payment for use.
 
-There is no Kubernetes manifest, no continuous-integration pipeline, and no install on a public server in this repository.
+Kubernetes manifests are under `deploy/gcp/k8s`. They are not applied by the tests and they are not a verified cluster install. There is no continuous-integration pipeline and no install on a public server in this repository.
 
 ## Related
 

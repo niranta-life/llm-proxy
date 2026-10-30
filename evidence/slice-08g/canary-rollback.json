@@ -1,0 +1,14 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "selfPromote": 400,
+  "concurrentRollback": [200, 409],
+  "propagationMs": 60.103290999999444,
+  "restoredDeployment": "h08g-base",
+  "forcedDeployment": "h08g-poor",
+  "detectionMs": 11.629000000000815,
+  "rollbackMs": 3.705832999999984,
+  "stops": 1,
+  "guardAfter": "h08g-base",
+  "cohortsBeforePromotion": {"baseline": 2, "canary": 2}
+}

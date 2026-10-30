@@ -1,0 +1,8 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "applied": "031_routing_promotions.sql",
+  "expected": "031_routing_promotions.sql",
+  "editedMigrations": "none",
+  "droppedObjects": "none"
+}

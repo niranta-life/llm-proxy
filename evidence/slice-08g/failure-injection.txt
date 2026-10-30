@@ -1,0 +1,4 @@
+SECTION failure-injection
+DATABASE_OUTAGE ready=503 status=500 code=internal_error hits=0 deployment= restored=h08g-beta
+SECTION failure-injection {"partialStatus":"failed","timeout":504,"outageAttempts":1,"circuit":"circuit_open","budget":"budget_exceeded","fallback":"h08g-base","forced":"h08g-poor","streamCapacity":503,"activeStreams":1,"activeStreamsAfter":0,"budgetReadStatus":503,"budgetReadCode":"admission_unavailable","budgetReadHits":0,"invalidEvidenceDeployment":"h08g-tie","staleActivation":"stale_activation","workerCrashDeployment":"h08g-quality","workerCrashServing":1,"concurrentDeployment":"h08g-tie","lostPermissionDeployment":"h08g-base","databaseOutageStatus":500,"databaseOutageCode":"internal_error","databaseOutageHits":0,"databaseOutageRestored":"h08g-beta"}
+EXIT:0

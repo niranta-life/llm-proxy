@@ -1,0 +1,14 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "decisionOmitsPrompt": true,
+  "decisionOmitsEvaluationMarker": true,
+  "replicaLogsOmitPrompt": true,
+  "replicaLogsOmitCredential": true,
+  "replicaLogsOmitEvaluationMarker": true,
+  "upstreamReplayMarkerHits": 0,
+  "setupSampleHits": 1,
+  "shadowReasons": ["lowest_qualified_cost", "latency_tie_break"],
+  "selectionStaysOnNamedModel": "h08g-base",
+  "onlinePathReadsReplayText": false
+}

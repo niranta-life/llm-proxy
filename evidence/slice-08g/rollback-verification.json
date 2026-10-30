@@ -1,0 +1,13 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "promoteBodyThatPromotesCanary": 400,
+  "code": "promotion_rejected",
+  "concurrentStatuses": [400, 200, 409],
+  "rolloutStatus": "stopped",
+  "newAutoDeployment": "h08g-base",
+  "forcedDeployment": "h08g-poor",
+  "guardrailStops": 1,
+  "afterGuardrail": "h08g-base",
+  "propagationMs": 60.103290999999444
+}

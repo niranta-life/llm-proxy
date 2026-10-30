@@ -1,0 +1,3 @@
+SECTION multi-replica
+SECTION launch {"deployment":["h08g-quality","h08g-quality"],"repeated":["h08g-quality","h08g-quality"],"foreign":[401,401],"restartedPid":94834,"restartedDeployment":"h08g-quality"}
+EXIT:0

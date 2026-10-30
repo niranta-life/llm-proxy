@@ -166,7 +166,7 @@ async function selectOnClient(
   const recommended = await recommendPolicy(client, tenantId, policy, request, live);
   const chosenId = recommended.outcome.failureReason === null ? recommended.outcome.recommendedDeploymentId : null;
   const chosen = chosenId === null ? undefined : deployments.find((item) => item.id === chosenId);
-  if (chosen !== undefined) {
+  if (chosen !== undefined && (await assignmentQualified(client, chosen.id, features.taskCategory))) {
     const selected = routeForDeployment(route.requestedModel, chosen, true, route.fallbackPolicy ?? null);
     const cost = recommended.expectedCost === null ? null : recommended.expectedCost.toFixed(8);
     if (digest !== null) await rememberPin(client, tenantId, serving.id, digest, chosen.id);
@@ -224,6 +224,11 @@ async function readPin(
   if (deployment === undefined || !deployment.enabled || !deployment.connectionEnabled || deployment.validationStatus !== 'validated_live') {
     return null;
   }
+  if (!(await assignmentQualified(client, deploymentId, taskSegment))) return null;
+  return { route: routeForDeployment(route.requestedModel, deployment, true, route.fallbackPolicy ?? null), expectedCost: null };
+}
+
+async function assignmentQualified(client: PoolClient, deploymentId: string, taskSegment: string): Promise<boolean> {
   const evidence = await client.query<{ status: string; fresh: boolean; model_ok: boolean; config_ok: boolean }>(
     `SELECT assessment.status,
             (snapshot.created_at + make_interval(secs => profile.freshness_seconds) > statement_timestamp()) AS fresh,
@@ -240,10 +245,7 @@ async function readPin(
     [deploymentId, taskSegment],
   );
   const newest = evidence.rows[0];
-  if (newest === undefined || newest.status !== 'qualified' || newest.fresh !== true || newest.model_ok !== true || newest.config_ok !== true) {
-    return null;
-  }
-  return { route: routeForDeployment(route.requestedModel, deployment, true, route.fallbackPolicy ?? null), expectedCost: null };
+  return newest !== undefined && newest.status === 'qualified' && newest.fresh === true && newest.model_ok === true && newest.config_ok === true;
 }
 
 async function rememberPin(

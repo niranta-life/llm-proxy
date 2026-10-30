@@ -1,0 +1,19 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "modelDrift": "baseline_fallback",
+  "configDrift": "fresh_config_version",
+  "agedDeployment": "h08g-tie",
+  "agedReason": "evidence_stale",
+  "regressedDeployment": "h08g-tie",
+  "evidenceRefresh": 201,
+  "residency": "baseline_unavailable",
+  "residencyRegion": "europe-west1",
+  "foreignPromotions": 0,
+  "foreignPinRejected": true,
+  "auditRejectsRewrite": true,
+  "migration": "031_routing_promotions.sql",
+  "plainKeyPromote": 403,
+  "imageCommand": "node dist/index.js",
+  "imageStartsWorkers": false
+}

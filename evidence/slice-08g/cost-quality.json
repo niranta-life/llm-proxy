@@ -1,0 +1,31 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "winner": "h08g-quality",
+  "reasons": ["lowest_qualified_cost", "latency_tie_break"],
+  "candidateCount": 8,
+  "ninthPolicy": 400,
+  "excluded": {
+    "h08g-poor": "quality_failed",
+    "h08g-stale": "evidence_stale",
+    "h08g-slow": "latency_exceeded",
+    "h08g-thin": "quality_failed",
+    "h08g-gap": "quality_failed",
+    "h08g-wide": "quality_failed"
+  },
+  "gapReason": "request_distribution_gap",
+  "judgeDisagreement": "unstable_judge",
+  "modelVersionChange": "fresh_model_version",
+  "evidenceExpiration": {"deployment": "h08g-tie", "reason": "evidence_stale"},
+  "qualityRegression": "h08g-tie",
+  "policyRefresh": 201,
+  "savingsKind": "estimate",
+  "estimatedSavings": null,
+  "storedAttemptCosts": {
+    "h08g-base": {"amount": "0.75", "count": 5, "unit": "0.15"},
+    "h08g-quality": {"amount": "1.56", "count": 26, "unit": "0.06"}
+  },
+  "realizedSavingsPerSuccess": 0.09,
+  "realizedSavingsLabel": "difference of stored attempt_costs unit amounts for h08g-base and h08g-quality",
+  "predictedSavingsLabel": "not realized"
+}

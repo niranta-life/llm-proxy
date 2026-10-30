@@ -354,7 +354,10 @@ export async function listSamples(
 ): Promise<{ samples: StoredSample[]; nextCursor: string | null }> {
   if (query.cursor !== null) {
     const found = await client.query(
-      `SELECT 1 FROM request_samples WHERE id = $1 AND request_sample_visible(expires_at, tenant_id)`,
+      `SELECT 1 FROM request_samples
+       WHERE id = $1
+         AND deletion_hold IS FALSE
+         AND request_sample_visible(expires_at, tenant_id)`,
       [query.cursor],
     );
     if ((found.rowCount ?? 0) === 0) throw invalidRequest('cursor', 'invalid_parameter', 'cursor is invalid.');
@@ -362,7 +365,8 @@ export async function listSamples(
   const result = await client.query<SampleMetaRow>(
     `SELECT ${META_COLUMNS}
      FROM request_samples
-     WHERE request_sample_visible(expires_at, tenant_id)
+     WHERE deletion_hold IS FALSE
+       AND request_sample_visible(expires_at, tenant_id)
        AND ($1::text IS NULL OR provider = $1)
        AND (
          $2::uuid IS NULL
@@ -385,6 +389,7 @@ export async function readSample(client: PoolClient, sampleId: string): Promise<
     `SELECT ${META_COLUMNS}
      FROM request_samples
      WHERE id = $1
+       AND deletion_hold IS FALSE
        AND request_sample_visible(expires_at, tenant_id)`,
     [sampleId],
   );

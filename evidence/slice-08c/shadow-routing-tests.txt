@@ -1,0 +1,75 @@
+(node:72269) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72303) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:72328) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/shadow-routing.test.ts > shadow rank fixtures > selects the lowest qualified cost
+EVIDENCE ranking-fixture {"winner":"rank-tiny","baseline":"rank-base","savings":"0.21875000","savingsKind":"estimate","eligibleCount":3,"candidateCount":8,"reasonCodes":["lowest_qualified_cost"]}
+
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > selects the lowest qualified cost 1ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes a cheap but poor-quality model 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes a fast but unauthorized model 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes a candidate with missing cost 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes a candidate whose required capability is absent 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > keeps a small context limit when the output bound is 1 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes a candidate whose context limit is exceeded 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > excludes stale evidence 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > reports an unmatched task 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > reports unknown complexity before candidate checks 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > falls back to the baseline when no candidate is eligible 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > uses lower latency to break an equal cost 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > ignores a ninth candidate beyond the cap 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > times out without caching the failure 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > ranks again when the same snapshot passes its freshness window 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > ranks again when the winning deployment is disabled 0ms
+ ✓ test/shadow-routing.test.ts > shadow rank fixtures > repeats the same recommendation for an immutable evidence version 0ms
+stdout | test/shadow-routing.test.ts > shadow routing > leaves model=auto on the alias baseline while shadow ranking is disabled
+EVIDENCE routing-unchanged {"phase":"disabled","deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"rankingStored":false,"simulateRoutingMode":"static"}
+EVIDENCE rollback {"migrationApplied":"028_shadow_ranking.sql","shadowEnabled":false,"deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1}
+
+ ✓ test/shadow-routing.test.ts > shadow routing > leaves model=auto on the alias baseline while shadow ranking is disabled 92ms
+stdout | test/shadow-routing.test.ts > shadow routing > selects the lowest qualified cost and still executes the baseline
+EVIDENCE simulation {"requestId":null,"policyVersionId":"d36fcbd8-5d39-406e-96f8-0438f138c211","evidenceSnapshotIds":["1dc7d7b8-7360-456a-a5a6-5b26a83cff87","00f3a32e-1e7f-4b52-af7d-d64cacd611b2","119c4af7-8f2b-4a27-82de-56a586d80bf5","71d7f380-3899-40d4-b4af-231f38ea8762","eabf2e58-7f83-4a63-b773-b94384d2f2ab","8134e0bb-b95f-4b18-8709-ff4a94b4558c","66f3c477-f5fe-4241-9904-aba0208f4472"],"baselineDeployment":"rank-base","recommendedDeployment":"rank-tiny","actualDeployment":null,"routingMode":"shadow","reasonCodes":["lowest_qualified_cost"],"exclusions":[{"deployment":"rank-poor","reason":"quality_failed"},{"deployment":"rank-fast","reason":"unauthorized"},{"deployment":"rank-nocost","reason":"cost_unknown"},{"deployment":"rank-blind","reason":"capability_absent"},{"deployment":"rank-stale","reason":"evidence_stale"}],"failureReason":null,"savingsKind":"estimate","estimatedSavings":"0.21875000","candidateCount":8,"eligibleCount":3,"cacheHit":false,"computationMs":4,"featureExtractorVersion":1}
+EVIDENCE comparison {"recommendedDeployment":"rank-tiny","baselineDeployment":"rank-base","actualDeployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"savingsKind":"estimate","estimatedSavings":"0.21875000","policyVersionId":"d36fcbd8-5d39-406e-96f8-0438f138c211","evidenceSnapshotIds":["1dc7d7b8-7360-456a-a5a6-5b26a83cff87","00f3a32e-1e7f-4b52-af7d-d64cacd611b2","119c4af7-8f2b-4a27-82de-56a586d80bf5","71d7f380-3899-40d4-b4af-231f38ea8762","eabf2e58-7f83-4a63-b773-b94384d2f2ab","8134e0bb-b95f-4b18-8709-ff4a94b4558c","66f3c477-f5fe-4241-9904-aba0208f4472"]}
+EVIDENCE routing-unchanged {"phase":"enabled","deployment":"rank-base","upstreamModel":"gpt-rank-base","providerCalls":1,"recommendedDeployment":"rank-tiny","baselineDeployment":"rank-base","actualDeployment":"rank-base","savingsKind":"estimate"}
+EVIDENCE shadow-metrics {"savingsKind":"estimate","predictedSavings":"0.65625000","predictedSavingsNote":"estimate","candidateCount":24,"decisionFailures":0,"decisions":3,"cacheHits":2,"cacheHitRate":"0.66667"}
+
+ ✓ test/shadow-routing.test.ts > shadow routing > selects the lowest qualified cost and still executes the baseline 202ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes a cheap but poor-quality model on the simulate route 0ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes a fast but unauthorized model on the simulate route 0ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes missing cost on the simulate route 0ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes a missing required capability on the simulate route 0ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes a context limit that is exceeded on the simulate route 24ms
+ ✓ test/shadow-routing.test.ts > shadow routing > excludes stale evidence on the simulate route 0ms
+ ✓ test/shadow-routing.test.ts > shadow routing > reports an unmatched task and does not call a provider 24ms
+ ✓ test/shadow-routing.test.ts > shadow routing > reports unknown complexity and falls back to the baseline 24ms
+ ✓ test/shadow-routing.test.ts > shadow routing > bypasses a forced model and executes that deployment 92ms
+ ✓ test/shadow-routing.test.ts > shadow routing > records a ranking timeout and still executes the baseline 112ms
+ ✓ test/shadow-routing.test.ts > shadow routing > keeps a qualified snapshot that is older than newer snapshots for other segments 29ms
+ ✓ test/shadow-routing.test.ts > shadow routing > keeps a large candidate set inside the cap and ignores a cheaper outsider 26ms
+ ✓ test/shadow-routing.test.ts > shadow routing > ranks two tenants in parallel without mixing recommendations 31ms
+stdout | test/shadow-routing.test.ts > shadow routing > hides tenant A rankings from tenant B
+EVIDENCE isolation {"otherHttpStatus":404,"otherVisibleRows":0,"ownerVisibleRows":1,"otherPredictedSavings":"0.00000000","otherSavingsKind":"estimate"}
+
+ ✓ test/shadow-routing.test.ts > shadow routing > hides tenant A rankings from tenant B 71ms
+ ✓ test/shadow-routing.test.ts > shadow routing > keeps a streaming request on the baseline deployment 310ms
+ ✓ test/shadow-routing.test.ts > shadow routing > retries the baseline and does not call the recommended model 314ms
+stdout | test/shadow-routing.test.ts > shadow routing > measures ranking computation on the bounded candidate set
+EVIDENCE performance {"samples":[0.01,0.01,0.01,0.01,0.01,0.011,0.011,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.012,0.013,0.013,0.013,0.013,0.013,0.013,0.013,0.014,0.014,0.014,0.014,0.015,0.015,0.015,0.015,0.016,0.016,0.017,0.017,0.017,0.018,0.018,0.077],"percentileMethod":"ceil","p50Ms":0.013,"p95Ms":0.018,"p99Ms":0.077,"candidateCount":8,"cacheHits":39,"cacheHitRate":"0.97500","decisionFailures":0,"addedInferenceOverheadMs":2,"providerCallsDuringRank":0,"providerCallsDuringShadowChat":1}
+
+ ✓ test/shadow-routing.test.ts > shadow routing > falls back to the stored secondary and does not execute the recommendation 209ms
+ ✓ test/shadow-routing.test.ts > shadow routing > measures ranking computation on the bounded candidate set 1ms
+
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+   Start at  09:57:06
+   Duration  9.77s (transform 216ms, setup 1ms, collect 419ms, tests 5.98s, environment 0ms, prepare 28ms)
+
+(node:72408) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

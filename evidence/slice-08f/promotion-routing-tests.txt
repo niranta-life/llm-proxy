@@ -1,0 +1,51 @@
+(node:56341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56367) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:56396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/promotion-routing.test.ts > promotion gate contract > names every required gate and rejects the first failure 1ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects insufficient live canary coverage 209ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects unstable judge evidence 179ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a quality gate that is not passed 196ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a stale model version 224ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects old evidence after a deployment update 212ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a latency regression 330ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a cost improvement that is not established 438ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects promotion during rollback 218ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a new key that repeats the create epoch 374ms
+ ✓ test/promotion-routing.test.ts > governed promotion > promotes one qualified policy and advances only when the gates pass again 974ms
+ ✓ test/promotion-routing.test.ts > governed promotion > keeps a forced-model request on that deployment 370ms
+ ✓ test/promotion-routing.test.ts > governed promotion > keeps active selection off until the operator enables it 584ms
+ ✓ test/promotion-routing.test.ts > governed promotion > uses the baseline when no qualified candidate remains 362ms
+ ✓ test/promotion-routing.test.ts > governed promotion > returns baseline unavailable when the approved baseline is not permitted 332ms
+ ✓ test/promotion-routing.test.ts > governed promotion > routes another task segment to the baseline 366ms
+ ✓ test/promotion-routing.test.ts > governed promotion > keeps the same routing key on the selected deployment 400ms
+(node:56396) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+ ✓ test/promotion-routing.test.ts > governed promotion > does not move the pin when feedback arrives after promotion 505ms
+ ✓ test/promotion-routing.test.ts > governed promotion > drops a pin when newer evidence is no longer qualified 435ms
+ ✓ test/promotion-routing.test.ts > governed promotion > proposes a new candidate without changing the serving policy 791ms
+ ✓ test/promotion-routing.test.ts > governed promotion > does not invent a cost proposal when the candidate is unchanged 535ms
+ ✓ test/promotion-routing.test.ts > governed promotion > stores an open incident instead of a passing proposal 350ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a looser automatic margin that would hide a noninferiority failure 343ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a promotion conflict and a reused idempotency key 371ms
+ ✓ test/promotion-routing.test.ts > governed promotion > keeps one serving policy when two promotions race 348ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rolls back to the stored target after full activation 463ms
+ ✓ test/promotion-routing.test.ts > governed promotion > preserves the emergency stop 345ms
+ ✓ test/promotion-routing.test.ts > governed promotion > rejects a canary that asks to promote itself 182ms
+ ✓ test/promotion-routing.test.ts > governed promotion > isolates promotion to the owning tenant and stores no prompt 491ms
+ ✓ test/promotion-routing.test.ts > governed promotion > leaves automatic promotion off until the operator approves a candidate 547ms
+ ✓ test/promotion-routing.test.ts > governed promotion > keeps the proxy process and the image command free of the promotion worker 175ms
+
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+   Start at  04:30:05
+   Duration  18.32s (transform 252ms, setup 3ms, collect 474ms, tests 14.21s, environment 0ms, prepare 33ms)
+
+(node:56645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

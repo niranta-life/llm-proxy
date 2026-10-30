@@ -1,0 +1,10 @@
+Source: the same vitest run boots dist/index.js and dist/evaluation-worker.js. Lines are the stdout records from those boots.
+{"step":"launch-disabled","skipReason":"scheduler_disabled","runId":null}
+{"step":"launch-kill","status":200,"action":"skip","skipReason":"global_kill_switch","runId":null,"fresh":false}
+{"step":"launch-run","status":201,"action":"run","skipReason":null,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982","fresh":true}
+{"step":"launch-duplicate","status":200,"action":"run","skipReason":null,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982","fresh":false}
+{"step":"launch-worker-1","code":0,"calls":"1"}
+{"step":"launch-worker-2","code":0,"calls":"0"}
+{"step":"launch-read-1","state":"inconclusive","routingChange":false}
+{"step":"launch-read-2","state":"inconclusive","routingChange":false}
+{"step":"launch-compare","sameState":true,"routingChange":false,"runId":"2b9d5d3b-d31a-4402-b88d-58dc4140b982"}

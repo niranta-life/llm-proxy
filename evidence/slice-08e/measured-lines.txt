@@ -1,0 +1,14 @@
+These lines are copied from the full npm test transcript. The operations page uses the same figures.
+
+GUARDRAIL_FALSE_ROLLBACK 0
+GUARDRAIL_DETECTION_MS 11.351
+GUARDRAIL_ROLLBACK_MS 4.636
+GUARDRAIL_MONITOR_MS 4.910
+GUARDRAIL_MONITOR_ROWS 1
+GUARDRAIL_WORKER_HEAP_BYTES 56825088
+GUARDRAIL_LAST_CANARY guard-spare
+GUARDRAIL_NEXT_BASELINE gpt-guard-base
+GUARDRAIL_INFLIGHT stream stayed on gpt-guard-spare
+GUARDRAIL_PROPAGATION_MS 93
+
+The last canary assignment was the deployment guard-spare. The next request used the model gpt-guard-base. An open stream stayed on gpt-guard-spare. A second database session saw the stopped rollout within 93 milliseconds. The synthetic run inside the gates recorded 0 false stops. The worker heap was 56825088 bytes. The monitoring read scanned 1 assignment row in 4.910 milliseconds. Detection took 11.351 milliseconds. The stop completed in 4.636 milliseconds.

@@ -1,0 +1,220 @@
+{
+  "source": "routing-hardening.test.ts",
+  "labels": {
+    "routingCpu": "whole-process CPU from ps, not routing-only CPU",
+    "routingLatency": "nearest-rank percentile of stored computation_ms wall-clock rank time",
+    "addedLatency": "client wall time minus stored model_attempts.duration_ms for the same request",
+    "policyLookup": "client-observed GET policy time",
+    "activeStreams": "count of model_attempts with stream_status connecting or streaming",
+    "lockContention": "maximum ungranted pg_locks while delayed chats overlapped",
+    "predictedSavings": "shadow estimatedSavings stays an estimate"
+  },
+  "qualitySnapshot": "d509c0f4-2511-4285-91ce-62ec12cf9ce0",
+  "betaSnapshot": "a974a6be-3088-46b7-b2b0-336750ac5342",
+  "rank": {
+    "winner": "h08g-quality",
+    "reasons": [
+      "lowest_qualified_cost",
+      "latency_tie_break"
+    ],
+    "candidateCount": 8,
+    "ninthPolicy": 400,
+    "firstCacheHit": false,
+    "secondCacheHit": true,
+    "invalidSnapshotMiss": false,
+    "invalidWinner": "h08g-tie",
+    "restoredWinner": "h08g-quality",
+    "dropped": "b6fcea58-f988-4b37-a009-f5f800ccfe72",
+    "estimate": null,
+    "savingsKind": "estimate"
+  },
+  "promotion": {
+    "judgeRejected": "unstable_judge",
+    "serving": 1,
+    "activationEpoch": 2,
+    "stale": "stale_activation",
+    "cohorts": {
+      "baseline": 2,
+      "canary": 2
+    },
+    "forced": "h08g-base",
+    "foreignDecision": 404,
+    "plainPromote": 403,
+    "segment": "segment_mismatch",
+    "beta": "h08g-beta"
+  },
+  "replicas": {
+    "deployment": [
+      "h08g-quality",
+      "h08g-quality"
+    ],
+    "repeated": [
+      "h08g-quality",
+      "h08g-quality"
+    ],
+    "foreign": [
+      401,
+      401
+    ],
+    "restartedPid": 94834,
+    "restartedDeployment": "h08g-quality"
+  },
+  "performance": {
+    "routingCpuSeconds": 0.6199999999999999,
+    "routingCpuLabel": {
+      "routingCpu": "whole-process CPU from ps, not routing-only CPU",
+      "routingLatency": "nearest-rank percentile of stored computation_ms wall-clock rank time",
+      "addedLatency": "client wall time minus stored model_attempts.duration_ms for the same request",
+      "policyLookup": "client-observed GET policy time",
+      "activeStreams": "count of model_attempts with stream_status connecting or streaming",
+      "lockContention": "maximum ungranted pg_locks while delayed chats overlapped",
+      "predictedSavings": "shadow estimatedSavings stays an estimate"
+    },
+    "rssKb": [
+      156448,
+      156032,
+      158640
+    ],
+    "computationMs": {
+      "p50": 2,
+      "p95": 6,
+      "p99": 8,
+      "samples": 34
+    },
+    "clientChatMs": {
+      "p50": 74.19583300000158,
+      "samples": 12
+    },
+    "addedInferenceLatencyMs": {
+      "p50": 70.19583300000158,
+      "p95": 76.36962499999936,
+      "samples": 12
+    },
+    "evidenceCacheHits": 25,
+    "evidenceCacheDecisions": 34,
+    "evidenceCacheHitRate": 0.7352941176470589,
+    "policyLookupMs": 68.5590000000011,
+    "locksNotGranted": 0,
+    "lockSamples": 47,
+    "maxLocks": 127,
+    "deadlocksBefore": 0,
+    "deadlocksAfter": 0,
+    "throughputPerSecond": 13.300310391671147,
+    "successRate": 1,
+    "costByDeployment": {
+      "h08g-base": {
+        "amount": "0.75",
+        "count": 5
+      },
+      "h08g-quality": {
+        "amount": "1.56",
+        "count": 26
+      }
+    },
+    "realizedSavingsPerSuccess": 0.09,
+    "realizedSavingsLabel": "difference of stored attempt_costs unit amounts for h08g-base and h08g-quality",
+    "predictedSavingsLabel": "not realized",
+    "activeStreams": 1,
+    "activeStreamsAfter": 0
+  },
+  "execution": {
+    "partialStatus": "failed",
+    "timeout": 504,
+    "outageAttempts": 1,
+    "circuit": "circuit_open",
+    "budget": "budget_exceeded",
+    "fallback": "h08g-base",
+    "forced": "h08g-poor",
+    "streamCapacity": 503,
+    "activeStreams": 1,
+    "activeStreamsAfter": 0,
+    "budgetReadStatus": 503,
+    "budgetReadCode": "admission_unavailable",
+    "budgetReadHits": 0,
+    "invalidEvidenceDeployment": "h08g-tie",
+    "staleActivation": "stale_activation",
+    "workerCrashDeployment": "h08g-quality",
+    "workerCrashServing": 1,
+    "concurrentDeployment": "h08g-tie",
+    "lostPermissionDeployment": "h08g-base",
+    "databaseOutageStatus": 500,
+    "databaseOutageCode": "internal_error",
+    "databaseOutageHits": 0,
+    "databaseOutageRestored": "h08g-beta"
+  },
+  "security": {
+    "modelDrift": "baseline_fallback",
+    "configDrift": "fresh_config_version",
+    "aged": "h08g-tie",
+    "agedReason": "evidence_stale",
+    "regressed": "h08g-tie",
+    "refresh": 201,
+    "residency": "baseline_unavailable",
+    "foreignPromotions": 0,
+    "migration": "031_routing_promotions.sql"
+  },
+  "recovery": {
+    "propagationMs": 60.103290999999444,
+    "rollbackStatuses": [
+      400,
+      200,
+      409
+    ],
+    "restoredDeployment": "h08g-base",
+    "forcedDeployment": "h08g-poor",
+    "detectionMs": 11.629000000000815,
+    "rollbackMs": 3.705832999999984,
+    "stops": 1,
+    "guardAfter": "h08g-base"
+  },
+  "providers": [
+    {
+      "provider": "openai",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    },
+    {
+      "provider": "anthropic",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    },
+    {
+      "provider": "vertex",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    },
+    {
+      "provider": "xai",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    },
+    {
+      "provider": "openrouter",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    },
+    {
+      "provider": "dgx",
+      "json": 200,
+      "streamDone": 1,
+      "timeout": 504,
+      "down": 502,
+      "cancelDone": 0
+    }
+  ]
+}

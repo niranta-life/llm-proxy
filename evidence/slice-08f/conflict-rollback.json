@@ -1,0 +1,16 @@
+{
+  "duringRollback": "promotion_during_rollback",
+  "replay": 200,
+  "reused": "idempotency_conflict",
+  "stale": "stale_activation",
+  "serving": 1,
+  "concurrent": [
+    201,
+    409
+  ],
+  "rollback": {
+    "next": "promote-base",
+    "violations": 1,
+    "serving": 0
+  }
+}

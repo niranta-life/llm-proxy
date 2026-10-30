@@ -12,7 +12,9 @@ This page covers the whole path. See the [request path](architecture.md#request-
 
 `POST /v1/chat/completions` needs `model` and text `messages`.
 
-`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`.
+`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. An evidence snapshot does not by itself change the deployment. A shadow ranking can name a different deployment. The ranking is not executed. Without an active canary rollout and without enabled selection, the chat uses the alias baseline. An operator can activate a rollout that sends a bounded share of `auto` to one qualified challenger. A named deployment stays on that deployment. An attached guardrail can stop that rollout. A request that already started keeps its pinned deployment. New `auto` requests then use the alias baseline. The guardrail does not promote the challenger. An operator can promote the rollout and enable selection for one task segment. Selection stays off until that enablement. When it is on, `auto` in that segment selects the lowest expected cost that meets the policy limits. See [Routing policy](operations.md#routing-policy), [Evidence qualification](operations.md#evidence-qualification), [Shadow ranking](operations.md#shadow-ranking), [Canary routing](operations.md#canary-routing), and [Governed promotion](operations.md#governed-promotion).
+
+You can send `X-LLM-Routing-Key` on a chat. The proxy uses that opaque key when it assigns a canary cohort and when a promotion pins a selected deployment. The same key, tenant, alias, and policy version stay on the same cohort. The same key stays on the selected deployment while that promotion is serving and the evidence stays qualified. The proxy stores a digest of the key. It does not store the raw key. An invalid key is rejected. Omit the header and the proxy generates a request key.
 
 You can omit `stream`, or set it to `false`. `stream: true` works only when streaming is on for that tenant and that deployment. See [Streaming](streaming.md).
 
@@ -60,7 +62,7 @@ A success body has `object` set to `chat.completion`. `model` is the upstream mo
 
 The body includes `provider` when the upstream response names one. Stream frames do not include `provider`.
 
-The proxy does not store the prompt or the completion text.
+The chat response does not write the prompt or the completion as plaintext. Request characteristics omit both. Encrypted capture is off by default. When it is on, an approved chat is stored as ciphertext. A sample route returns metadata only. A schedule and a replay do not run on this path. See [Encrypted samples](metrics.md#encrypted-samples).
 
 Before the provider call, the proxy writes a request row and an attempt row. The two ids are different. The rows keep the deployment, the configuration version, the connection, the connection version, the status, the duration, the provider token counts, the provider response id, and the native stop or error reason. A stream also stores `stream_status`, the time to the first text, the chunk count, and the bytes written.
 

@@ -1,0 +1,9 @@
+A second Node process imported dist/inference/canary-assignment.js. That process does not share memory with the test. Both callers used the same tenant id, alias, policy version, routing key conversation-stable, and 5000 basis points. Both returned canary.
+
+A request with no routing key still receives a generated key. Two such requests at 10000 basis points both execute the challenger and store different digests. The raw key is not stored. The prompt is not hashed.
+
+A policy version change at 5000 basis points changed the cohort for at least one of 200 keys.
+
+Source: the full npm test transcript.
+
+CANARY_REPLICA canary

@@ -1,0 +1,12 @@
+{
+  "rolloutId": "b07d4ca7-9eb7-4d55-b02e-4846afb21fff",
+  "stopReason": "critical_errors",
+  "trigger": "operator",
+  "statuses": [
+    200,
+    409
+  ],
+  "alias": "guard-chat",
+  "emergencyStopReason": "manual",
+  "emergencyViolations": 0
+}

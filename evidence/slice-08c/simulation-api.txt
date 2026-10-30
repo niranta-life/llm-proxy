@@ -1,0 +1,12 @@
+POST /internal/v1/routing/simulate for model=auto.
+The mock provider received no call for this request.
+Savings kind is estimate. actualDeployment is null because simulate does not execute a chat.
+The recommendation is rank-tiny. Its context limit is 1 and the request has no max_tokens, so the output bound is 1.
+Source: test/shadow-routing.test.ts.
+
+EVIDENCE simulation {"requestId":null,"policyVersionId":"d36fcbd8-5d39-406e-96f8-0438f138c211","evidenceSnapshotIds":["1dc7d7b8-7360-456a-a5a6-5b26a83cff87","00f3a32e-1e7f-4b52-af7d-d64cacd611b2","119c4af7-8f2b-4a27-82de-56a586d80bf5","71d7f380-3899-40d4-b4af-231f38ea8762","eabf2e58-7f83-4a63-b773-b94384d2f2ab","8134e0bb-b95f-4b18-8709-ff4a94b4558c","66f3c477-f5fe-4241-9904-aba0208f4472"],"baselineDeployment":"rank-base","recommendedDeployment":"rank-tiny","actualDeployment":null,"routingMode":"shadow","reasonCodes":["lowest_qualified_cost"],"exclusions":[{"deployment":"rank-poor","reason":"quality_failed"},{"deployment":"rank-fast","reason":"unauthorized"},{"deployment":"rank-nocost","reason":"cost_unknown"},{"deployment":"rank-blind","reason":"capability_absent"},{"deployment":"rank-stale","reason":"evidence_stale"}],"failureReason":null,"savingsKind":"estimate","estimatedSavings":"0.21875000","candidateCount":8,"eligibleCount":3,"cacheHit":false,"computationMs":4,"featureExtractorVersion":1}
+
+GET /internal/v1/routing/shadow-metrics after two simulate rows and one shadow chat.
+predictedSavings is the sum of the estimates. It is not a ledger amount.
+
+EVIDENCE shadow-metrics {"savingsKind":"estimate","predictedSavings":"0.65625000","predictedSavingsNote":"estimate","candidateCount":24,"decisionFailures":0,"decisions":3,"cacheHits":2,"cacheHitRate":"0.66667"}

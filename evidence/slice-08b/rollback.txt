@@ -1,0 +1,15 @@
+Migration 027_evidence_qualification.sql is applied by the test harness before any test.
+The first model=auto chat in test/qualification.test.ts runs before any profile insert and before any evidence refresh.
+Refresh is not running for that call.
+
+Observed deployment: qual-chat
+Observed upstream model: gpt-baseline
+Provider calls added by that chat: 1
+Chat body contains no qualification status.
+
+The same test later stores a qualified snapshot. A second model=auto chat still uses qual-chat and gpt-baseline, and it adds one provider call. The refresh itself adds zero provider calls.
+
+Rollback leaves 027_evidence_qualification.sql applied. Do not call POST /internal/v1/routing/evidence/refresh. model=auto stays on the alias baseline.
+
+Source line from the qualification transcript:
+EVIDENCE routing-unchanged {"beforeDeployment":"qual-chat","afterDeployment":"qual-chat","upstreamModel":"gpt-baseline","providerCallsEach":1,"qualificationStatusInChat":false}

@@ -1,0 +1,7 @@
+Tenant B reads Tenant A's shadow ranking by request id.
+The HTTP status is 404. A runtime query as tenant B sees 0 rows for that request id.
+Tenant A sees 1 row. Tenant B metrics stay an estimate of 0.00000000.
+A parallel simulate returns rank-tiny for tenant A and baseline_fallback for tenant B.
+Source: test/shadow-routing.test.ts.
+
+EVIDENCE isolation {"otherHttpStatus":404,"otherVisibleRows":0,"ownerVisibleRows":1,"otherPredictedSavings":"0.00000000","otherSavingsKind":"estimate"}

@@ -94,6 +94,13 @@ describe('provider registry', () => {
       '022_evaluation_replay.sql',
       '023_evaluation_validators.sql',
       '024_evaluation_judgments.sql',
+      '025_evaluation_schedules.sql',
+      '026_routing_policies.sql',
+      '027_evidence_qualification.sql',
+      '028_shadow_ranking.sql',
+      '029_routing_rollouts.sql',
+      '030_routing_guardrails.sql',
+      '031_routing_promotions.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -132,6 +139,27 @@ describe('provider registry', () => {
     const evaluationJudgments = readFileSync(join(projectRoot, 'migrations', '024_evaluation_judgments.sql'), 'utf8');
     expect(evaluationJudgments).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     expect(evaluationJudgments).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const evaluationSchedules = readFileSync(join(projectRoot, 'migrations', '025_evaluation_schedules.sql'), 'utf8');
+    expect(evaluationSchedules).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(evaluationSchedules).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const routingPolicies = readFileSync(join(projectRoot, 'migrations', '026_routing_policies.sql'), 'utf8');
+    expect(routingPolicies).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(routingPolicies).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const evidenceQualification = readFileSync(join(projectRoot, 'migrations', '027_evidence_qualification.sql'), 'utf8');
+    expect(evidenceQualification).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(evidenceQualification).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const shadowRanking = readFileSync(join(projectRoot, 'migrations', '028_shadow_ranking.sql'), 'utf8');
+    expect(shadowRanking).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(shadowRanking).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const routingRollouts = readFileSync(join(projectRoot, 'migrations', '029_routing_rollouts.sql'), 'utf8');
+    expect(routingRollouts).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(routingRollouts).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const routingGuardrails = readFileSync(join(projectRoot, 'migrations', '030_routing_guardrails.sql'), 'utf8');
+    expect(routingGuardrails).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(routingGuardrails).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const routingPromotions = readFileSync(join(projectRoot, 'migrations', '031_routing_promotions.sql'), 'utf8');
+    expect(routingPromotions).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(routingPromotions).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');

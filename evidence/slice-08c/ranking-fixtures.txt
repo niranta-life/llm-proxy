@@ -1,0 +1,33 @@
+Synthetic rank inputs and the shipped rankShadow result.
+Expected winner, baseline, and savings are literals. The test does not ask the ranker to mint the expected winner.
+The output bound is 1. rank-tiny has context limit 1 and cost 0.03125. It stays eligible and beats rank-cheap.
+Source: test/shadow-routing.test.ts. Transcript: shadow-routing-tests.txt.
+
+Winner: rank-tiny
+Baseline: rank-base
+Estimated savings: 0.21875000
+Savings kind: estimate
+Eligible count: 3
+Candidate count: 8
+Reason codes: lowest_qualified_cost
+
+Exclusions from the same inputs:
+- rank-poor: quality_failed
+- rank-fast: unauthorized
+- rank-nocost: cost_unknown
+- rank-blind: capability_absent
+- rank-stale: evidence_stale
+
+A context limit of 128 with output bound 1 and an input token estimate of 200 stays eligible.
+max_tokens 2 against context limit 1 returns context_exceeded.
+rank-ninth is a ninth candidate with a lower cost. The ranker ignores it. candidateCount stays 8.
+An equal cost of 0.5 selects the lower latency and adds latency_tie_break.
+An unmatched task returns task_unmatched.
+Unknown complexity returns unknown_complexity.
+No eligible candidate returns baseline_fallback.
+A deadline that expires returns ranking_timeout and does not cache that failure.
+A snapshot that is fresh at createdAt plus 1 second is evidence_stale at createdAt plus 120 seconds. The second call does not clear the cache first.
+A deployment disabled after the first rank is unauthorized. The second call does not clear the cache first.
+A second read of the same evidence version, the same authorization, and the same freshness result returns the same recommendation and cacheHit true.
+
+EVIDENCE ranking-fixture {"winner":"rank-tiny","baseline":"rank-base","savings":"0.21875000","savingsKind":"estimate","eligibleCount":3,"candidateCount":8,"reasonCodes":["lowest_qualified_cost"]}

@@ -24,6 +24,10 @@ import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
+import { recordSelection, type SelectionPlan } from './promotion-select.js';
+import { recordRoutingDecision } from './routing-policy-store.js';
+import { recordCanaryAssignment, reconcileCanary, type CanaryPlan } from './canary-rollout.js';
+import { observeShadowRank } from './shadow-rank-store.js';
 import {
   deadlineKindOf,
   decideRetry,
@@ -121,6 +125,9 @@ export async function runChatStream(input: {
   beforeSampleStore?: () => Promise<void> | void;
   beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
+  rankDeadlineMs?: number;
+  plan: CanaryPlan;
+  selection: SelectionPlan;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -174,6 +181,9 @@ export async function runChatStream(input: {
       const store = input.store;
       const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
         const pending = await insertPending(client, input.tenantId, input.route);
+        await recordRoutingDecision(client, input.tenantId, pending.requestId, input.route);
+        await recordSelection(client, input.tenantId, pending.requestId, input.selection);
+        await recordCanaryAssignment(client, input.tenantId, pending.requestId, input.plan);
         return {
           requestId: pending.requestId,
           attemptId: pending.attemptId,
@@ -188,6 +198,16 @@ export async function runChatStream(input: {
       input.logger.error('request persistence failed', { message: errorMessage(error) });
       throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
     }
+
+    await observeShadowRank({
+      pool: input.runtimePool,
+      logger: input.logger,
+      tenantId: input.tenantId,
+      requestId,
+      route: input.route,
+      request: input.request,
+      deadlineMs: input.rankDeadlineMs,
+    });
 
     const requestStarted = process.hrtime.bigint();
     const { policy, deadlinesActive } = policyFor(input.route);
@@ -636,13 +656,16 @@ export async function runChatStream(input: {
       total.cancel();
     }
   } finally {
-    if (requestId !== '' && !opened && !input.reply.headersSent()) {
-      stampProxyOutcome(input.reply, {
-        requestId,
-        deployment: input.route.deploymentName,
-        attemptCount: ordinal,
-        fallback: fellBack,
-      });
+    if (requestId !== '') {
+      if (!opened && !input.reply.headersSent()) {
+        stampProxyOutcome(input.reply, {
+          requestId,
+          deployment: input.route.deploymentName,
+          attemptCount: ordinal,
+          fallback: fellBack,
+        });
+      }
+      await reconcileCanary(input.runtimePool, input.logger, input.tenantId, requestId);
     }
     apiKey = '';
     untrack();

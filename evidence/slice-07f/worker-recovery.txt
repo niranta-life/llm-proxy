@@ -1,0 +1,8 @@
+Extracted from the passing scheduler-tests.txt run.
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not repeat a provider call after a crash once the call has left the worker 117ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a tenant run before dispatch
+{"step":"cancel-latency-ms","cancelMs":28.849041999999827}
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a tenant run before dispatch 80ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > cancels a run that exceeds its schedule duration 100ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not call a provider when the database is down 31ms
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > boots the API and the worker twice and does not change a route 1990ms

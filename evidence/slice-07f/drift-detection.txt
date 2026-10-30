@@ -1,0 +1,7 @@
+Extracted from the passing scheduler-tests.txt run. Node v24.22.1.
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > states drift from stored evidence and ignores later runs
+{"step":"drift","workloadMixChange":true,"limits":["insufficient_history","mixed_task_category"],"qualityDrift":true,"schemaValidityRegression":true,"latencyRegression":true,"reliabilityRegression":true,"modelVersionChanged":true,"priceVersionChanged":true,"newModelDeployed":true,"historicalQualityDrift":null}
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > states drift from stored evidence and ignores later runs 232ms
+stdout | test/evaluations-schedule.test.ts > continuous evaluation schedules > ignores a validator and a completion stored after asOf
+{"step":"drift-asof","comparable":true,"qualityDrift":false,"schemaValidityRegression":false}
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > ignores a validator and a completion stored after asOf 57ms

@@ -1,0 +1,27 @@
+{
+  "createEpoch": {
+    "submitted": 1,
+    "stored": 2,
+    "retry": "stale_activation",
+    "basisPoints": 100
+  },
+  "first": {
+    "basisPoints": 200,
+    "stageIndex": 1,
+    "actor": "operator"
+  },
+  "afterWait": {
+    "basisPoints": 200
+  },
+  "advanced": {
+    "basisPoints": 800,
+    "stageIndex": 2
+  },
+  "policyVersionUnchanged": true,
+  "automatic": {
+    "actor": "automatic",
+    "basisPoints": 100,
+    "selectionEnabled": false,
+    "secondPass": 0
+  }
+}

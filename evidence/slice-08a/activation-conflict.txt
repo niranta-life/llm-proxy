@@ -1,0 +1,2 @@
+Captured HTTP 409 from POST /internal/v1/routing/policies/{id}/status when a second policy for alias auto moved to shadow.
+{"error":{"message":"Another policy is already in shadow.","type":"invalid_request_error","param":"status","code":"activation_conflict"}}

@@ -1,0 +1,34 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "result": "7 passed",
+  "durationSeconds": 50.03,
+  "exit": 0,
+  "chat": {
+    "selectedModel": "gpt-h08g-quality",
+    "selectedDeployment": "h08g-quality",
+    "decisionContainsPrompt": false,
+    "forcedDeployment": "h08g-base",
+    "forcedRoutingMode": "bypass",
+    "otherSegment": "segment_mismatch",
+    "otherTenantDeployment": "h08g-beta"
+  },
+  "promotion": {
+    "judgeRejected": "unstable_judge",
+    "serving": 1,
+    "activationEpoch": 2,
+    "staleActivation": "stale_activation",
+    "concurrentStatuses": [201, 409],
+    "plainPromote": 403,
+    "foreignDecision": 404,
+    "foreignPolicy": 404,
+    "feedbackCreated": 201
+  },
+  "providers": [
+    {"provider": "openai", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0},
+    {"provider": "anthropic", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0},
+    {"provider": "vertex", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0},
+    {"provider": "xai", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0},
+    {"provider": "openrouter", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0},
+    {"provider": "dgx", "json": 200, "streamDone": 1, "timeout": 504, "down": 502, "cancelDone": 0, "host": "dgx.lab.internal"}
+  ]
+}

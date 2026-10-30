@@ -1,0 +1,18 @@
+{
+  "selected": {
+    "deployment": "promote-spare",
+    "reason": "selected",
+    "promptPresent": false
+  },
+  "held": {
+    "deployment": "promote-base"
+  },
+  "forced": {
+    "deployment": "promote-base",
+    "selection": null
+  },
+  "noCandidate": "baseline_fallback",
+  "baselineUnavailable": "baseline_unavailable",
+  "otherSegment": "segment_mismatch",
+  "invalidated": "baseline_fallback"
+}

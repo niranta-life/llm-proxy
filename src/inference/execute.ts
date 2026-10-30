@@ -31,6 +31,11 @@ import {
 import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
+import { recordSelection, selectPromoted } from './promotion-select.js';
+import { recordRoutingDecision } from './routing-policy-store.js';
+import { observeShadowRank } from './shadow-rank-store.js';
+import { pinCanary, recordCanaryAssignment, reconcileCanary } from './canary-rollout.js';
+import { recordCapabilityDenial } from './guardrail-store.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
@@ -137,6 +142,8 @@ export async function executeChat(input: {
   beforeSampleStore?: () => Promise<void> | void;
   beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
+  rankDeadlineMs?: number;
+  routingKey?: string | null;
 }): Promise<UpstreamCompletion['response'] | undefined> {
   const request = validateChatRequest(input.body);
   const session = { ...input, featureRequest: featureInputFromChat(request) };
@@ -149,14 +156,63 @@ export async function executeChat(input: {
     return {
       route: resolveModel(request.model, catalog.deployments, catalog.aliases),
       streamingEnabled: catalog.streamingEnabled,
+      deployments: catalog.deployments,
     };
   });
   if (loaded.route === null) {
     throw proxyError(404, 'invalid_request_error', 'model_not_found', 'model', 'The model is not available.');
   }
-  let route: ResolvedRoute = loaded.route;
+  const selection = await selectPromoted({
+    pool: input.runtimePool,
+    logger: input.logger,
+    tenantId: input.tenantId,
+    route: loaded.route,
+    request,
+    routingKey: input.routingKey ?? null,
+    deployments: loaded.deployments,
+  });
+  const plan = selection.skipCanary
+    ? {
+        route: selection.route,
+        cohort: 'baseline' as const,
+        rolloutId: null,
+        policyVersionId: null,
+        cohortDeploymentId: selection.route.deploymentId,
+        routingKeyDigest: selection.routingKeyDigest,
+        holdReason: 'not_auto',
+        record: false,
+      }
+    : await pinCanary({
+        pool: input.runtimePool,
+        logger: input.logger,
+        tenantId: input.tenantId,
+        route: loaded.route,
+        routingKey: input.routingKey ?? null,
+        deployments: loaded.deployments,
+      });
+  let route: ResolvedRoute = plan.route;
   assertStreamAllowed(request, route, loaded.streamingEnabled);
-  assertCapabilities(request, route.capabilities);
+  try {
+    assertCapabilities(request, route.capabilities);
+  } catch (error) {
+    if (
+      plan.cohort === 'canary' &&
+      plan.rolloutId !== null &&
+      error instanceof ProxyError &&
+      error.code === 'unsupported_parameter' &&
+      error.param !== null
+    ) {
+      await recordCapabilityDenial(
+        input.runtimePool,
+        input.logger,
+        input.tenantId,
+        plan.rolloutId,
+        route.deploymentId,
+        error.param,
+      );
+    }
+    throw error;
+  }
   let adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {
@@ -184,6 +240,9 @@ export async function executeChat(input: {
       beforeSampleStore: input.beforeSampleStore,
       beforeSampleInsert: input.beforeSampleInsert,
       failSampleInsert: input.failSampleInsert,
+      rankDeadlineMs: input.rankDeadlineMs,
+      plan,
+      selection,
     });
     return undefined;
   }
@@ -203,6 +262,9 @@ export async function executeChat(input: {
     const store = input.store;
     const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
       const pending = await insertPending(client, input.tenantId, route);
+      await recordRoutingDecision(client, input.tenantId, pending.requestId, route);
+      await recordSelection(client, input.tenantId, pending.requestId, selection);
+      await recordCanaryAssignment(client, input.tenantId, pending.requestId, plan);
       return {
         requestId: pending.requestId,
         attemptId: pending.attemptId,
@@ -218,6 +280,16 @@ export async function executeChat(input: {
     input.logger.error('request persistence failed', { message: errorMessage(error) });
     throw proxyError(503, 'server_error', 'service_unavailable', null, 'The service is unavailable.');
   }
+
+  await observeShadowRank({
+    pool: input.runtimePool,
+    logger: input.logger,
+    tenantId: input.tenantId,
+    requestId,
+    route,
+    request,
+    deadlineMs: input.rankDeadlineMs,
+  });
 
   const requestStarted = process.hrtime.bigint();
   const { policy, deadlinesActive } = policyFor(route);
@@ -496,6 +568,7 @@ export async function executeChat(input: {
         attemptCount: ordinal,
         fallback: fellBack,
       });
+      await reconcileCanary(input.runtimePool, input.logger, input.tenantId, requestId);
     }
     apiKey = '';
     await transport.release();

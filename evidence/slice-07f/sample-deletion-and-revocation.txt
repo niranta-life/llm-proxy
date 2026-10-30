@@ -1,0 +1,2 @@
+Extracted from the passing scheduler-tests.txt run.
+ ✓ test/evaluations-schedule.test.ts > continuous evaluation schedules > does not call a provider after expiry, revocation, or deletion 584ms

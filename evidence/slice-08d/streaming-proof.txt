@@ -1,0 +1,9 @@
+A 10000 basis-point rollout pinned the challenger before the stream. The success body contains the challenger model and data: [DONE]. The deployment header is alpha-spare. The assignment cohort is canary and the executed deployment is alpha-spare.
+
+The partial script writes server-sent events and ends without [DONE]. The body stays on gpt-canary-spare. It does not contain the baseline model. The attempt failure class is stream_started. The cohort stays canary.
+
+An authorized fallback runs only before the first byte. The response is HTTP 200. The executed deployment is alpha-chat. The header x-fallback is true. The cohort stays canary and the cohort deployment stays alpha-spare. The rollout stays active.
+
+Source: the full npm test transcript.
+
+CANARY_TRACE stream {"success":"alpha-spare","partial":"alpha-spare","fallbackExecuted":"alpha-chat","cohort":"canary"}

@@ -1,0 +1,65 @@
+
+> llm-proxy@0.0.0 test
+> vitest run --reporter=verbose test/routing-hardening.test.ts
+
+(node:92329) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:92368) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/routing-hardening.test.ts > routing hardening > ranks quality over cheaper unqualified models and records the reason codes
+SECTION quality {"winner":"h08g-quality","reasons":["lowest_qualified_cost","latency_tie_break"],"candidateCount":8,"ninthPolicy":400,"firstCacheHit":false,"secondCacheHit":true,"invalidSnapshotMiss":false,"invalidWinner":"h08g-tie","restoredWinner":"h08g-quality","dropped":"668edf49-ad12-4b1d-8ff1-e368964b5c3a","estimate":null,"savingsKind":"estimate"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > ranks quality over cheaper unqualified models and records the reason codes 223ms
+(node:92368) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+stdout | test/routing-hardening.test.ts > routing hardening > promotes one serving policy per tenant and keeps forced and foreign traffic apart
+SECTION promotion {"judgeRejected":"unstable_judge","serving":1,"activationEpoch":2,"stale":"stale_activation","cohorts":{"baseline":2,"canary":2},"forced":"h08g-base","foreignDecision":404,"plainPromote":403,"segment":"segment_mismatch","beta":"h08g-beta"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > promotes one serving policy per tenant and keeps forced and foreign traffic apart 1551ms
+stdout | test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice
+SECTION multi-replica
+SECTION launch
+
+stdout | test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice
+SECTION launch {"deployment":["h08g-quality","h08g-quality"],"repeated":["h08g-quality","h08g-quality"],"foreign":[401,401],"restartedPid":92560,"restartedDeployment":"h08g-quality"}
+SECTION performance {"routingCpuSeconds":0.6099999999999999,"routingCpuLabel":{"routingCpu":"whole-process CPU from ps, not routing-only CPU","routingLatency":"nearest-rank percentile of stored computation_ms wall-clock rank time","addedLatency":"client wall time minus stored model_attempts.duration_ms for the same request","policyLookup":"client-observed GET policy time","activeStreams":"count of model_attempts with stream_status connecting or streaming","lockContention":"maximum ungranted pg_locks while delayed chats overlapped","predictedSavings":"shadow estimatedSavings stays an estimate"},"rssKb":[140064,148464,158288],"computationMs":{"p50":2,"p95":3,"p99":6,"samples":34},"clientChatMs":{"p50":74.47083399999974,"samples":12},"addedInferenceLatencyMs":{"p50":70.47083399999974,"p95":83.1597499999989,"samples":12},"evidenceCacheHits":25,"evidenceCacheDecisions":34,"evidenceCacheHitRate":0.7352941176470589,"policyLookupMs":59.01783299999806,"locksNotGranted":0,"lockSamples":48,"maxLocks":38,"deadlocksBefore":0,"deadlocksAfter":0,"throughputPerSecond":13.184991194898078,"successRate":1,"costByDeployment":{"h08g-base":{"amount":"0.75","count":5},"h08g-quality":{"amount":"1.56","count":26}},"realizedSavingsPerSuccess":0.09,"realizedSavingsLabel":"difference of stored attempt_costs unit amounts for h08g-base and h08g-quality","predictedSavingsLabel":"not realized"}
+LAUNCH model=gpt-h08g-quality decision-has-prompt=false
+LAUNCH repeat model=gpt-h08g-quality decision-has-prompt=false
+
+ ✓ test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice 3286ms
+stdout | test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path
+SECTION failure-injection
+
+stdout | test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path
+DATABASE_OUTAGE ready=503 status=500 code=internal_error hits=0 deployment= restored=h08g-beta
+SECTION failure-injection {"partialStatus":"failed","timeout":504,"outageAttempts":1,"circuit":"circuit_open","budget":"budget_exceeded","fallback":"h08g-base","forced":"h08g-poor","streamCapacity":503,"activeStreams":1,"activeStreamsAfter":0,"budgetReadStatus":503,"budgetReadCode":"admission_unavailable","budgetReadHits":0,"invalidEvidenceDeployment":"h08g-tie","staleActivation":"stale_activation","workerCrashDeployment":"h08g-quality","workerCrashServing":1,"concurrentDeployment":"h08g-tie","lostPermissionDeployment":"h08g-base","databaseOutageStatus":500,"databaseOutageCode":"internal_error","databaseOutageHits":0,"databaseOutageRestored":"h08g-beta"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path 4570ms
+stdout | test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row
+SECTION security
+
+stdout | test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row
+SECTION security {"modelDrift":"baseline_fallback","configDrift":"fresh_config_version","aged":"h08g-tie","agedReason":"evidence_stale","regressed":"h08g-tie","refresh":201,"residency":"baseline_unavailable","foreignPromotions":0,"migration":"031_routing_promotions.sql"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row 3257ms
+stdout | test/routing-hardening.test.ts > routing hardening > rolls back to the stored baseline after the controller stops
+SECTION recovery {"propagationMs":58.09979199999725,"rollbackStatuses":[400,200,409],"restoredDeployment":"h08g-base","forcedDeployment":"h08g-poor","detectionMs":10.429082999999082,"rollbackMs":3.9937909999971453,"stops":1,"guardAfter":"h08g-base"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > rolls back to the stored baseline after the controller stops 1259ms
+stdout | test/routing-hardening.test.ts > routing hardening providers > exercises every provider on the shipped adapters and keeps DGX on the mock host
+SECTION providers [{"provider":"openai","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"anthropic","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"vertex","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"xai","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"openrouter","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"dgx","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0}]
+
+ ✓ test/routing-hardening.test.ts > routing hardening providers > exercises every provider on the shipped adapters and keeps DGX on the mock host 8994ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  07:35:29
+   Duration  50.03s (transform 272ms, setup 1ms, collect 499ms, tests 45.85s, environment 0ms, prepare 31ms)
+
+(node:92831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT:0

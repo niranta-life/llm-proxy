@@ -113,6 +113,10 @@ export async function createTestApp(
     beforeSampleInsert?: () => Promise<void> | void;
     failSampleInsert?: () => boolean;
     keepAliveTimeoutMs?: number;
+    evaluationScheduleTenantIds?: readonly string[];
+    evaluationGlobalKill?: boolean;
+    scheduleNow?: () => Date;
+    rankDeadlineMs?: number;
   } = {},
 ) {
   const config = configFor(db);
@@ -143,6 +147,10 @@ export async function createTestApp(
     beforeSettle: options.beforeSettle,
     extractFeatures: options.extractFeatures,
     keepAliveTimeoutMs: options.keepAliveTimeoutMs ?? config.httpKeepAliveTimeoutMs,
+    evaluationScheduleTenantIds: options.evaluationScheduleTenantIds,
+    evaluationGlobalKill: options.evaluationGlobalKill,
+    scheduleNow: options.scheduleNow,
+    rankDeadlineMs: options.rankDeadlineMs,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

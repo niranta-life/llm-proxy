@@ -41,8 +41,58 @@ import { parseEligibilityBody, readSampleEligibility } from '../inference/sample
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
+import { parseRoutingKey } from '../inference/canary-assignment.js';
+import { createRollout, parseRolloutId, parseRolloutWrite, readRollout, stopRollout } from '../inference/canary-rollout.js';
+import {
+  parsePromoteBody,
+  promoteRollout,
+  rejectProposal,
+  saveAutomaticPolicy,
+} from '../inference/promotion-store.js';
+import {
+  attachGuardrails,
+  listGuardrails,
+  parseFeedbackWrite,
+  parseGuardrailAttach,
+  parseRollbackBody,
+  recordFeedback,
+  rollbackRollout,
+} from '../inference/guardrail-store.js';
 import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
+import {
+  disableSchedule,
+  enableSchedule,
+  listScheduleDecisions,
+  manualScheduleRun,
+  parseAsOf,
+  parseKillBody,
+  parseSchedulePage,
+  readSchedule,
+  readScheduleDrift,
+  requireIdempotencyKey,
+  setEvaluationKill,
+  tickSchedule,
+  type ScheduleContext,
+} from '../inference/evaluation-schedule-store.js';
+import { parseDecisionRequestId, parseExpectedEpoch, parsePolicyId, parseRoutingWrite, parseStatusChange } from '../inference/routing-policy.js';
+import {
+  createRoutingPolicy,
+  keyRoutingPermissions,
+  listRoutingPolicies,
+  readRoutingDecision,
+  readRoutingPolicy,
+  setRoutingStatus,
+  validateRoutingPolicy,
+} from '../inference/routing-policy-store.js';
+import { parseEvidenceQuery, parseQualificationWrite, parseRefreshBody } from '../inference/qualification.js';
+import { readShadowMetrics, readShadowRanking, simulateShadowRank } from '../inference/shadow-rank-store.js';
+import { SHADOW_RANK_DEADLINE_MS } from '../inference/shadow-rank.js';
+import {
+  createQualificationProfile,
+  listEvidenceSnapshots,
+  refreshEvidenceSnapshot,
+} from '../inference/qualification-store.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { parseCostFilters, summarizeCosts } from '../inference/cost-store.js';
 import { readTenantCapacity } from '../db/admission.js';
@@ -85,6 +135,10 @@ export type AppDeps = {
   beforeSettle?: () => Promise<void> | void;
   extractFeatures?: (value: FeatureExtractInput) => ExtractedFeatures;
   keepAliveTimeoutMs?: number;
+  evaluationScheduleTenantIds?: readonly string[];
+  evaluationGlobalKill?: boolean;
+  scheduleNow?: () => Date;
+  rankDeadlineMs?: number;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -96,6 +150,10 @@ export type ProxyApp = FastifyInstance & {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
+}
+
+function isEmptyObject(body: unknown): boolean {
+  return body === undefined || body === null || (typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
 }
 
 function streamReply(reply: FastifyReply): StreamHttp {
@@ -304,6 +362,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
     request.raw.on('aborted', abortUpstream);
     reply.raw.on('close', onClose);
     try {
+      const routingKey = parseRoutingKey(request.headers['x-llm-routing-key']);
       const result = await executeChat({
         runtimePool: deps.runtimePool,
         logger: deps.logger,
@@ -328,6 +387,8 @@ export function buildApp(deps: AppDeps): ProxyApp {
         beforeSampleStore: deps.beforeSampleStore,
         beforeSampleInsert: deps.beforeSampleInsert,
         failSampleInsert: deps.failSampleInsert,
+        rankDeadlineMs: deps.rankDeadlineMs,
+        routingKey,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -343,6 +404,24 @@ export function buildApp(deps: AppDeps): ProxyApp {
       reply.raw.off('close', onClose);
     }
   });
+
+  app.post(
+    '/v1/feedback',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const write = parseFeedbackWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          recordFeedback(client, auth.tenantId, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.feedback);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
 
   app.get('/v1/models', async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);
@@ -935,6 +1014,576 @@ export function buildApp(deps: AppDeps): ProxyApp {
     },
   );
 
+  function scheduleContext(): ScheduleContext {
+    return {
+      scheduleTenantIds: deps.evaluationScheduleTenantIds ?? [],
+      globalKill: deps.evaluationGlobalKill === true,
+      now: deps.scheduleNow?.() ?? new Date(),
+    };
+  }
+
+  function emptyScheduleQuery(query: { tenantId?: string }, tenantId: string): boolean {
+    return query.tenantId !== undefined && query.tenantId.toLowerCase() !== tenantId;
+  }
+
+  app.post(
+    '/internal/v1/evaluation-schedules',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          enableSchedule(client, auth.tenantId, idempotencyKey, request.body, scheduleContext()),
+        );
+        return reply.code(saved.replayed ? 200 : 201).send(saved.schedule);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/disable',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const schedule = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          disableSchedule(client, auth.tenantId, scheduleContext()),
+        );
+        return schedule;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/tick',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (!isEmptyObject(request.body)) {
+          return reply
+            .code(400)
+            .send(proxyError(400, 'invalid_request_error', 'invalid_parameter', 'body', 'The schedule body is invalid.').body());
+        }
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          tickSchedule(client, auth.tenantId, idempotencyKey, scheduleContext()),
+        );
+        return reply.code(decision.fresh ? 201 : 200).send(decision);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-schedules/runs',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (!isEmptyObject(request.body)) {
+          return reply
+            .code(400)
+            .send(proxyError(400, 'invalid_request_error', 'invalid_parameter', 'body', 'The schedule body is invalid.').body());
+        }
+        const idempotencyKey = requireIdempotencyKey(request.headers['idempotency-key']);
+        const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          manualScheduleRun(client, auth.tenantId, idempotencyKey, scheduleContext()),
+        );
+        return reply.code(decision.fresh ? 201 : 200).send(decision);
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/evaluation-schedules', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    try {
+      if (emptyScheduleQuery(request.query, auth.tenantId)) return { schedule: null };
+      const schedule = await withTenant(deps.runtimePool, auth.tenantId, (client) => readSchedule(client));
+      return { schedule };
+    } catch (error) {
+      return sendEvaluationError(reply, error);
+    }
+  });
+
+  app.get<{ Querystring: { limit?: string; cursor?: string; tenantId?: string } }>(
+    '/internal/v1/evaluation-schedules/decisions',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        if (emptyScheduleQuery(request.query, auth.tenantId)) return { decisions: [], nextCursor: null };
+        const query = parseSchedulePage(request.query);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => listScheduleDecisions(client, query));
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { asOf?: string; tenantId?: string } }>(
+    '/internal/v1/evaluation-schedules/drift',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const asOf = parseAsOf(request.query.asOf);
+        if (emptyScheduleQuery(request.query, auth.tenantId)) {
+          return { asOf, statements: [], workloadMixChange: false, limits: ['insufficient_history'], historical: true };
+        }
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => readScheduleDrift(client, asOf));
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/evaluation-controls',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const killSwitch = parseKillBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          setEvaluationKill(client, auth.tenantId, killSwitch, scheduleContext()),
+        );
+        return saved;
+      } catch (error) {
+        return sendEvaluationError(reply, error);
+      }
+    },
+  );
+
+  async function allowRouting(
+    auth: { tenantId: string; keyId: string },
+    reply: FastifyReply,
+    permission: 'routing:read' | 'routing:admin',
+  ): Promise<boolean> {
+    try {
+      const granted = await keyRoutingPermissions(deps.authPool, auth.tenantId, auth.keyId);
+      if (granted.has(permission)) return true;
+      await reply
+        .code(403)
+        .send(proxyError(403, 'authentication_error', 'forbidden', null, 'The credential cannot use this route.').body());
+      return false;
+    } catch (error) {
+      deps.logger.error('routing permission failed', { message: errorMessage(error) });
+      await reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+      return false;
+    }
+  }
+
+  function sendRoutingError(reply: FastifyReply, error: unknown): FastifyReply {
+    if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+    deps.logger.error('routing request failed', { message: errorMessage(error) });
+    return reply
+      .code(500)
+      .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+  }
+
+  app.post(
+    '/internal/v1/routing/policies',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseRoutingWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createRoutingPolicy(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.policy);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/policies', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return { policies: [] };
+    }
+    try {
+      const policies = await withTenant(deps.runtimePool, auth.tenantId, (client) => listRoutingPolicies(client));
+      return { policies };
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/internal/v1/routing/policies/:id', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    try {
+      const policyId = parsePolicyId(request.params.id);
+      return await withTenant(deps.runtimePool, auth.tenantId, (client) => readRoutingPolicy(client, policyId));
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.post(
+    '/internal/v1/routing/policies/:id/validate',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const policyId = parsePolicyId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const expectedEpoch = parseExpectedEpoch(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          validateRoutingPolicy(client, auth.tenantId, policyId, idempotencyKey, expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/policies/:id/status',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const policyId = parsePolicyId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const change = parseStatusChange(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          setRoutingStatus(client, auth.tenantId, policyId, idempotencyKey, change.status, change.expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseRolloutWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createRollout(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.rollout);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { tenantId?: string } }>(
+    '/internal/v1/routing/rollouts/:id',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'rollout_id', 'The rollout was not found.').body());
+      }
+      try {
+        const rolloutId = parseRolloutId(request.params.id);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => readRollout(client, rolloutId));
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts/:id/stop',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const expectedEpoch = parseExpectedEpoch(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          stopRollout(client, auth.tenantId, rolloutId, idempotencyKey, expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts/:id/rollback',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const body = parseRollbackBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          rollbackRollout(client, auth.tenantId, rolloutId, idempotencyKey, body.expectedEpoch, 'operator', {
+            ruleId: null,
+            kind: 'operator_rollback',
+            signal: 'operator_request',
+            reason: 'operator_request',
+            evidence: { expectedEpoch: body.expectedEpoch },
+          }),
+        );
+        return { rollout: saved.rollout, violation: saved.violation };
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts/:id/promote',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const command = parsePromoteBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, async (client) => {
+          if (command.kind === 'automatic') {
+            const found = await client.query(`SELECT 1 FROM routing_rollouts WHERE id = $1`, [rolloutId]);
+            if ((found.rowCount ?? 0) === 0) {
+              throw proxyError(404, 'invalid_request_error', 'not_found', 'rollout_id', 'The rollout was not found.');
+            }
+            return { status: 200, body: { automaticPromotion: await saveAutomaticPolicy(client, auth.tenantId, command.policy) } };
+          }
+          if (command.kind === 'reject') {
+            return { status: 200, body: await rejectProposal(client, auth.tenantId, rolloutId, idempotencyKey, command.proposalId) };
+          }
+          const promoted = await promoteRollout(client, auth.tenantId, rolloutId, idempotencyKey, command.write, 'operator', null);
+          return { status: promoted.created ? 201 : 200, body: promoted.promotion };
+        });
+        return reply.code(saved.status).send(saved.body);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/guardrails',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseGuardrailAttach(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          attachGuardrails(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.guardrail);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/guardrails', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return { guardrails: [] };
+    }
+    try {
+      const guardrails = await withTenant(deps.runtimePool, auth.tenantId, (client) => listGuardrails(client));
+      return { guardrails };
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.post(
+    '/internal/v1/routing/qualification-profiles',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseQualificationWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createQualificationProfile(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.profile);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/evidence/refresh',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const profileVersionId = parseRefreshBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          refreshEvidenceSnapshot(client, auth.tenantId, idempotencyKey, profileVersionId, new Date()),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.snapshot);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string; profileVersionId?: string } }>(
+    '/internal/v1/routing/evidence',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return { snapshots: [] };
+      }
+      try {
+        const profileVersionId = parseEvidenceQuery(request.query);
+        const snapshots = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          listEvidenceSnapshots(client, profileVersionId),
+        );
+        return { snapshots };
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { requestId: string } }>('/internal/v1/routing/decisions/:requestId', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    try {
+      const requestId = parseDecisionRequestId(request.params.requestId);
+      const decision = await withTenant(deps.runtimePool, auth.tenantId, (client) => readRoutingDecision(client, requestId));
+      if (decision === null) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The decision was not found.').body());
+      }
+      return decision;
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.post(
+    '/internal/v1/routing/simulate',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      try {
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          simulateShadowRank(client, auth.tenantId, request.body, deps.rankDeadlineMs ?? SHADOW_RANK_DEADLINE_MS),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/shadow-metrics', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return {
+        savingsKind: 'estimate',
+        predictedSavings: '0.00000000',
+        predictedSavingsNote: 'estimate',
+        candidateCount: 0,
+        decisionFailures: 0,
+        decisions: 0,
+        cacheHits: 0,
+        cacheHitRate: null,
+      };
+    }
+    try {
+      return await withTenant(deps.runtimePool, auth.tenantId, (client) => readShadowMetrics(client));
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { requestId: string }; Querystring: { tenantId?: string } }>(
+    '/internal/v1/routing/shadow-rankings/:requestId',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The ranking was not found.').body());
+      }
+      try {
+        const requestId = parseDecisionRequestId(request.params.requestId);
+        const ranking = await withTenant(deps.runtimePool, auth.tenantId, (client) => readShadowRanking(client, requestId));
+        if (ranking === null) {
+          return reply
+            .code(404)
+            .send(proxyError(404, 'invalid_request_error', 'not_found', 'request_id', 'The ranking was not found.').body());
+        }
+        return ranking;
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });
   });
@@ -946,7 +1595,12 @@ export function buildApp(deps: AppDeps): ProxyApp {
     if (
       (path.startsWith('/internal/v1/evaluations') ||
         path.startsWith('/internal/v1/evaluation-profiles') ||
-        path.startsWith('/internal/v1/evaluation-rubrics')) &&
+        path.startsWith('/internal/v1/evaluation-rubrics') ||
+        path.startsWith('/internal/v1/evaluation-schedules') ||
+        path.startsWith('/internal/v1/evaluation-controls') ||
+        path.startsWith('/internal/v1/routing') ||
+        path === '/v1/feedback' ||
+        path.startsWith('/v1/feedback?')) &&
       statusCode === 413
     ) {
       reply

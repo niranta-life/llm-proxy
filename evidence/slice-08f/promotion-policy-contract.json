@@ -1,0 +1,35 @@
+{
+  "gates": [
+    "unstable_judge",
+    "qualified_evidence",
+    "fresh_model_version",
+    "fresh_config_version",
+    "matched_samples",
+    "quality_threshold",
+    "noninferiority",
+    "reliability_target",
+    "latency_target",
+    "cost_objective",
+    "canary_window",
+    "budget_policy",
+    "provider_policy",
+    "critical_incident"
+  ],
+  "pass": true,
+  "failures": {
+    "unstable_judge": "unstable_judge",
+    "qualified_evidence": "qualified_evidence",
+    "fresh_model_version": "fresh_model_version",
+    "fresh_config_version": "fresh_config_version",
+    "matched_samples": "matched_samples",
+    "quality_threshold": "quality_threshold",
+    "noninferiority": "noninferiority",
+    "reliability_target": "reliability_target",
+    "latency_target": "latency_target",
+    "cost_objective": "cost_objective",
+    "canary_window": "canary_window",
+    "budget_policy": "budget_policy",
+    "provider_policy": "provider_policy",
+    "critical_incident": "critical_incident"
+  }
+}

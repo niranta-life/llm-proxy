@@ -1,0 +1,15 @@
+{
+  "source": "test/routing-hardening.test.ts",
+  "exit": 0,
+  "processes": 3,
+  "entry": "node dist/index.js",
+  "database": "one PostgreSQL 16 database",
+  "providers": "controlled mock providers",
+  "sameKeyDeployments": ["h08g-quality", "h08g-quality"],
+  "repeatedDeployments": ["h08g-quality", "h08g-quality"],
+  "foreignReads": [401, 401],
+  "restartedPid": 94834,
+  "restartedDeployment": "h08g-quality",
+  "launchModel": "gpt-h08g-quality",
+  "decisionHasPrompt": false
+}

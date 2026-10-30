@@ -1,0 +1,11 @@
+model=auto before a qualified snapshot and model=auto after that snapshot.
+Source: test/qualification.test.ts, transcript qualification-tests.txt.
+beforeDeployment: qual-chat
+afterDeployment: qual-chat
+upstreamModel: gpt-baseline
+providerCallsEach: 1
+qualificationStatusInChat: false
+refreshProviderCallsAdded: 0
+namedDeployment: qual-chat
+The chat JSON does not contain the qualification status, the snapshot id, or wilson_95_newcombe.
+EVIDENCE routing-unchanged {"beforeDeployment":"qual-chat","afterDeployment":"qual-chat","upstreamModel":"gpt-baseline","providerCallsEach":1,"qualificationStatusInChat":false}

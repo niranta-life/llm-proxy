@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-This page maps the [high-level architecture](../README.md#high-level-architecture) to the code. It also lists the data model and the trust boundaries.
+This page maps the [high-level architecture](../README.md#high-level-architecture) to the code. It also lists the data model, the trust boundaries, and the [local runtime](#local-runtime).
 
 ## Components and code
 
@@ -11,7 +11,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | API + Authentication | Fastify routes. Checks `X-Tenant-ID` and the tenant secret against a scrypt verifier. Opens a tenant-scoped database transaction. | `src/http/app.ts`, `src/auth/authenticate.ts`, `src/secrets.ts`, `src/db/tenant-context.ts` |
 | Request Normalization | Parses the OpenAI body into one canonical text request. | `src/inference/contract.ts`, `src/inference/validate.ts` |
 | Capability Validation | Refuses any field that the deployment does not list. | `src/inference/validate.ts`, `src/inference/registry.ts` |
-| Model Router | Resolves `auto` or a deployment name to one enabled deployment. | `src/inference/resolve.ts` |
+| Model Router | Resolves `auto` or a deployment name to one enabled deployment. A shadow policy records that choice. Without an active canary and without enabled selection, that record does not change the deployment. An active canary can pin one qualified challenger for a bounded share of `auto`. A ranker can store a recommendation beside the baseline and the executed deployment. The router does not execute that recommendation. An operator can enable selection for one task segment. Selection stays off until then. An attached guardrail can stop that canary. The canary does not promote itself. | `src/inference/resolve.ts`, `src/inference/routing-policy.ts`, `src/inference/qualification.ts`, `src/inference/shadow-rank.ts`, `src/inference/canary-assignment.ts`, `src/inference/canary-rollout.ts`, `src/inference/guardrail-decision.ts`, `src/inference/guardrail-store.ts`, `src/inference/promotion-gate.ts`, `src/inference/promotion-store.ts`, `src/inference/promotion-select.ts` |
 | Circuit breaker | Rejects an attempt on an open deployment before the provider call. | `src/inference/breaker.ts`, `src/db/breaker.ts` |
 | Admission | Rate and concurrency limits, and budget reservation. | `src/inference/admission.ts`, `src/db/admission.ts` |
 | Provider Adapters | Turn the canonical request into each provider API and back. | `src/inference/adapter.ts`, `openai-stream.ts`, `anthropic.ts`, `anthropic-stream.ts`, `vertex*.ts`, `compatible.ts` (xAI, OpenRouter), `private.ts`, `private-serve.ts` (DGX) |
@@ -21,15 +21,15 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |
 | Key custody | Encrypts provider keys with AES-256-GCM. The key comes from `PROVIDER_CREDENTIAL_KEY`. | `src/credentials.ts` |
 | Sample capture | Stores an approved text chat as an encrypted envelope. A completed text stream is included only when streaming capture is on. A bounded recent and diverse set is kept. The proxy process runs the cleanup job. Metadata routes return no content. An eligibility check reads metadata and does not start a replay. A capture failure does not change the chat result. | `src/inference/samples.ts`, `src/inference/sample-selection.ts`, `src/inference/sample-jobs.ts`, `src/inference/sample-crypto.ts`, `src/inference/sample-eligibility.ts`, `src/inference/stream-capture.ts` |
-| Evaluation | Stores a bounded run of approved samples against one challenger. A dry run changes item state and does not call a model. A replay calls that pinned deployment through the adapter. An approved profile runs deterministic checks on the original output and the challenger output. The inference process does not start the worker. | `src/inference/evaluations.ts`, `src/inference/evaluation-profiles.ts`, `src/inference/validators.ts`, `src/inference/evaluation-worker.ts`, `src/inference/replay-request.ts`, `src/inference/replay-execution.ts`, `src/evaluation-worker.ts` |
+| Evaluation | Stores a bounded run of approved samples against one challenger. A dry run changes item state and does not call a model. A replay calls that pinned deployment through the adapter. An approved profile runs deterministic checks. An optional judge runs only when one tenant is named. A schedule selects samples and records why a run starts or why it skips. An offline refresh writes an immutable evidence snapshot from completed runs. The scheduler is off until one tenant is named. The inference process does not start the worker. A shadow ranker can read snapshot metadata when a shadow policy is enabled. The router does not execute a recommendation from that snapshot. | `src/inference/evaluations.ts`, `src/inference/evaluation-profiles.ts`, `src/inference/evaluation-schedule.ts`, `src/inference/evaluation-schedule-store.ts`, `src/inference/qualification.ts`, `src/inference/qualification-store.ts`, `src/inference/validators.ts`, `src/inference/judge.ts`, `src/inference/judge-rubrics.ts`, `src/inference/evaluation-worker.ts`, `src/inference/replay-execution.ts`, `src/evaluation-worker.ts` |
 | Logging | Removes secrets, prompts, and chat messages from logs. | `src/logger.ts`, `src/redact.ts` |
-| Admin | All config changes. There is no HTTP admin API. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts` |
+| Admin | CLI changes for tenants, keys, deployments, aliases, prices, limits, and fallback. A routing policy, a qualification profile, an evidence refresh, a canary rollout, a guardrail set, and a promotion use internal HTTP routes and a static grant on the tenant secret. Task feedback uses the same tenant authentication as chat. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts`, `src/http/app.ts` |
 
 ## Request path
 
 1. Auth: the tenant secret is checked.
 2. Validate: the body is checked and normalized.
-3. Resolve: `model` becomes one deployment. The request and attempt rows are written.
+3. Resolve: `model` becomes one deployment. When an operator has enabled selection for one task segment, `auto` in that segment selects the lowest expected cost among qualified candidates that meet the policy limits. Selection stays off until that enablement. The same routing key stays on the selected deployment for later turns. A request outside the stage share, or in another segment, uses the alias baseline. A candidate runs only when its newest snapshot for that task is qualified, fresh, and the profile model version and deployment config version match the deployment. A shadow rank can name an older model and does not execute it. When no qualified candidate remains, the router uses the approved baseline when that baseline is permitted. Otherwise the chat returns HTTP 409 `baseline_unavailable`. Without that selection, an active canary rollout can pin a qualified challenger for a bounded share of `auto`. The pin reads the rollout row and the evidence snapshot. A named deployment stays on that deployment. The request, the attempt, and the routing decision store the deployment that runs. When a guardrail set is attached, the pin also reads the cohort metrics. A failed read uses the alias baseline and leaves the rollout active. The worker evaluates the rules. It can stop later assignments.
 4. Breaker: an open breaker rejects the attempt before the provider call.
 5. Admission: limits are checked and the budget is reserved.
 6. Adapter: the provider is called. Retry and fallback decide after each failed attempt. A new attempt goes back to step 4.
@@ -38,7 +38,7 @@ This page maps the [high-level architecture](../README.md#high-level-architectur
 
 Fallback is allowed only before the proxy sends a response header or a response byte. After that, a failure ends the stream with an error. The proxy never joins output from two models.
 
-Replay is not a step on this path. The evaluation worker reads a queued job, decrypts one approved sample, and calls the pinned challenger through the adapter. See [Replay](#replay).
+Replay is not a step on this path. The evaluation worker reads a queued job, decrypts one approved sample, and calls the pinned challenger through the adapter. See [Evaluation](#evaluation).
 
 ## HTTP routes
 
@@ -47,6 +47,7 @@ Replay is not a step on this path. The evaluation worker reads a queued job, dec
 | `GET /health/live`, `GET /health/ready` | Process and database health. No auth. |
 | `GET /v1/tenant` | The caller's own tenant. |
 | `POST /v1/chat/completions` | Text chat, JSON or SSE. |
+| `POST /v1/feedback` | One task result for one chat request. The body has no prompt and no model output. |
 | `GET /v1/models` | Enabled deployments and aliases for the tenant. |
 | `GET /internal/v1/metrics/summary`, `/attempts`, `/breakers`, `/costs` | Per-tenant metrics. See [Metrics](metrics.md). |
 | `GET /internal/v1/limits`, `GET /internal/v1/budgets/usage` | Per-tenant limit and budget state. See [Limits](limits.md). |
@@ -58,6 +59,31 @@ Replay is not a step on this path. The evaluation worker reads a queued job, dec
 | `GET /internal/v1/evaluations`, `GET /internal/v1/evaluations/{id}`, `GET /internal/v1/evaluations/{id}/items` | Run and item status. The JSON has cost, latency, usage, status, and validator results. It has no prompt and no completion text. |
 | `GET /internal/v1/evaluations/{id}/report` | Read-only comparison of one run. Matched samples only. It has counts, quality, cost, latency, reliability, model versions, and one recommendation. It has no prompt and no completion text. |
 | `GET /internal/v1/evaluations/recommendations` | One recommendation per completed run for the caller. The page is bounded. A tenant filter that does not match the caller returns an empty page. |
+| `POST /internal/v1/evaluation-schedules` | Store one schedule for the named tenant. The same idempotency key and the same body return the stored row. |
+| `POST /internal/v1/evaluation-schedules/disable` | Turn that schedule off. |
+| `POST /internal/v1/evaluation-schedules/tick` | Select a bounded sample set, or record why the tick skips. An empty body is required. |
+| `POST /internal/v1/evaluation-schedules/runs` | Start one manual run from the stored schedule. An empty body is required. |
+| `GET /internal/v1/evaluation-schedules` | Read the caller's schedule. A tenant filter that does not match the caller returns `schedule: null`. |
+| `GET /internal/v1/evaluation-schedules/decisions` | Read stored tick and manual decisions. The page has no prompt and no completion text. |
+| `GET /internal/v1/evaluation-schedules/drift` | Read drift from runs stored at or before `asOf`. Different populations are not pooled. |
+| `POST /internal/v1/evaluation-controls` | Set the global evaluation kill switch. Only the named schedule tenant can set it. |
+| `POST /internal/v1/routing/policies` | Store one immutable routing policy for the alias `auto`. The same idempotency key and body return the stored version. |
+| `GET /internal/v1/routing/policies`, `GET /internal/v1/routing/policies/{id}` | Read the caller's policies. A tenant filter that does not match the caller returns an empty list. |
+| `POST /internal/v1/routing/policies/{id}/validate` | Move a draft policy to `validated`. |
+| `POST /internal/v1/routing/policies/{id}/status` | Move a validated policy to `shadow` or `disabled`, or a shadow policy to `disabled`. |
+| `GET /internal/v1/routing/decisions/{requestId}` | Read the decision for one production chat. The body has no prompt and no completion text. |
+| `POST /internal/v1/routing/simulate` | Rank one bounded request and store the recommendation. The route does not call a provider. |
+| `GET /internal/v1/routing/shadow-metrics` | Read estimated savings, candidate count, and decision failures for the caller. The savings are estimates. |
+| `GET /internal/v1/routing/shadow-rankings/{requestId}` | Read one stored ranking. The recommendation, the baseline, and the executed deployment are separate fields. |
+| `POST /internal/v1/routing/rollouts` | Activate one canary rollout for `auto`. `routing:admin` is required. The same idempotency key and body return the stored row. |
+| `GET /internal/v1/routing/rollouts/{id}` | Read one rollout. `routing:read` is required. Another tenant receives HTTP 404. |
+| `POST /internal/v1/routing/rollouts/{id}/stop` | Stop an active rollout. The stop reason is `manual`. The route writes no violation row. A stale epoch returns HTTP 409. |
+| `POST /internal/v1/routing/rollouts/{id}/rollback` | Stop an active rollout and store one operator violation. `routing:admin` is required. A stale epoch returns HTTP 409. A body that promotes the canary is rejected. |
+| `POST /internal/v1/routing/guardrails` | Attach one guardrail set to one active rollout. `routing:admin` is required. The same idempotency key and body return the stored set. |
+| `GET /internal/v1/routing/guardrails` | Read the caller's guardrail sets, cohort series, and violations. `routing:read` is required. `routing:admin` does not grant that read. |
+| `POST /internal/v1/routing/qualification-profiles` | Store one immutable qualification profile version for one task segment. |
+| `POST /internal/v1/routing/evidence/refresh` | Insert one immutable evidence snapshot from completed evaluation runs. The route does not decrypt a sample and does not call a model. Chat does not call it. |
+| `GET /internal/v1/routing/evidence` | Read the caller's snapshots. A tenant filter that does not match the caller returns an empty list. The body has no prompt and no completion text. |
 | `POST /internal/v1/evaluations/{id}/cancel` | Cancel a queued run. The worker does not complete its items. |
 | `POST /internal/v1/evaluation-profiles`, `POST /internal/v1/evaluation-profiles/{id}/versions`, `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/approve` | Store a profile version and approve it. Approval freezes that version. |
 | `POST /internal/v1/evaluation-profiles/{id}/versions/{version}/references`, `GET /internal/v1/evaluation-profiles/{id}/versions/{version}` | Store a trusted reference on a draft version, or read one profile version. The read has no model output. |
@@ -68,17 +94,24 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 
 | Area | Tables |
 | --- | --- |
-| Tenants | `tenants`, `tenant_api_keys` |
+| Tenants | `tenants`, `tenant_api_keys`, `tenant_key_grants` |
 | Providers and routing | `provider_connections`, `model_deployments`, `model_aliases`, `private_endpoint_allowlist` |
+| Routing policy | `routing_policies`, `routing_policy_versions`, `routing_policy_activations`, `routing_policy_activation_events`, `routing_decisions` |
+| Canary routing | `routing_rollouts`, `routing_rollout_events`, `routing_canary_assignments` |
+| Guardrails | `routing_guardrail_sets`, `routing_guardrail_rules`, `routing_task_feedback`, `routing_guardrail_violations`, `routing_capability_denials` |
+| Evidence qualification | `qualification_profiles`, `qualification_profile_versions`, `evidence_snapshots`, `evidence_candidate_assessments` |
 | Requests | `proxy_requests`, `model_attempts`, `request_features`, `request_samples`, `sample_deletions` |
-| Evaluation | `evaluation_definitions`, `evaluation_definition_versions`, `evaluation_runs`, `evaluation_items`, `evaluation_jobs`, `evaluation_judge_jobs`, `evaluation_attempts`, `evaluation_profiles`, `evaluation_profile_versions`, `evaluation_references`, `evaluation_validator_results`, `evaluation_rubrics`, `evaluation_rubric_versions`, `evaluation_judge_calls`, `evaluation_judge_findings` |
+| Evaluation | `evaluation_definitions`, `evaluation_definition_versions`, `evaluation_runs`, `evaluation_items`, `evaluation_jobs`, `evaluation_judge_jobs`, `evaluation_attempts`, `evaluation_profiles`, `evaluation_profile_versions`, `evaluation_references`, `evaluation_validator_results`, `evaluation_rubrics`, `evaluation_rubric_versions`, `evaluation_judge_calls`, `evaluation_judge_findings`, `evaluation_schedules`, `evaluation_schedule_decisions`, `evaluation_budget_reservations` |
+| Evaluation control | `evaluation_controls` |
 | Policies | `execution_policies`, `fallback_policies`, `deployment_breakers`, `breaker_observations`, `sample_policies`, `sample_jobs` |
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |
 
-A policy change stores a new version. The proxy does not edit a stored policy in place.
+A policy change stores a new version. The proxy does not edit a stored policy in place. A qualification profile version and an evidence snapshot are insert-only. A later refresh stores a new snapshot. A canary rollout is off until an operator activates it. A guardrail set is off until an operator attaches it. The assignment row stores the cohort and the executed deployment as separate fields. It stores a digest of the routing key. It does not store the raw key. Feedback rows store a metric and a result. They do not store a prompt or a model output.
 
 `request_samples` stores ciphertext and metadata. It does not store a second copy of the prompt as plaintext. `sample_deletions` records that a sample was removed and the reason. `sample_jobs` records one cleanup run. The cleanup worker is not a separate Compose service. `src/index.ts` starts it in the proxy process. The interval is 60 seconds. Each automatic run uses one idempotency key for the current hour and for every tenant. `cleanup-expired-samples` uses one key per tenant per minute.
+
+A sample that an evaluation item or attempt still references stays as a wiped shell. `deletion_hold` is true. The ciphertext and the wrapped key are replaced with zeros of the same length. Operator reads omit that row. The worker treats the sample as not owned and does not call the provider. A sample with no evaluation reference is deleted. `evaluation_controls` is one global row. It has no tenant data and no row-level security. The other schedule tables are tenant-scoped and use row-level security.
 
 `proxy_requests.traffic_class` is `production` or `evaluation`. A production chat stays `production`. A replay insert is `evaluation`.
 
@@ -89,13 +122,34 @@ A policy change stores a new version. The proxy does not edit a stored policy in
 - **Caller → proxy.** The caller holds a tenant id and secret only. It cannot pass a provider key or a provider URL.
 - **Proxy → database.** The proxy logs in as `llm_auth` (secret checks) and `llm_runtime` (tenant work). Both roles are `NOBYPASSRLS`. The runtime role cannot read provider key ciphertext or secret verifiers. `llm_migrator` runs migrations. `llm_owner` owns the tables and cannot log in.
 - **Proxy → provider.** Base URLs for hosted providers are fixed in code. A private endpoint must be on the tenant's allowlist with pinned addresses. Redirects are refused.
-- **Operator → proxy.** Config changes only through the CLI, with database access. Nothing on the network can change config.
+- **Operator → proxy.** Tenants, providers, limits, and prices change through the CLI. A routing policy, an evidence refresh, a canary rollout, and a guardrail set use internal HTTP routes. Those routes require the tenant secret and a routing grant. Task feedback uses the same tenant authentication as chat. Those routes do not change a provider key.
 - **Key custody for samples.** `PROVIDER_CREDENTIAL_KEY` seals a new provider credential and wraps a new sample. `PROVIDER_CREDENTIAL_KEY_PREVIOUS` is an optional comma-separated list of retained 32-byte keys. Those keys open an older provider credential and an older sample. The HTTP server and the operator CLI both pass that list when they open a stored credential. A wrong key opens nothing. A changed ciphertext opens nothing. The current key still seals new values.
+- **Local config file.** `config/docker.env` stays on the host. Git does not track it. The image build does not copy it. The script does not print `PROVIDER_CREDENTIAL_KEY`. Compose passes the allowlisted values into the one app container. Database passwords in `docker-compose.yml` are for local development.
 - **TLS.** The proxy does not terminate TLS. Put it behind a load balancer or reverse proxy that does. Each proxy process has its own stream slots. Two processes share one PostgreSQL database and the same sample rows.
 
-## Replay
+## Local runtime
 
-History, pinned replay, deterministic checks, an optional pinned judge, and a read-only evaluation report are in this release. The report recommends further testing or canary consideration. It does not change a route. Rankings that the router reads are not.
+The laptop path is one Compose project on the Colima profile you already use. The default profile is `default`. The socket is `~/.colima/default/docker.sock`. Set `COLIMA_PROFILE` or `COLIMA_SOCKET` when yours differ. `llm-proxy-docker.sh` and `scripts/colima.sh` both start `docker-compose.yml`. That file defines one `postgres:16` service and one `app` service. `npm run docker` runs `llm-proxy-docker.sh`. `npm run stack` runs `scripts/colima.sh`. Set `LLM_PROXY_ENV_FILE` only when that file already exists. The script creates `config/docker.env` only when you do not set `LLM_PROXY_ENV_FILE`.
+
+| Piece | What it does | Code |
+| --- | --- | --- |
+| Local control | Creates `config/docker.env` when it is missing. Builds the app image on Colima. Starts and stops the Compose project. Sets `DOCKER_HOST` for its own commands. Leaves the Docker context unchanged. | `llm-proxy-docker.sh` |
+| Compose project | Runs PostgreSQL 16 and one app container. Sets the database host, the role names, the role passwords, and the listen address. | `docker-compose.yml`, `scripts/colima.sh` |
+| Local config | Stores the log level, inference, the OpenAI base URL, the credential keys, the stream limits, and the migration timeouts. Inference stays off until you set `INFERENCE_ENABLED=true`. Git does not track `config/docker.env`. | `config/docker.env.example` |
+| App image | Runs `node dist/index.js`. The Dockerfile sets no `ENTRYPOINT`. The base image entrypoint stays `docker-entrypoint.sh`. The build context excludes `config/docker.env` and `config/.image-stamp`. | `Dockerfile`, `.dockerignore` |
+| Config check | Calls `llm-proxy-docker.sh` for usage, a second `setup`, and a rejected config. It does not build an image and it does not start Colima. | `scripts/check-llm-proxy-docker.sh` |
+
+`src/index.ts` serves HTTP and starts the sample cleanup job. Run `node dist/evaluation-worker.js` only when you want evaluation jobs. Run `node dist/guardrail-worker.js` only when you want guardrail checks. Run `node dist/promotion-worker.js` only when you want automatic promotion. The app image does not start those three processes.
+
+`setup` copies `config/docker.env.example` when `config/docker.env` is missing. It stores a provider credential key when `openssl` is installed. It leaves `INFERENCE_ENABLED` false. A second `setup` leaves that value false. The script accepts only the keys in the example file. It rejects a duplicate key. It rejects database settings, role names, role passwords, and the listen address. It rejects a value that runs a command. It rejects a credential that is not 32-byte base64. It rejects inference on with an empty credential key. It rejects a stream or timeout outside the process range. `build` and `start` then exit before they start Colima or build an image.
+
+The rebuild hash covers `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, and `docker/postgres/`. The script stores that hash in `config/.image-stamp`. Git does not track that file. `start` rebuilds when the hash changes, when the image is missing, or when you pass `--build`. A start with those files unchanged does not rebuild the image. `watch` rebuilds when that hash changes. `watch` recreates the app when `config/docker.env` changes. `stop` stops the containers and keeps the database volume. Colima stops only with `stop --vm`.
+
+`GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` when Postgres is up and the schema is current. `status` prints the `INFERENCE_ENABLED` value from the config file. `setup` leaves that value false. When the program-file stamp matches and Colima is down, `status` prints `image: not checked`. See [Operations](operations.md).
+
+## Evaluation
+
+History, pinned replay, deterministic checks, an optional pinned judge, a read-only report, an offline evidence snapshot, a schedule, and a shadow ranking are in this release. The report recommends further testing or canary consideration. The snapshot marks a candidate `qualified`, `unqualified`, `inconclusive`, or `invalidated` for one task segment. A shadow ranking records a recommendation. Neither record selects a route. An operator can activate a canary rollout that sends a bounded share of `auto` to one qualified challenger. The rollout does not follow the ranking and it does not promote itself. An attached guardrail can stop that rollout. An operator can promote that rollout and enable selection for one task segment. Selection stays off until that enablement. A changed snapshot can propose a new policy version. An unchanged snapshot does not. The proposal does not change the serving policy. The guardrail worker and the promotion worker are separate processes. The scheduler is off until one tenant is named.
 
 - **History.** `proxy_requests`, `model_attempts`, `attempt_costs`, and `request_features` store the outcome. An operator can also store an approved text chat as an encrypted sample, including a completed text stream when streaming capture is on. Capture is off by default. An eligibility check reports whether that sample may be replayed later. The check reads metadata only.
 - **Run.** `POST /internal/v1/evaluations` stores one bounded run. `mode` is `dry_run` or `replay`. The challenger is one deployment name. `model=auto` is rejected for replay execution. The same idempotency key returns the stored run. A different body for that key returns HTTP 409.
@@ -104,12 +158,14 @@ History, pinned replay, deterministic checks, an optional pinned judge, and a re
 - **Call.** The worker rebuilds the canonical request from the sample and keeps the original parameters that the challenger supports. It calls the provider adapter. It does not call `POST /v1/chat/completions`. It does not resolve aliases. It does not run tools. It writes the attempt before the cost reservation, and the reservation before the provider call. A crash before dispatch does not call the provider. A crash after dispatch does not send the call again.
 - **Record.** The challenger output uses the same tenant-scoped sample encryption. The operator JSON has cost, latency, usage, and status. It has no prompt and no completion text. `EVALUATION_EXECUTION_ENABLED=false` stops new replay calls. A call that already left the worker is not sent again.
 - **Checks.** An approved profile version pins the validators for that run. The worker checks the original output and the challenger output. Each result is `pass`, `fail`, `not_applicable`, or `unknown`. A missing trusted reference is `unknown`. The checks do not call a judge. Output stays ciphertext.
-- **Judge.** Judging is off by default. A judge job is its own row in `evaluation_judge_jobs`. One tenant id in `EVALUATION_JUDGE_TENANTS`, together with a budget of at most 1, turns it on for a replay run that pins an approved rubric and a judge deployment. The judge model is the pinned upstream model of that deployment. The worker sends the task, the rubric, Candidate X, Candidate Y, and a trusted reference when one exists. It does not send candidate model names, provider names, cost, latency, or routing recommendations. It compares the pair again in reverse order. A material disagreement is `unstable` or `inconclusive`. The judge cannot execute a tool. A judging failure does not change routing. Protected judge evidence stays ciphertext.
-- **Routing.** Active aliases and fallback policy stay unchanged. A later production chat still follows the existing route.
+- **Judge.** Judging is off by default. A judge job is its own row in `evaluation_judge_jobs`. One tenant id in `EVALUATION_JUDGE_TENANTS`, together with a budget of at most 1 USD, turns it on for a replay run that pins an approved rubric and a judge deployment. The judge model is the pinned upstream model of that deployment. The worker sends the task, the rubric, Candidate X, Candidate Y, and a trusted reference when one exists. It does not send candidate model names, provider names, cost, latency, or routing recommendations. It compares the pair again in reverse order. A material disagreement is `unstable` or `inconclusive`. The judge cannot execute a tool. A judging failure does not change routing. Protected judge evidence stays ciphertext.
+- **Schedule.** The scheduler is off until `EVALUATION_SCHEDULE_TENANTS` names one tenant. A tick or a manual run stores an ordinary evaluation run. Selection uses workload volume, coverage, evidence age, model or config or price version changes, quality regression, efficiency, estimated cost, and uncertainty. The same inputs produce the same selection. The decision records the reason or the skip. No scheduling step calls a model. One tick run is stored per tenant per UTC day. A later tick that day returns that run and does not call the provider again. The worker ticks only when execution is on, one schedule tenant is named, and the queue is idle. `src/index.ts` does not tick.
+- **Drift.** `GET /internal/v1/evaluation-schedules/drift` compares the latest two completed runs that share a task category, a profile, and a rubric. A run counts only when `created_at` and `updated_at` are at or before `asOf`. A validator counts only when its `created_at` is at or before `asOf`. An attempt counts only when its `created_at` and `updated_at` are at or before `asOf`. It can report quality drift, a schema-validity regression, a latency regression, a reliability regression, a model or price version change, a new deployment, and a workload-mix change. A mixed population is named and is not pooled into one rate.
+- **Routing.** Active aliases and fallback policy stay unchanged. A later production chat still follows the existing route. A schedule tick does not write an alias or a fallback policy. A routing policy in shadow records a decision. An evidence snapshot records a qualification status and does not by itself choose a deployment. A shadow ranker can read that snapshot when the policy is in shadow. It stores a recommendation. The router does not execute that recommendation. Without an active canary rollout and without enabled selection, `auto` resolves to the alias baseline. An active canary rollout can pin one qualified challenger for a bounded share of `auto`. An attached guardrail can stop later assignments. An operator can enable selection for one task segment. Selection stays off until that enablement. An in-flight request stays on the deployment it already pinned. A named model still never switches.
 
-The worker command is `node dist/evaluation-worker.js`. The image command stays `node dist/index.js`. The inference process does not start the worker. The queue is PostgreSQL. See [Operations](operations.md#evaluation-rollback).
+The evaluation worker command is `node dist/evaluation-worker.js`. The guardrail worker command is `node dist/guardrail-worker.js`. The promotion worker command is `node dist/promotion-worker.js`. The image command stays `node dist/index.js`. The app process does not start those workers. The queue is PostgreSQL. See [Local runtime](#local-runtime) and [Operations](operations.md#evaluation-rollback).
 
 ## Planned
 
-- **Optimizer.** Write per-task rankings. The router may use them for `auto` only, and only among deployments that pass the same policy checks as fallback. A named model still never switches. The router does not use a quality score today. A judge finding does not change that route.
+- **Optimizer.** A shadow ranker already records an estimated ranking for `auto`. The router does not execute that ranking. An operator can promote one qualified policy and enable selection for one tenant and one task segment. Selection stays off until that enablement. When selection is on, `auto` in that segment uses the lowest expected cost inside the policy limits. A named model still never switches. A judge finding does not change the route by itself. Admission stays in force for the deployment that executes. A canary pin is an operator share. It is not a quality score. A guardrail can stop that share. A canary cannot promote itself. The automatic optimizer stays off. The recommendation is not admitted.
 - **Infra.** Redis for hot counters, and an external secret manager for provider keys. Evaluation jobs do not need Redis.

@@ -1,0 +1,5 @@
+GET /internal/v1/routing/evidence body for the qualified snapshot.
+The JSON has the task segment, the candidate, the status, an empty reason list, and the uncertainty bound.
+It has no prompt and no completion. It has no eligible_for_canary.
+
+{"id":"f275cc48-df0f-4d11-b6c0-3a8680f7a4ec","profileVersionId":"09589658-c313-40f4-a461-630ea9e221c3","taskCategory":"extraction","complexity":"low","inputSizeCategory":"l","outputRequirementId":"fbe867ad-859a-4fce-8dfe-3f5ce3575935","requiredCapabilities":["temperature"],"candidateDeployment":"qual-chat","modelVersion":"gpt-model-b","deploymentConfigVersion":2,"adapterVersion":1,"status":"qualified","reasonCodes":[],"uncertainty":{"method":"wilson_95_newcombe","lower":0.83887,"upper":1,"differenceLower":-0.16113},"sourceRunIds":["695c79eb-8702-46e5-a688-769ba535289d"],"sampleCount":20,"coverageRate":1,"createdAt":"2026-10-28T21:07:30.860Z"}

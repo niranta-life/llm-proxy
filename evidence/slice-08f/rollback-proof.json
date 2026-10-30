@@ -1,0 +1,13 @@
+{
+  "duringRollback": "promotion_during_rollback",
+  "concurrent": [
+    201,
+    409
+  ],
+  "servingDuringRace": 1,
+  "rollback": {
+    "next": "promote-base",
+    "violations": 1,
+    "serving": 0
+  }
+}

@@ -1,0 +1,5 @@
+10000 independent routing keys were assigned by the shipped function. A share of 100 basis points selected 107 keys. A share of 500 basis points selected 486 keys. 107 of 10000 is 1.07 percent. 486 of 10000 is 4.86 percent. Both stay within 0.5 percentage points of the named share. A share of 0 selected none. A share of 10000 selected every key. 10000 is an explicit operator value.
+
+Source: the full npm test transcript. Test: pins 0, 1, 5, and 100 percent and changes with the policy version.
+
+CANARY_DISTRIBUTION 100=107 500=486

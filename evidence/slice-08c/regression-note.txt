@@ -1,0 +1,7 @@
+regression-before.txt is the pre-change suite. Test Files 65 passed, 3 skipped (68). Tests 630 passed, 5 skipped (635). Duration 608.19s. EXIT:0.
+
+regression-after.txt is the suite after shadow ranking. Test Files 66 passed, 3 skipped (69). Tests 667 passed, 5 skipped (672). Duration 600.88s. EXIT:0.
+
+The added file is test/shadow-routing.test.ts. The isolated run of that file is shadow-routing-tests.txt. Test Files 1 passed. Tests 37 passed. Duration 9.77s. EXIT:0.
+
+Bearer fixture keys in the regression transcripts are replaced with [redacted].

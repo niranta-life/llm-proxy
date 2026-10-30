@@ -1,0 +1,7 @@
+regression-before.txt is the pre-change suite. Test Files 66 passed, 3 skipped (69). Tests 667 passed, 5 skipped (672). Duration 663.42s. EXIT:0.
+
+regression-after.txt is the suite after canary routing. Test Files 67 passed, 3 skipped (70). Tests 679 passed, 5 skipped (684). Duration 683.70s. Start at 23:11:51. EXIT:0.
+
+The added file is test/canary-routing.test.ts. That file's verbose lines are in canary-routing-tests.txt. The file passed 12 tests. The stop measurement in this suite is CANARY_STOP_VISIBILITY_MS 74.
+
+Bearer fixture keys in the regression transcripts are replaced with [redacted].

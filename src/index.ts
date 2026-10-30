@@ -85,6 +85,8 @@ async function main(): Promise<void> {
     maxActiveStreams: config.maxActiveStreams,
     maxStreamsPerTenant: config.maxStreamsPerTenant,
     keepAliveTimeoutMs: config.httpKeepAliveTimeoutMs,
+    evaluationScheduleTenantIds: config.evaluationScheduleTenantIds,
+    evaluationGlobalKill: config.evaluationGlobalKill,
   });
 
   const stopSampleCleanup = startSampleCleanupWorker(runtimePool, logger);

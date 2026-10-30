@@ -1,0 +1,39 @@
+Independent Wilson 95 percent and Newcombe method 10 bounds.
+Computed with Node Math, Z = 1.96, and half-up rounding to 6 decimals.
+The script does not import src/inference/qualification.ts.
+The test literals in test/qualification.test.ts are these same numbers.
+They were not produced by calling qualifyCohort.
+
+qualified 20/20 vs 20/20
+floor 0.80, max width 0.20, margin 0.20, min samples 20
+lower 0.83887 upper 1 width 0.16113 differenceLower -0.16113
+status qualified
+
+threshold 10/20 vs 18/20
+floor 0.80, max width 0.50, margin 0.20, min samples 20
+lower 0.299295 upper 0.700705 width 0.40141 differenceLower -0.613274
+status unqualified objective_threshold_failed
+The floor fails before the width gate.
+
+wide 8/8 vs 8/8
+floor 0.60, max width 0.20, margin 0.40, min samples 8
+lower 0.675584 upper 1 width 0.324416 differenceLower -0.324416
+status inconclusive uncertainty_too_wide
+The pass rate is 1. The interval is still too wide.
+
+noninferior 18/20 vs 20/20
+floor 0.65, max width 0.30, margin 0.10, min samples 20
+lower 0.698962 upper 0.972134 width 0.273172 differenceLower -0.301038
+status unqualified noninferiority_failed
+
+reference 4/4 vs 4/4
+lower 0.5101 upper 1 width 0.4899 differenceLower -0.4899
+
+reference 60/100 vs 90/100
+lower 0.502001 upper 0.6906 width 0.188599 differenceLower -0.407742
+
+reference 19/20 vs 18/20
+lower 0.763864 upper 0.991119 width 0.227255 differenceLower -0.149624
+
+HTTP refresh of the threshold cohort returned lower 0.299295, upper 0.700705, differenceLower -0.613274.
+HTTP refresh of the qualified cohort returned lower 0.83887, upper 1, differenceLower -0.16113.

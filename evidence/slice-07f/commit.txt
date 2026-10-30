@@ -1,0 +1,4 @@
+Parent: 6e8e22f93b2eb7fc84eef0d63db05cbb0340b16f
+Subject: feat(proxy): schedule bounded evaluation without a route change
+
+This note records the parent. The commit id is the HEAD that contains this file. Read it with git rev-parse HEAD after the commit. This file does not store that id.

@@ -1,0 +1,7 @@
+A manual stop sets the rollout to stopped. A new process then serves model=auto on the alias baseline. The same stop path is the rollback.
+
+Leave 029_routing_rollouts.sql applied. Do not delete that schema_migrations row. Stop every rollout. A new model=auto request uses the alias baseline. A named deployment still uses that deployment. Existing assignment rows stay.
+
+Source: the full npm test transcript, the manual stop case.
+
+CANARY_ROLLBACK stop returns auto to the alias baseline

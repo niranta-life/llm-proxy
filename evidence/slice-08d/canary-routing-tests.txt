@@ -1,0 +1,43 @@
+Source: the full npm test transcript after the canary change.
+File: test/canary-routing.test.ts. The block below is that file's verbose output.
+The suite ended EXIT:0. Test Files 67 passed, 3 skipped (70). Tests 679 passed, 5 skipped (684).
+
+stdout | test/canary-routing.test.ts > canary assignment > pins 0, 1, 5, and 100 percent and changes with the policy version
+CANARY_DISTRIBUTION 100=107 500=486
+CANARY_REPLICA canary
+
+ ✓ test/canary-routing.test.ts > canary assignment > pins 0, 1, 5, and 100 percent and changes with the policy version 98ms
+ ✓ test/canary-routing.test.ts > controlled canary routing > requires a shadow policy and qualified evidence before activation 1277ms
+stdout | test/canary-routing.test.ts > controlled canary routing > assigns the keyed share and leaves a forced model and the other tenant alone
+CANARY_TRACE share {"zero":"baseline","full":"canary","forced":"bypass","tenantB":"gpt-tenant-b"}
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > assigns the keyed share and leaves a forced model and the other tenant alone 2103ms
+stdout | test/canary-routing.test.ts > controlled canary routing > holds the baseline when the challenger fails a gate and does not stop the rollout
+CANARY_TRACE gates {"unvalidated":"baseline","disabled":"baseline","provider":"baseline","region":"baseline","data":"baseline"}
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > holds the baseline when the challenger fails a gate and does not stop the rollout 1343ms
+stdout | test/canary-routing.test.ts > controlled canary routing > stops on invalidated evidence, the request cap, and the expense cap
+CANARY_TRACE caps {"invalidated":"baseline","requestCap":"baseline","expense":"0.03000000"}
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > stops on invalidated evidence, the request cap, and the expense cap 779ms
+ ✓ test/canary-routing.test.ts > controlled canary routing > stops when the duration elapses or the evidence becomes stale 5442ms
+stdout | test/canary-routing.test.ts > controlled canary routing > keeps breaker, budget, and rate-limit denials on the pinned deployment
+CANARY_TRACE denials {"breaker":"circuit_open","budget":"budget_exceeded","rate":"tenant_rate_limited"}
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > keeps breaker, budget, and rate-limit denials on the pinned deployment 1277ms
+stdout | test/canary-routing.test.ts > controlled canary routing > streams the canary, keeps a partial body on that model, and falls back before the first byte
+CANARY_TRACE stream {"success":"alpha-spare","partial":"alpha-spare","fallbackExecuted":"alpha-chat","cohort":"canary"}
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > streams the canary, keeps a partial body on that model, and falls back before the first byte 766ms
+stdout | test/canary-routing.test.ts > controlled canary routing > stops manually, stays stopped in a new process, and keeps an active canary in a new process
+CANARY_STOP_VISIBILITY_MS 74
+
+stdout | test/canary-routing.test.ts > controlled canary routing > stops manually, stays stopped in a new process, and keeps an active canary in a new process
+CANARY_ROLLBACK stop returns auto to the alias baseline
+
+ ✓ test/canary-routing.test.ts > controlled canary routing > stops manually, stays stopped in a new process, and keeps an active canary in a new process 515ms
+ ✓ test/canary-routing.test.ts > controlled canary routing > uses the baseline when the rollout table cannot be read 231ms
+ ✓ test/canary-routing.test.ts > controlled canary routing > stops when a canary attempt hits the critical error threshold 249ms
+ ✓ test/canary-routing.test.ts > controlled canary routing > stops new canary traffic when the shadow policy is disabled 288ms
+(node:95907) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

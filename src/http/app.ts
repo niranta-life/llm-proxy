@@ -41,6 +41,8 @@ import { parseEligibilityBody, readSampleEligibility } from '../inference/sample
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
+import { parseRoutingKey } from '../inference/canary-assignment.js';
+import { createRollout, parseRolloutId, parseRolloutWrite, readRollout, stopRollout } from '../inference/canary-rollout.js';
 import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import {
@@ -345,6 +347,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
     request.raw.on('aborted', abortUpstream);
     reply.raw.on('close', onClose);
     try {
+      const routingKey = parseRoutingKey(request.headers['x-llm-routing-key']);
       const result = await executeChat({
         runtimePool: deps.runtimePool,
         logger: deps.logger,
@@ -370,6 +373,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         beforeSampleInsert: deps.beforeSampleInsert,
         failSampleInsert: deps.failSampleInsert,
         rankDeadlineMs: deps.rankDeadlineMs,
+        routingKey,
       });
       if (reply.sent || reply.raw.headersSent) return;
       return result;
@@ -1241,6 +1245,66 @@ export function buildApp(deps: AppDeps): ProxyApp {
         const change = parseStatusChange(request.body);
         return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
           setRoutingStatus(client, auth.tenantId, policyId, idempotencyKey, change.status, change.expectedEpoch),
+        );
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseRolloutWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          createRollout(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.rollout);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { tenantId?: string } }>(
+    '/internal/v1/routing/rollouts/:id',
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+      if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+        return reply
+          .code(404)
+          .send(proxyError(404, 'invalid_request_error', 'not_found', 'rollout_id', 'The rollout was not found.').body());
+      }
+      try {
+        const rolloutId = parseRolloutId(request.params.id);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) => readRollout(client, rolloutId));
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts/:id/stop',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const expectedEpoch = parseExpectedEpoch(request.body);
+        return await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          stopRollout(client, auth.tenantId, rolloutId, idempotencyKey, expectedEpoch),
         );
       } catch (error) {
         return sendRoutingError(reply, error);

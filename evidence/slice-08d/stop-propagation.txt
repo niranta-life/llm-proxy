@@ -1,0 +1,7 @@
+A second database session reads the rollout after the stop call. The clock starts before POST /internal/v1/routing/rollouts/{id}/stop and stops when that session sees status stopped. The measured ceiling is 74 milliseconds. The test requires the delay to stay under 2000 milliseconds. The operations page states 74 milliseconds. That number comes from this run.
+
+A stopped rollout stays on the baseline in a new process. An active rollout still selects the challenger in a new process. A missing safety read does not assign a canary. A critical-error threshold stops later canary traffic. A disabled shadow policy stops later canary traffic.
+
+Source: the full npm test transcript, test/canary-routing.test.ts.
+
+CANARY_STOP_VISIBILITY_MS 74

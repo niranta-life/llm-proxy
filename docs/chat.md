@@ -12,7 +12,9 @@ This page covers the whole path. See the [request path](architecture.md#request-
 
 `POST /v1/chat/completions` needs `model` and text `messages`.
 
-`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. It does not change the deployment or the response. An evidence snapshot does not change the deployment. A shadow ranking can name a different deployment. The chat still uses the alias baseline. See [Routing policy](operations.md#routing-policy), [Evidence qualification](operations.md#evidence-qualification), and [Shadow ranking](operations.md#shadow-ranking).
+`model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. An evidence snapshot does not by itself change the deployment. A shadow ranking can name a different deployment. The ranking is not executed. Without an active canary rollout, the chat uses the alias baseline. An operator can activate a rollout that sends a bounded share of `auto` to one qualified challenger. A named deployment stays on that deployment. See [Routing policy](operations.md#routing-policy), [Evidence qualification](operations.md#evidence-qualification), [Shadow ranking](operations.md#shadow-ranking), and [Canary routing](operations.md#canary-routing).
+
+You can send `X-LLM-Routing-Key` on a chat. The proxy uses that opaque key when it assigns a canary cohort. The same key, tenant, alias, and policy version stay on the same cohort. The proxy stores a digest of the key. It does not store the raw key. An invalid key is rejected. Omit the header and the proxy generates a request key.
 
 You can omit `stream`, or set it to `false`. `stream: true` works only when streaming is on for that tenant and that deployment. See [Streaming](streaming.md).
 

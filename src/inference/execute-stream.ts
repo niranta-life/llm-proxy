@@ -25,6 +25,7 @@ import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
+import { recordCanaryAssignment, reconcileCanary, type CanaryPlan } from './canary-rollout.js';
 import { observeShadowRank } from './shadow-rank-store.js';
 import {
   deadlineKindOf,
@@ -124,6 +125,7 @@ export async function runChatStream(input: {
   beforeSampleInsert?: () => Promise<void> | void;
   failSampleInsert?: () => boolean;
   rankDeadlineMs?: number;
+  plan: CanaryPlan;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -178,6 +180,7 @@ export async function runChatStream(input: {
       const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
         const pending = await insertPending(client, input.tenantId, input.route);
         await recordRoutingDecision(client, input.tenantId, pending.requestId, input.route);
+        await recordCanaryAssignment(client, input.tenantId, pending.requestId, input.plan);
         return {
           requestId: pending.requestId,
           attemptId: pending.attemptId,
@@ -650,13 +653,16 @@ export async function runChatStream(input: {
       total.cancel();
     }
   } finally {
-    if (requestId !== '' && !opened && !input.reply.headersSent()) {
-      stampProxyOutcome(input.reply, {
-        requestId,
-        deployment: input.route.deploymentName,
-        attemptCount: ordinal,
-        fallback: fellBack,
-      });
+    if (requestId !== '') {
+      if (!opened && !input.reply.headersSent()) {
+        stampProxyOutcome(input.reply, {
+          requestId,
+          deployment: input.route.deploymentName,
+          attemptCount: ordinal,
+          fallback: fellBack,
+        });
+      }
+      await reconcileCanary(input.runtimePool, input.logger, input.tenantId, requestId);
     }
     apiKey = '';
     untrack();

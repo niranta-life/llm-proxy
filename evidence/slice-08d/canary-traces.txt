@@ -1,0 +1,13 @@
+These lines are the shipped chat path. The cohort is the assignment row. The model is the deployment that answered.
+
+A share of 0 stays on the baseline. A share of 10000 uses the challenger. A named deployment is not assigned. Tenant B stays on gpt-tenant-b and cannot read Tenant A's rollout.
+
+An unvalidated challenger, a disabled challenger, a provider mismatch, a region mismatch, and a data-policy mismatch each answer on the baseline. Those gates do not stop the rollout.
+
+Invalidated evidence and the request cap stop the rollout. The next request uses the baseline. The expense recorded for one canary attempt is 0.03000000.
+
+Source: the full npm test transcript.
+
+CANARY_TRACE share {"zero":"baseline","full":"canary","forced":"bypass","tenantB":"gpt-tenant-b"}
+CANARY_TRACE gates {"unvalidated":"baseline","disabled":"baseline","provider":"baseline","region":"baseline","data":"baseline"}
+CANARY_TRACE caps {"invalidated":"baseline","requestCap":"baseline","expense":"0.03000000"}

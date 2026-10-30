@@ -1,0 +1,8 @@
+The canary is pinned first. Admission then runs on that deployment. An open breaker returns circuit_open. A hard budget below the quote returns budget_exceeded. A tenant rate limit returns tenant_rate_limited. None of those denials move the request to the baseline.
+
+Provider, region, and data-policy mismatches hold the request on the baseline and leave the rollout active. The baseline still uses its own permissions and hard limits.
+
+Source: the full npm test transcript.
+
+CANARY_TRACE gates {"unvalidated":"baseline","disabled":"baseline","provider":"baseline","region":"baseline","data":"baseline"}
+CANARY_TRACE denials {"breaker":"circuit_open","budget":"budget_exceeded","rate":"tenant_rate_limited"}

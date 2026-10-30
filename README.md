@@ -102,7 +102,7 @@ flowchart TB
     class optimizer,infraPlanned planned
 ```
 
-Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router does not execute that recommendation. A canary rollout can send a bounded share of `auto` to one qualified challenger. The rollout is off until an operator activates it. It does not promote itself. A guardrail is off until an operator attaches it. A violation stops new canary assignments. The ranker, the snapshot, and the schedule do not choose that challenger. An operator can promote a qualified policy and enable selection for one tenant and one task segment. Selection stays off until that enablement. The shadow ranker still does not choose the route. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database.
+Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router does not execute that recommendation. A canary rollout can send a bounded share of `auto` to one qualified challenger. The rollout is off until an operator activates it. It does not promote itself. A guardrail is off until an operator attaches it. A violation stops new canary assignments. The ranker, the snapshot, and the schedule do not choose that challenger. An operator can promote a qualified policy and enable selection for one tenant and one task segment. Selection stays off until that enablement. The shadow ranker still does not choose the route. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database. The local path is one Compose project on Colima. See [Local runtime](#local-runtime).
 
 ### How a request flows
 
@@ -118,7 +118,17 @@ Solid lines are shipped. Dashed lines are planned. Replay stays off until you en
 
 Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. An evidence refresh is a separate offline call. A shadow ranker can run after the route is chosen. It does not change the router and it does not call a provider.
 
-Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, and the trust boundaries.
+Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, the trust boundaries, and the [local runtime](docs/architecture.md#local-runtime).
+
+### Local runtime
+
+`./llm-proxy-docker.sh` runs this proxy on the Colima profile you already use. Compose starts PostgreSQL 16 and one app container. The app command is `node dist/index.js`. The base image entrypoint stays `docker-entrypoint.sh`. The image does not start the evaluation worker, the guardrail worker, or the promotion worker. The cleanup worker still starts inside the app process.
+
+`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. That file holds the log level, the OpenAI address, the credential keys, the stream limits, and the migration timeouts. Compose sets the database host, the role names, the role passwords, and the listen address. Leave those values out of the config file.
+
+`build` builds the app image and does not start it. `start` rebuilds that image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `watch` rebuilds the image when those files change. `watch` recreates the app when the config file changes. After either change the ready check returns HTTP 200 `{"status":"ready","database":"ready"}`. `stop` keeps the database volume and leaves Colima running. Colima stops only with `stop --vm`.
+
+Git does not track `config/docker.env`. A Docker build does not copy that file. A config the process would reject makes `build` and `start` exit before they start Colima or build an image. `scripts/colima.sh` starts the same Compose project. See [Architecture](docs/architecture.md#local-runtime) and [Operations](docs/operations.md).
 
 ### Request characteristics
 
@@ -229,14 +239,18 @@ The maintainers route every internal product's LLM calls through llm-proxy. Each
 
 You need Colima, the Docker CLI, Docker Compose, and curl. Tests and the check script also need Node.js 24. If your shell is on another Node version, run `nvm use 24`, then `npm install`, before `npm test`.
 
-Point Docker at the Colima socket, then start the stack. The script starts Colima when it is down, then PostgreSQL 16 and the proxy on port 8080.
+Export the Colima socket in the block below for later Docker commands. Run `./llm-proxy-docker.sh setup`. Run `./llm-proxy-docker.sh start`. The script starts Colima when it is down, then PostgreSQL 16 and the proxy on port 8080.
 
 ```bash
 export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
-scripts/colima.sh start
+./llm-proxy-docker.sh setup
+./llm-proxy-docker.sh build
+./llm-proxy-docker.sh start
 ```
 
-`npm run stack -- start` is the same script. `scripts/colima.sh start --build` rebuilds the image. `scripts/colima.sh stop` stops the containers and keeps the database volume. Colima itself stops only with `scripts/colima.sh stop --vm`.
+`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. Edit `config/docker.env` to change the log level, the OpenAI address, the stream limits, or the migration timeouts. Leave `INFERENCE_ENABLED` false until you want a provider call. `build` builds the app image and does not start it. `start` rebuilds the app image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. `start` also builds that image when it is missing. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `./llm-proxy-docker.sh status` shows Colima, the config file, whether inference is off, and whether the image matches the program files. It prints `image: not checked` when the program-file stamp matches and Colima is down. `status` shows the containers and the ready check when Colima is running. `./llm-proxy-docker.sh watch` rebuilds the app image when those program files change. `watch` recreates the app when the config file changes. `./llm-proxy-docker.sh stop` stops the containers and keeps the database volume. Colima itself stops only with `./llm-proxy-docker.sh stop --vm`. The shape of that runtime is in [Local runtime](#local-runtime).
+
+`scripts/colima.sh start` starts the same Compose project. `npm run stack -- start` runs that script. `npm run docker -- start` runs `llm-proxy-docker.sh`. `scripts/colima.sh start --build` rebuilds the image.
 
 Check the process:
 
@@ -314,7 +328,7 @@ Compose database passwords are for local development. The proxy listens without 
 
 ## Capabilities
 
-- **[Architecture](docs/architecture.md).** Module map, request path, data model, and trust boundaries.
+- **[Architecture](docs/architecture.md).** Module map, request path, data model, trust boundaries, and the local Colima runtime.
 - **[Tenants](docs/tenants.md).** Every call carries a tenant id and a secret. You can add and revoke keys. One tenant cannot read another tenant's rows.
 - **[Chat](docs/chat.md).** `POST /v1/chat/completions` and `GET /v1/models`. Text only. Success and errors use the OpenAI shape.
 - **[Providers](docs/providers.md).** OpenAI, Anthropic, Vertex, xAI, OpenRouter, and one private DGX endpoint per tenant. You store the key. The caller does not.

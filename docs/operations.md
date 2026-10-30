@@ -31,6 +31,19 @@ scripts/colima.sh status
 
 `npm run stack -- start` runs the same script. `restart --build` builds the image again and creates the containers again. `stop` keeps the database volume. Colima stops only with `--vm`. The image is `node:24-bookworm-slim`. If `DOCKER_HOST` is absent, tests use the selected Docker context.
 
+`./llm-proxy-docker.sh start` creates `config/docker.env` when that file is missing. `start` builds the app image when it is missing or the program files changed. `start` starts the same Compose project on Colima. `npm run docker -- start` runs that script.
+
+```bash
+./llm-proxy-docker.sh setup
+./llm-proxy-docker.sh build
+./llm-proxy-docker.sh start
+./llm-proxy-docker.sh status
+./llm-proxy-docker.sh watch
+./llm-proxy-docker.sh stop
+```
+
+`setup` creates `config/docker.env` from `config/docker.env.example` when the file is missing. It stores a provider credential key when `openssl` is installed. It leaves `INFERENCE_ENABLED` false. A second `setup` leaves that value false. Edit `config/docker.env` to change the log level, inference, the OpenAI base URL, the stream limits, or the migration timeouts. Do not put database settings, role names, role passwords, or the listen address in that file. Compose sets those values. A config the process would reject makes `build` and `start` exit before they start Colima or build an image. `scripts/check-llm-proxy-docker.sh` checks usage, setup, and that rejection. It does not build an image. `start` starts Colima when it is down. `start` rebuilds the app image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. A start with those files unchanged does not rebuild the image. `start --build` rebuilds that image every time. `watch` rebuilds the app image when those files change. `watch` recreates the app when the config file changes. After either change the ready check returns HTTP 200 `{"status":"ready","database":"ready"}`. `stop` keeps the database volume and leaves Colima running. Colima stops only with `--vm`. The script sets `DOCKER_HOST` for its own commands. The script does not change the Docker context. `status` shows inference off and the ready check while the stack is up. `status` prints `image: not checked` when the program-file stamp matches and Colima is down. The image command stays `node dist/index.js`. The image does not start the evaluation worker, the guardrail worker, or the promotion worker.
+
 ## Check a running proxy
 
 `scripts/check-deployed.mjs` sends request and response cases to a proxy that is already up. It does not call OpenAI.
@@ -76,7 +89,7 @@ The process refuses to listen when a required value is missing or invalid.
 | `EVALUATION_SCHEDULE_TENANTS` | no | One tenant id. Default empty. Empty means the scheduler creates no run and makes no provider call. Two ids are a configuration error. The id is stored in lowercase. |
 | `EVALUATION_GLOBAL_KILL` | no | `true` or `false`. Default `false`. `true` stops new evaluation work even when the database flag is false. Any other text is a configuration error. |
 
-The proxy does not listen with TLS. Compose passwords are for local development. There is no external secret manager. Git does not track `.env.live`, and a Docker build does not copy it.
+The proxy does not listen with TLS. Compose passwords are for local development. There is no external secret manager. Git does not track `.env.live` or `config/docker.env`. A Docker build does not copy them.
 
 ## Health
 

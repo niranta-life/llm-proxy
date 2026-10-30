@@ -6,3 +6,5 @@ test
 *.md
 .env.live
 .env.file
+config/docker.env
+config/.image-stamp

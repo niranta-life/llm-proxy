@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-This page maps the [high-level architecture](../README.md#high-level-architecture) to the code. It also lists the data model and the trust boundaries.
+This page maps the [high-level architecture](../README.md#high-level-architecture) to the code. It also lists the data model, the trust boundaries, and the [local runtime](#local-runtime).
 
 ## Components and code
 
@@ -124,7 +124,28 @@ A sample that an evaluation item or attempt still references stays as a wiped sh
 - **Proxy → provider.** Base URLs for hosted providers are fixed in code. A private endpoint must be on the tenant's allowlist with pinned addresses. Redirects are refused.
 - **Operator → proxy.** Tenants, providers, limits, and prices change through the CLI. A routing policy, an evidence refresh, a canary rollout, and a guardrail set use internal HTTP routes. Those routes require the tenant secret and a routing grant. Task feedback uses the same tenant authentication as chat. Those routes do not change a provider key.
 - **Key custody for samples.** `PROVIDER_CREDENTIAL_KEY` seals a new provider credential and wraps a new sample. `PROVIDER_CREDENTIAL_KEY_PREVIOUS` is an optional comma-separated list of retained 32-byte keys. Those keys open an older provider credential and an older sample. The HTTP server and the operator CLI both pass that list when they open a stored credential. A wrong key opens nothing. A changed ciphertext opens nothing. The current key still seals new values.
+- **Local config file.** `config/docker.env` stays on the host. Git does not track it. The image build does not copy it. The script does not print `PROVIDER_CREDENTIAL_KEY`. Compose passes the allowlisted values into the one app container. Database passwords in `docker-compose.yml` are for local development.
 - **TLS.** The proxy does not terminate TLS. Put it behind a load balancer or reverse proxy that does. Each proxy process has its own stream slots. Two processes share one PostgreSQL database and the same sample rows.
+
+## Local runtime
+
+The laptop path is one Compose project on the Colima profile you already use. The default profile is `default`. The socket is `~/.colima/default/docker.sock`. Set `COLIMA_PROFILE` or `COLIMA_SOCKET` when yours differ. `llm-proxy-docker.sh` and `scripts/colima.sh` both start `docker-compose.yml`. That file defines one `postgres:16` service and one `app` service. `npm run docker` runs `llm-proxy-docker.sh`. `npm run stack` runs `scripts/colima.sh`. Set `LLM_PROXY_ENV_FILE` only when that file already exists. The script creates `config/docker.env` only when you do not set `LLM_PROXY_ENV_FILE`.
+
+| Piece | What it does | Code |
+| --- | --- | --- |
+| Local control | Creates `config/docker.env` when it is missing. Builds the app image on Colima. Starts and stops the Compose project. Sets `DOCKER_HOST` for its own commands. Leaves the Docker context unchanged. | `llm-proxy-docker.sh` |
+| Compose project | Runs PostgreSQL 16 and one app container. Sets the database host, the role names, the role passwords, and the listen address. | `docker-compose.yml`, `scripts/colima.sh` |
+| Local config | Stores the log level, inference, the OpenAI base URL, the credential keys, the stream limits, and the migration timeouts. Inference stays off until you set `INFERENCE_ENABLED=true`. Git does not track `config/docker.env`. | `config/docker.env.example` |
+| App image | Runs `node dist/index.js`. The Dockerfile sets no `ENTRYPOINT`. The base image entrypoint stays `docker-entrypoint.sh`. The build context excludes `config/docker.env` and `config/.image-stamp`. | `Dockerfile`, `.dockerignore` |
+| Config check | Calls `llm-proxy-docker.sh` for usage, a second `setup`, and a rejected config. It does not build an image and it does not start Colima. | `scripts/check-llm-proxy-docker.sh` |
+
+`src/index.ts` serves HTTP and starts the sample cleanup job. Run `node dist/evaluation-worker.js` only when you want evaluation jobs. Run `node dist/guardrail-worker.js` only when you want guardrail checks. Run `node dist/promotion-worker.js` only when you want automatic promotion. The app image does not start those three processes.
+
+`setup` copies `config/docker.env.example` when `config/docker.env` is missing. It stores a provider credential key when `openssl` is installed. It leaves `INFERENCE_ENABLED` false. A second `setup` leaves that value false. The script accepts only the keys in the example file. It rejects a duplicate key. It rejects database settings, role names, role passwords, and the listen address. It rejects a value that runs a command. It rejects a credential that is not 32-byte base64. It rejects inference on with an empty credential key. It rejects a stream or timeout outside the process range. `build` and `start` then exit before they start Colima or build an image.
+
+The rebuild hash covers `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, and `docker/postgres/`. The script stores that hash in `config/.image-stamp`. Git does not track that file. `start` rebuilds when the hash changes, when the image is missing, or when you pass `--build`. A start with those files unchanged does not rebuild the image. `watch` rebuilds when that hash changes. `watch` recreates the app when `config/docker.env` changes. `stop` stops the containers and keeps the database volume. Colima stops only with `stop --vm`.
+
+`GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` when Postgres is up and the schema is current. `status` prints the `INFERENCE_ENABLED` value from the config file. `setup` leaves that value false. When the program-file stamp matches and Colima is down, `status` prints `image: not checked`. See [Operations](operations.md).
 
 ## Evaluation
 
@@ -142,7 +163,7 @@ History, pinned replay, deterministic checks, an optional pinned judge, a read-o
 - **Drift.** `GET /internal/v1/evaluation-schedules/drift` compares the latest two completed runs that share a task category, a profile, and a rubric. A run counts only when `created_at` and `updated_at` are at or before `asOf`. A validator counts only when its `created_at` is at or before `asOf`. An attempt counts only when its `created_at` and `updated_at` are at or before `asOf`. It can report quality drift, a schema-validity regression, a latency regression, a reliability regression, a model or price version change, a new deployment, and a workload-mix change. A mixed population is named and is not pooled into one rate.
 - **Routing.** Active aliases and fallback policy stay unchanged. A later production chat still follows the existing route. A schedule tick does not write an alias or a fallback policy. A routing policy in shadow records a decision. An evidence snapshot records a qualification status and does not by itself choose a deployment. A shadow ranker can read that snapshot when the policy is in shadow. It stores a recommendation. The router does not execute that recommendation. Without an active canary rollout and without enabled selection, `auto` resolves to the alias baseline. An active canary rollout can pin one qualified challenger for a bounded share of `auto`. An attached guardrail can stop later assignments. An operator can enable selection for one task segment. Selection stays off until that enablement. An in-flight request stays on the deployment it already pinned. A named model still never switches.
 
-The evaluation worker command is `node dist/evaluation-worker.js`. The guardrail worker command is `node dist/guardrail-worker.js`. The image command stays `node dist/index.js`. The inference process does not start either worker. The queue is PostgreSQL. See [Operations](operations.md#evaluation-rollback).
+The evaluation worker command is `node dist/evaluation-worker.js`. The guardrail worker command is `node dist/guardrail-worker.js`. The promotion worker command is `node dist/promotion-worker.js`. The image command stays `node dist/index.js`. The app process does not start those workers. The queue is PostgreSQL. See [Local runtime](#local-runtime) and [Operations](operations.md#evaluation-rollback).
 
 ## Planned
 

@@ -4,6 +4,8 @@ test/.pg.json
 *.log
 .DS_Store
 .env.live
+config/docker.env
+config/.image-stamp
 deploy/gcp/settings.env
 deploy/gcp/tofu/*/generated.auto.tfvars.json
 deploy/gcp/tofu/*/.terraform/

@@ -106,7 +106,7 @@ flowchart TB
     class optimizer,infraPlanned planned
 ```
 
-Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router does not execute that recommendation. A canary rollout can send a bounded share of `auto` to one qualified challenger. The rollout is off until an operator activates it. It does not promote itself. A guardrail is off until an operator attaches it. A violation stops new canary assignments. The ranker, the snapshot, and the schedule do not choose that challenger. Rankings are shipped. A shadow ranking records a recommendation and does not change the route. An operator can enable selection for one tenant and one task segment. Selection stays off until that enablement. When selection is on, the router sends `auto` in that segment to the lowest qualified expected cost inside the policy limits. The automatic optimizer stays dashed. It does not promote a policy by itself. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database. The local path is one Compose project on Colima. See [Local runtime](#local-runtime).
+Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router does not execute that recommendation. A canary rollout can send a bounded share of `auto` to one qualified challenger. The rollout is off until an operator activates it. It does not promote itself. A guardrail is off until an operator attaches it. A violation stops new canary assignments. The ranker, the snapshot, and the schedule do not choose that challenger. Rankings are shipped. A shadow ranking records a recommendation and does not change the route. An operator can enable selection for one tenant and one task segment. Selection stays off until that enablement. When selection is on, the router sends `auto` in that segment to the lowest qualified expected cost inside the policy limits. The automatic optimizer stays dashed. It does not promote a policy by itself. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database. The local path is one Compose project on Colima. See [Local runtime](#local-runtime). Recorded timings are in [Performance](docs/performance.md).
 
 ### How a request flows
 
@@ -160,7 +160,7 @@ The learning system uses your own traffic. History, pinned replay, deterministic
 - **Canary** sends a bounded share of `auto` to one qualified challenger. The challenger comes from one qualified evidence snapshot. The rollout does not follow the ranking. It does not promote itself. An attached guardrail can stop it. Missing feedback is not treated as success.
 - **Automatic optimizer** stays off. No process promotes a policy by itself.
 
-Evaluation jobs stay in PostgreSQL. The schedule does not add Redis. See [Evaluation](docs/architecture.md#evaluation).
+Evaluation jobs stay in PostgreSQL. The schedule does not add Redis. See [Evaluation](docs/architecture.md#evaluation) and [Performance](docs/performance.md).
 
 ### How this architecture compares
 

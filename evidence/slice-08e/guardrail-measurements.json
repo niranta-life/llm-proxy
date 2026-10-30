@@ -1,0 +1,26 @@
+{
+  "detectionMs": 11.351208000000042,
+  "rollbackMs": 4.635666000000128,
+  "monitorMs": 4.910457999998471,
+  "monitorRows": 1,
+  "heapUsed": 56825088,
+  "lastCanary": "guard-spare",
+  "nextBaseline": "gpt-guard-base",
+  "violation": {
+    "id": "52cacd63-0b99-47b1-a2e3-a5c20e195158",
+    "rolloutId": "74561817-ab79-42f2-ada7-e7d0cf9fde56",
+    "ruleId": "015143c8-df34-467c-9e8a-a5e5058a3652",
+    "trigger": "guardrail",
+    "kind": "absolute_failure",
+    "signal": "error_rate",
+    "reason": "violation",
+    "epoch": 2,
+    "evidence": {
+      "rate": 1,
+      "samples": 1,
+      "failures": 1,
+      "threshold": 1
+    },
+    "createdAt": "2026-10-30T09:23:07.030Z"
+  }
+}

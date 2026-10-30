@@ -592,6 +592,8 @@ async function planOnClient(
   if (rollout === undefined) {
     return held(route, null, route.deploymentId, null, null, 'no_rollout', false);
   }
+  // A failed cohort metric read must not assign the canary. The worker stores no violation for that failure.
+  await readAttachedCohortMetrics(client, rollout.id);
   const hold = (reason: string, deploymentId = route.deploymentId): CanaryPlan =>
     held(route, rollout.id, deploymentId, rollout.version_id, null, reason, true);
   if (route.deploymentId !== rollout.baseline_deployment_id) return hold('baseline_changed');
@@ -705,6 +707,29 @@ async function planOnClient(
     holdReason: 'assigned',
     record: true,
   };
+}
+
+async function readAttachedCohortMetrics(client: PoolClient, rolloutId: string): Promise<void> {
+  const attached = await client.query(
+    `SELECT 1 FROM routing_guardrail_sets WHERE rollout_id = $1 LIMIT 1`,
+    [rolloutId],
+  );
+  if ((attached.rowCount ?? 0) === 0) return;
+  await client.query(
+    `SELECT 1
+     FROM routing_canary_assignments AS assignment
+     LEFT JOIN model_attempts AS attempt
+       ON attempt.tenant_id = assignment.tenant_id AND attempt.request_id = assignment.request_id
+     LEFT JOIN attempt_costs AS cost
+       ON cost.tenant_id = attempt.tenant_id AND cost.attempt_id = attempt.id
+     LEFT JOIN proxy_requests AS request
+       ON request.tenant_id = assignment.tenant_id AND request.id = assignment.request_id
+     LEFT JOIN routing_task_feedback AS feedback
+       ON feedback.tenant_id = assignment.tenant_id AND feedback.request_id = assignment.request_id
+     WHERE assignment.rollout_id = $1
+     LIMIT 1`,
+    [rolloutId],
+  );
 }
 
 async function safetyStop(client: PoolClient, rollout: RolloutRow, reason: string): Promise<void> {

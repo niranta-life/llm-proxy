@@ -1,0 +1,81 @@
+stdout | test/guardrail-routing.test.ts > guardrail decision > does not stop a synthetic run that stays inside the gates
+GUARDRAIL_FALSE_ROLLBACK 0
+
+ ✓ test/guardrail-routing.test.ts > guardrail decision > stops on a separated relative failure and holds when the intervals overlap 1ms
+ ✓ test/guardrail-routing.test.ts > guardrail decision > does not stop a synthetic run that stays inside the gates 0ms
+ ✓ test/guardrail-routing.test.ts > guardrail decision > keeps the proxy process and the image command free of the worker 59ms
+(node:66402) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+ ✓ test/guardrail-routing.test.ts > routing guardrails > rejects bad feedback and stores an approved record without a prompt 1589ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > keeps a small or immature sample and missing feedback from stopping the rollout 1524ms
+stdout | test/guardrail-routing.test.ts > routing guardrails > stops on error, timeout, truncation, latency, cost, schema, and correctness gates
+GUARDRAIL_DETECTION_MS 11.351
+GUARDRAIL_ROLLBACK_MS 4.636
+GUARDRAIL_MONITOR_MS 4.910
+GUARDRAIL_MONITOR_ROWS 1
+GUARDRAIL_WORKER_HEAP_BYTES 56825088
+
+stdout | test/guardrail-routing.test.ts > routing guardrails > stops on error, timeout, truncation, latency, cost, schema, and correctness gates
+GUARDRAIL_LAST_CANARY guard-spare
+GUARDRAIL_NEXT_BASELINE gpt-guard-base
+
+ ✓ test/guardrail-routing.test.ts > routing guardrails > stops on error, timeout, truncation, latency, cost, schema, and correctness gates 4813ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > does not stop when relative quality still overlaps 826ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > stops once when two rollbacks race and rejects promotion 832ms
+stdout | test/guardrail-routing.test.ts > routing guardrails > keeps an open stream and an in-flight fallback on the pinned deployment
+GUARDRAIL_INFLIGHT stream stayed on gpt-guard-spare
+
+ ✓ test/guardrail-routing.test.ts > routing guardrails > keeps an open stream and an in-flight fallback on the pinned deployment 1474ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > uses the baseline when the rollout cannot be read and does not invent a violation 611ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > counts a rescued canary failure and does not treat fallback as a retry 3954ms
+stdout | test/guardrail-routing.test.ts > routing guardrails > stays stopped across a restart and a second database session
+GUARDRAIL_PROPAGATION_MS 93
+
+ ✓ test/guardrail-routing.test.ts > routing guardrails > stays stopped across a restart and a second database session 331ms
+ ✓ test/guardrail-routing.test.ts > routing guardrails > does not stop another tenant 464ms
+(node:66646) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security
+{"metricsSummary":{"window":{"from":"2026-10-30T09:21:22.540Z","to":"2026-10-30T09:25:22.540Z"},"requests":{"total":6,"succeeded":3,"failed":3,"pending":0},"usage":{"promptTokens":21,"completionTokens":19,"totalTokens":40,"responsesMissingUsage":0},"latency":{"samples":6,"sumMs":59,"maxMs":18},"streaming":{"requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"firstTextDeltaMs":{"samples":2,"p50":7,"p95":17},"durationMs":{"samples":5,"p50":8,"p95":18},"usage":{"promptTokens":18,"completionTokens":17,"totalTokens":35}},"byProvider":[{"provider":"anthropic","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"promptTokens":6,"completionTokens":4,"totalTokens":10}],"byDeployment":[{"provider":"anthropic","deployment":"metrics-claude","requests":1,"completed":1,"cancelled":0,"errors":0,"truncated":0,"promptTokens":15,"completionTokens":15,"totalTokens":30},{"provider":"openai","deployment":"metrics-openai","requests":5,"completed":2,"cancelled":1,"errors":1,"truncated":1,"promptTokens":6,"completionTokens":4,"totalTokens":10}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > reports stream metrics for OpenAI and Anthropic under row-level security 2432ms
+ ✓ test/stream-production.test.ts > streaming production controls > isolates tenant caps per process and releases a slow consumer slot 3553ms
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":1,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+stdout | test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown
+{"shutdownPass":2,"activeAfter":0,"aborted":1,"secondActive":0,"completed":1,"interrupted":1}
+
+ ✓ test/stream-production.test.ts > streaming production controls > drains open streams and records an abort on a second shutdown 10728ms
+stdout | test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream
+{"restartExit":0,"interrupted":"interrupted","restarted":"completed","drainLogged":true,"poolsClosed":true}
+
+ ✓ test/stream-production.test.ts > streaming production controls > restarts a proxy process after an interrupted stream 2185ms
+stdout | test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot
+{"streamLoad":{"runs":[{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":36.949000000000524,"p95":44.71549999999843},"durationMs":{"p50":44.505583000001934,"p95":54.5792079999992},"forwardingOverheadMs":{"p50":2.9650409999994736,"p95":5.124707999999373},"memoryRssBytes":{"1":130203648,"4":181862400,"8":184762368,"after":186482688}},{"completed":12,"errors":0,"completionRate":1,"errorRate":0,"firstTextDeltaMs":{"p50":37.021749999999884,"p95":51.90879199999836},"durationMs":{"p50":45.84200000000055,"p95":64.81725000000006},"forwardingOverheadMs":{"p50":3.152583000002778,"p95":6.523416999996698},"memoryRssBytes":{"1":130203648,"4":181862400,"8":184762368,"after":186482688}}]}}
+
+ ✓ test/stream-production.test.ts > streaming production controls > measures mock stream load without a leaked slot 2188ms
+(node:66812) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > rejects an illegal run transition and accepts the same status again 1ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > creates a dry run, pages it, and hides it from another tenant 1445ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > replays a duplicate Idempotency-Key and rejects the same key with a different payload 1049ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > rejects invalid plans with a specific code and does not decrypt 8064ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > advances a dry run once across crash, duplicate delivery, and two workers 3106ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > cancels a queued run, rejects an illegal stored transition, and keeps state on an outage 2054ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > stores a second version when the definition name already exists 997ms
+ ✓ test/evaluations-http.test.ts > durable evaluation orchestration > does not deadlock when cancel runs with the worker 1341ms
+(node:67033) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+(node:69844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ↓ test/vertex-live.test.ts > vertex live provider > runs one small non-streaming call and one small streaming call
+
+ Test Files  68 passed | 3 skipped (71)
+      Tests  692 passed | 5 skipped (697)
+   Start at  02:17:41
+   Duration  664.08s (transform 931ms, setup 57ms, collect 10.14s, tests 642.89s, environment 4ms, prepare 1.87s)
+
+(node:69846) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

@@ -43,6 +43,15 @@ import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
 import { parseRoutingKey } from '../inference/canary-assignment.js';
 import { createRollout, parseRolloutId, parseRolloutWrite, readRollout, stopRollout } from '../inference/canary-rollout.js';
+import {
+  attachGuardrails,
+  listGuardrails,
+  parseFeedbackWrite,
+  parseGuardrailAttach,
+  parseRollbackBody,
+  recordFeedback,
+  rollbackRollout,
+} from '../inference/guardrail-store.js';
 import type { VertexClientFactory } from '../inference/vertex-client.js';
 import type { StreamHttp } from '../inference/execute-stream.js';
 import {
@@ -389,6 +398,24 @@ export function buildApp(deps: AppDeps): ProxyApp {
       reply.raw.off('close', onClose);
     }
   });
+
+  app.post(
+    '/v1/feedback',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      try {
+        const write = parseFeedbackWrite(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          recordFeedback(client, auth.tenantId, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.feedback);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
 
   app.get('/v1/models', async (request, reply) => {
     const auth = await rejectUnauthenticated(request, reply);
@@ -1313,6 +1340,68 @@ export function buildApp(deps: AppDeps): ProxyApp {
   );
 
   app.post(
+    '/internal/v1/routing/rollouts/:id/rollback',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const body = parseRollbackBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          rollbackRollout(client, auth.tenantId, rolloutId, idempotencyKey, body.expectedEpoch, 'operator', {
+            ruleId: null,
+            kind: 'operator_rollback',
+            signal: 'operator_request',
+            reason: 'operator_request',
+            evidence: { expectedEpoch: body.expectedEpoch },
+          }),
+        );
+        return { rollout: saved.rollout, violation: saved.violation };
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/guardrails',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const write = parseGuardrailAttach(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          attachGuardrails(client, auth.tenantId, idempotencyKey, write),
+        );
+        return reply.code(saved.created ? 201 : 200).send(saved.guardrail);
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Querystring: { tenantId?: string } }>('/internal/v1/routing/guardrails', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    if (!(await allowRouting(auth, reply, 'routing:read'))) return;
+    if (request.query.tenantId !== undefined && request.query.tenantId.toLowerCase() !== auth.tenantId) {
+      return { guardrails: [] };
+    }
+    try {
+      const guardrails = await withTenant(deps.runtimePool, auth.tenantId, (client) => listGuardrails(client));
+      return { guardrails };
+    } catch (error) {
+      return sendRoutingError(reply, error);
+    }
+  });
+
+  app.post(
     '/internal/v1/routing/qualification-profiles',
     { bodyLimit: 65_536 },
     async (request, reply) => {
@@ -1471,7 +1560,9 @@ export function buildApp(deps: AppDeps): ProxyApp {
         path.startsWith('/internal/v1/evaluation-rubrics') ||
         path.startsWith('/internal/v1/evaluation-schedules') ||
         path.startsWith('/internal/v1/evaluation-controls') ||
-        path.startsWith('/internal/v1/routing')) &&
+        path.startsWith('/internal/v1/routing') ||
+        path === '/v1/feedback' ||
+        path.startsWith('/v1/feedback?')) &&
       statusCode === 413
     ) {
       reply

@@ -1,0 +1,137 @@
+{
+  "delayed": {
+    "reason": "immature",
+    "status": "active"
+  },
+  "missing": {
+    "reason": "missing_feedback",
+    "providerSuccesses": 1,
+    "schemaPasses": 0
+  },
+  "errorRate": {
+    "status": "stopped",
+    "signal": "error_rate",
+    "series": {
+      "policyVersionId": "4f212a46-06ea-4dd7-bb8c-cb1e90198cd8",
+      "cohort": "canary",
+      "cohortDeployment": "guard-spare",
+      "executedDeployment": "guard-spare",
+      "taskSegment": "general_qa",
+      "assignments": 1,
+      "executions": 1,
+      "errorRate": 1,
+      "timeoutRate": 0,
+      "incompleteStreamRate": 0,
+      "retryRate": 0,
+      "fallbackRate": 0,
+      "latencyP50Ms": 5,
+      "latencyP95Ms": 5,
+      "costPerRequest": "0.00000000",
+      "costPerCompletedRequest": null,
+      "schemaValidationFailures": 0,
+      "providerSuccesses": 0,
+      "trustedQuality": {
+        "taskSuccess": {
+          "pass": 0,
+          "fail": 0,
+          "unknown": 0,
+          "mature": 0,
+          "missing": 1,
+          "immature": 0
+        },
+        "schemaValid": {
+          "pass": 0,
+          "fail": 0,
+          "unknown": 0,
+          "mature": 0,
+          "missing": 1,
+          "immature": 0
+        },
+        "correctness": {
+          "pass": 0,
+          "fail": 0,
+          "unknown": 0,
+          "mature": 0,
+          "missing": 1,
+          "immature": 0
+        }
+      },
+      "evaluationQuality": {
+        "pass": 0,
+        "fail": 0,
+        "unknown": 0
+      },
+      "feedback": {
+        "mature": 0,
+        "missing": 1,
+        "immature": 0
+      }
+    }
+  },
+  "timeout": {
+    "failureClass": "timeout_after_dispatch",
+    "status": "stopped"
+  },
+  "truncation": {
+    "failureClass": "stream_started",
+    "status": "stopped"
+  },
+  "latency": {
+    "latencyP95Ms": 6,
+    "status": "stopped"
+  },
+  "cost": {
+    "costSum": 0.03,
+    "status": "stopped"
+  },
+  "schema": {
+    "status": "stopped"
+  },
+  "correctness": {
+    "status": "stopped"
+  },
+  "capability": {
+    "status": "stopped"
+  },
+  "overlap": {
+    "status": "active",
+    "cohorts": [
+      "baseline",
+      "canary"
+    ]
+  },
+  "rollback": {
+    "concurrentStatuses": [
+      200,
+      409
+    ],
+    "alias": "guard-chat",
+    "violations": 1,
+    "winnerKey": "race-b"
+  },
+  "inflight": {
+    "stream": "gpt-guard-spare",
+    "fallbackCohort": "canary",
+    "fallbackExecuted": "guard-chat"
+  },
+  "controlPlane": {
+    "status": "active",
+    "violations": 0,
+    "metricReadModel": "gpt-guard-base"
+  },
+  "rescuedTimeout": {
+    "timeoutRate": 1,
+    "status": "stopped"
+  },
+  "rescued": {
+    "errorRate": 1,
+    "retryRate": 0,
+    "fallbackRate": 1,
+    "realRetryRate": 1
+  },
+  "propagationMs": 93,
+  "crossTenant": {
+    "betaStatus": "active",
+    "betaModel": "gpt-guard-beta-spare"
+  }
+}

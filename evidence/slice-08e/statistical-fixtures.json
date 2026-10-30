@@ -1,0 +1,69 @@
+{
+  "method": "wilson_95_newcombe",
+  "relativeFailure": {
+    "action": "stop",
+    "canary": {
+      "lower": 0.825633,
+      "upper": 0.944771,
+      "successes": 90,
+      "trials": 100
+    },
+    "baseline": {
+      "lower": 0.021543,
+      "upper": 0.111752,
+      "successes": 5,
+      "trials": 100
+    },
+    "margin": 0.05
+  },
+  "relativeFailureOverlap": {
+    "action": "hold",
+    "reason": "inconclusive",
+    "canary": {
+      "lower": 0.133366,
+      "upper": 0.288831,
+      "successes": 20,
+      "trials": 100
+    },
+    "baseline": {
+      "lower": 0.175451,
+      "upper": 0.343046,
+      "successes": 25,
+      "trials": 100
+    },
+    "margin": 0.05
+  },
+  "qualityRegression": {
+    "action": "stop",
+    "canary": {
+      "lower": 0.133366,
+      "upper": 0.288831,
+      "successes": 20,
+      "trials": 100
+    },
+    "baseline": {
+      "lower": 0.888248,
+      "upper": 0.978457,
+      "successes": 95,
+      "trials": 100
+    },
+    "margin": 0.05
+  },
+  "qualityOverlap": {
+    "action": "hold",
+    "reason": "inconclusive"
+  },
+  "missingFeedback": {
+    "action": "hold",
+    "reason": "missing_feedback",
+    "successes": 0
+  },
+  "tooFewSamples": {
+    "action": "hold",
+    "reason": "insufficient_samples"
+  },
+  "delayedFeedback": {
+    "action": "hold",
+    "reason": "immature"
+  }
+}

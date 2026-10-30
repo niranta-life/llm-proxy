@@ -34,6 +34,7 @@ import { resolveModel, type ResolvedRoute } from './resolve.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
 import { observeShadowRank } from './shadow-rank-store.js';
 import { pinCanary, recordCanaryAssignment, reconcileCanary } from './canary-rollout.js';
+import { recordCapabilityDenial } from './guardrail-store.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
@@ -170,7 +171,27 @@ export async function executeChat(input: {
   });
   let route: ResolvedRoute = plan.route;
   assertStreamAllowed(request, route, loaded.streamingEnabled);
-  assertCapabilities(request, route.capabilities);
+  try {
+    assertCapabilities(request, route.capabilities);
+  } catch (error) {
+    if (
+      plan.cohort === 'canary' &&
+      plan.rolloutId !== null &&
+      error instanceof ProxyError &&
+      error.code === 'unsupported_parameter' &&
+      error.param !== null
+    ) {
+      await recordCapabilityDenial(
+        input.runtimePool,
+        input.logger,
+        input.tenantId,
+        plan.rolloutId,
+        route.deploymentId,
+        error.param,
+      );
+    }
+    throw error;
+  }
   let adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {

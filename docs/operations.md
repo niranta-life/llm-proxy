@@ -335,7 +335,7 @@ The emergency stop stays `POST /internal/v1/routing/rollouts/{id}/stop`. That st
 
 A relative failure rule and a quality-regression rule use a Wilson interval. The rollout stops only when the challenger bound is worse than the baseline bound by more than the margin. Overlapping intervals do not stop the rollout. Unknown feedback is not a success and is not a failure. Delayed feedback stays immature until the maturity time has passed.
 
-One measured pass detected the violation in 11.351 milliseconds and completed the stop in 4.636 milliseconds. The monitoring read scanned 1 assignment row in 4.910 milliseconds. The worker heap was 56825088 bytes. A synthetic run inside the gates recorded 0 false stops. The last canary deployment was guard-spare. The next request used gpt-guard-base. An open stream stayed on gpt-guard-spare. A second database session saw that rollback within 93 milliseconds.
+One measured pass detected the violation in 11.351 milliseconds and completed the stop in 4.636 milliseconds. The monitoring read scanned 1 assignment row in 4.910 milliseconds. The worker heap was 56825088 bytes. A synthetic run inside the gates recorded 0 false stops. The last canary deployment was guard-spare. The next request used gpt-guard-base. An open stream stayed on gpt-guard-spare. A second database session saw that rollback within 93 milliseconds. Recorded performance figures are on the [performance page](performance.md).
 
 ## Governed promotion
 

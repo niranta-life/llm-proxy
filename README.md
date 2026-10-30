@@ -351,6 +351,7 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
 - **[Metrics](docs/metrics.md).** Counts, latency, stream percentiles, attempts, breaker state, and cost for the caller's own tenant.
+- **[Performance](docs/performance.md).** Recorded times, rates, and memory from the evidence runs. The figures use mock providers. They are not a production service level.
 - **[Request characteristics](docs/metrics.md#request-features).** One versioned record per completed chat: the task, the model, the size, and the outcome. The prompt and the answer are not stored.
 - **[Encrypted samples](docs/metrics.md#encrypted-samples).** Optional ciphertext for an approved chat. Off by default. Metadata routes return no prompt and no completion.
 - **[Evaluation](docs/architecture.md#evaluation).** Pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant. None of them change production routing.

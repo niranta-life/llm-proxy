@@ -44,6 +44,12 @@ import { executeChat } from '../inference/execute.js';
 import { parseRoutingKey } from '../inference/canary-assignment.js';
 import { createRollout, parseRolloutId, parseRolloutWrite, readRollout, stopRollout } from '../inference/canary-rollout.js';
 import {
+  parsePromoteBody,
+  promoteRollout,
+  rejectProposal,
+  saveAutomaticPolicy,
+} from '../inference/promotion-store.js';
+import {
   attachGuardrails,
   listGuardrails,
   parseFeedbackWrite,
@@ -1360,6 +1366,38 @@ export function buildApp(deps: AppDeps): ProxyApp {
           }),
         );
         return { rollout: saved.rollout, violation: saved.violation };
+      } catch (error) {
+        return sendRoutingError(reply, error);
+      }
+    },
+  );
+
+  app.post(
+    '/internal/v1/routing/rollouts/:id/promote',
+    { bodyLimit: 65_536 },
+    async (request, reply) => {
+      const auth = await rejectUnauthenticated(request, reply);
+      if (auth === null) return;
+      if (!(await allowRouting(auth, reply, 'routing:admin'))) return;
+      try {
+        const rolloutId = parseRolloutId((request.params as { id: string }).id);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        const command = parsePromoteBody(request.body);
+        const saved = await withTenant(deps.runtimePool, auth.tenantId, async (client) => {
+          if (command.kind === 'automatic') {
+            const found = await client.query(`SELECT 1 FROM routing_rollouts WHERE id = $1`, [rolloutId]);
+            if ((found.rowCount ?? 0) === 0) {
+              throw proxyError(404, 'invalid_request_error', 'not_found', 'rollout_id', 'The rollout was not found.');
+            }
+            return { status: 200, body: { automaticPromotion: await saveAutomaticPolicy(client, auth.tenantId, command.policy) } };
+          }
+          if (command.kind === 'reject') {
+            return { status: 200, body: await rejectProposal(client, auth.tenantId, rolloutId, idempotencyKey, command.proposalId) };
+          }
+          const promoted = await promoteRollout(client, auth.tenantId, rolloutId, idempotencyKey, command.write, 'operator', null);
+          return { status: promoted.created ? 201 : 200, body: promoted.promotion };
+        });
+        return reply.code(saved.status).send(saved.body);
       } catch (error) {
         return sendRoutingError(reply, error);
       }

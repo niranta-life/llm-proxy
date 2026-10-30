@@ -4,6 +4,7 @@ import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { assignCohort, generatedRoutingKey, routingKeyDigest, type CanaryCohort } from './canary-assignment.js';
 import { invalidRequest, proxyError } from './errors.js';
+import { retirePromotion } from './promotion-store.js';
 import { routeForDeployment, type DeploymentCandidate, type ResolvedRoute } from './resolve.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -385,9 +386,13 @@ export async function stopRollout(
       `SELECT request_hash FROM routing_rollout_events WHERE idempotency_key = $1 AND rollout_id = $2`,
       [idempotencyKey, rolloutId],
     );
-    if (raced.rows[0]?.request_hash === requestHash) return readRollout(client, rolloutId);
+    if (raced.rows[0]?.request_hash === requestHash) {
+      await retirePromotion(client, rolloutId);
+      return readRollout(client, rolloutId);
+    }
     throw proxyError(409, 'invalid_request_error', 'idempotency_conflict', 'Idempotency-Key', 'The idempotency key was reused.');
   }
+  await retirePromotion(client, rolloutId);
   return readRollout(client, rolloutId);
 }
 
@@ -756,6 +761,7 @@ async function safetyStop(client: PoolClient, rollout: RolloutRow, reason: strin
   }).catch((error: unknown) => {
     if (!isUniqueViolation(error)) throw error;
   });
+  await retirePromotion(client, rollout.id);
 }
 
 async function insertEvent(

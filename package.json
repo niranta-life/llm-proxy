@@ -11,6 +11,7 @@
     "start": "node dist/index.js",
     "evaluation-worker": "node dist/evaluation-worker.js",
     "guardrail-worker": "node dist/guardrail-worker.js",
+    "promotion-worker": "node dist/promotion-worker.js",
     "cli": "node dist/cli.js",
     "stack": "bash scripts/colima.sh",
     "check:deployed": "node scripts/check-deployed.mjs",

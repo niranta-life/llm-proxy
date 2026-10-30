@@ -31,6 +31,7 @@ import {
 import { circuitOpenError, classifyBreakerOutcome, type BreakerOutcome } from './breaker.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeErrorCode, timeoutProxy } from './errors.js';
 import { resolveModel, type ResolvedRoute } from './resolve.js';
+import { recordSelection, selectPromoted } from './promotion-select.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
 import { observeShadowRank } from './shadow-rank-store.js';
 import { pinCanary, recordCanaryAssignment, reconcileCanary } from './canary-rollout.js';
@@ -161,14 +162,34 @@ export async function executeChat(input: {
   if (loaded.route === null) {
     throw proxyError(404, 'invalid_request_error', 'model_not_found', 'model', 'The model is not available.');
   }
-  const plan = await pinCanary({
+  const selection = await selectPromoted({
     pool: input.runtimePool,
     logger: input.logger,
     tenantId: input.tenantId,
     route: loaded.route,
+    request,
     routingKey: input.routingKey ?? null,
     deployments: loaded.deployments,
   });
+  const plan = selection.skipCanary
+    ? {
+        route: selection.route,
+        cohort: 'baseline' as const,
+        rolloutId: null,
+        policyVersionId: null,
+        cohortDeploymentId: selection.route.deploymentId,
+        routingKeyDigest: selection.routingKeyDigest,
+        holdReason: 'not_auto',
+        record: false,
+      }
+    : await pinCanary({
+        pool: input.runtimePool,
+        logger: input.logger,
+        tenantId: input.tenantId,
+        route: loaded.route,
+        routingKey: input.routingKey ?? null,
+        deployments: loaded.deployments,
+      });
   let route: ResolvedRoute = plan.route;
   assertStreamAllowed(request, route, loaded.streamingEnabled);
   try {
@@ -221,6 +242,7 @@ export async function executeChat(input: {
       failSampleInsert: input.failSampleInsert,
       rankDeadlineMs: input.rankDeadlineMs,
       plan,
+      selection,
     });
     return undefined;
   }
@@ -241,6 +263,7 @@ export async function executeChat(input: {
     const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
       const pending = await insertPending(client, input.tenantId, route);
       await recordRoutingDecision(client, input.tenantId, pending.requestId, route);
+      await recordSelection(client, input.tenantId, pending.requestId, selection);
       await recordCanaryAssignment(client, input.tenantId, pending.requestId, plan);
       return {
         requestId: pending.requestId,

@@ -24,6 +24,7 @@ import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
+import { recordSelection, type SelectionPlan } from './promotion-select.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
 import { recordCanaryAssignment, reconcileCanary, type CanaryPlan } from './canary-rollout.js';
 import { observeShadowRank } from './shadow-rank-store.js';
@@ -126,6 +127,7 @@ export async function runChatStream(input: {
   failSampleInsert?: () => boolean;
   rankDeadlineMs?: number;
   plan: CanaryPlan;
+  selection: SelectionPlan;
 }): Promise<void> {
   if (
     input.route.provider !== 'anthropic' &&
@@ -180,6 +182,7 @@ export async function runChatStream(input: {
       const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
         const pending = await insertPending(client, input.tenantId, input.route);
         await recordRoutingDecision(client, input.tenantId, pending.requestId, input.route);
+        await recordSelection(client, input.tenantId, pending.requestId, input.selection);
         await recordCanaryAssignment(client, input.tenantId, pending.requestId, input.plan);
         return {
           requestId: pending.requestId,

@@ -1,0 +1,7 @@
+{
+  "foreignPromote": 404,
+  "foreignPolicy": 404,
+  "foreignDecision": 404,
+  "promptInPolicy": false,
+  "promptInDecision": false
+}

@@ -1,0 +1,13 @@
+{
+  "canary_window": "canary_window",
+  "unstable_judge": "unstable_judge",
+  "quality_threshold": "quality_threshold",
+  "fresh_model_version": "fresh_model_version",
+  "fresh_config_version": "fresh_config_version",
+  "latency_target": "latency_target",
+  "cost_objective": "cost_objective",
+  "loose_margin": {
+    "manual": "noninferiority",
+    "automaticPromoted": 0
+  }
+}

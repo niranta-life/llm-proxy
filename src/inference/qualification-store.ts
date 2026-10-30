@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { proxyError } from './errors.js';
+import { proposeFromSnapshot } from './promotion-store.js';
 import {
   qualificationDigest,
   qualificationRequestHash,
@@ -368,6 +369,7 @@ export async function refreshEvidenceSnapshot(
     }
     throw proxyError(409, 'invalid_request_error', 'idempotency_conflict', 'Idempotency-Key', 'The idempotency key was reused.');
   }
+  await proposeFromSnapshot(client, tenantId, snapshotId);
   return { snapshot: await readSnapshot(client, snapshotId), created: true };
 }
 

@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { invalidRequest, proxyError } from './errors.js';
+import {
+  readDecisionSelection,
+  readPromotionAttachment,
+  type AutomaticPolicyView,
+  type DecisionSelectionView,
+  type PromotionView,
+  type ProposalView,
+} from './promotion-store.js';
 import { FEATURE_EXTRACTOR_VERSION } from './request-features.js';
 import type { ResolvedRoute } from './resolve.js';
 import {
@@ -34,6 +42,9 @@ export type RoutingPolicyView = {
   maxLatencyMs: number;
   taskSegments: string[];
   events: RoutingEventView[];
+  promotion: PromotionView | null;
+  proposals: ProposalView[];
+  automaticPromotion: AutomaticPolicyView | null;
 };
 
 export type RoutingDecisionView = {
@@ -47,6 +58,8 @@ export type RoutingDecisionView = {
   featureExtractorVersion: number;
   routingMode: 'static' | 'shadow' | 'bypass';
   reasonCodes: string[];
+  promotion: DecisionSelectionView['promotion'];
+  selection: DecisionSelectionView['selection'];
 };
 
 type PolicyRow = {
@@ -302,6 +315,7 @@ export async function readRoutingDecision(client: PoolClient, requestId: string)
     featureExtractorVersion: Number(row.feature_extractor_version),
     routingMode: row.routing_mode,
     reasonCodes: textList(row.reason_codes),
+    ...(await readDecisionSelection(client, requestId)),
   };
 }
 
@@ -431,6 +445,7 @@ async function presentPolicy(client: PoolClient, row: PolicyRow): Promise<Routin
       epoch: Number(event.epoch),
       versionId: event.version_id,
     })),
+    ...(await readPromotionAttachment(client, row.id)),
   };
 }
 

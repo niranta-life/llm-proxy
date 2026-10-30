@@ -309,6 +309,7 @@ describe('Anthropic integration', () => {
       '028_shadow_ranking.sql',
       '029_routing_rollouts.sql',
       '030_routing_guardrails.sql',
+      '031_routing_promotions.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

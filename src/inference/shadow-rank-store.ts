@@ -50,7 +50,7 @@ export type ShadowMetricsView = {
   cacheHitRate: string | null;
 };
 
-type PolicyLoad = {
+export type PolicyLoad = {
   versionId: string;
   baselineDeploymentId: string;
   candidateDeploymentIds: string[];
@@ -197,6 +197,40 @@ export async function readShadowMetrics(client: PoolClient): Promise<ShadowMetri
     cacheHits,
     cacheHitRate: decisions === 0 ? null : (cacheHits / decisions).toFixed(5),
   };
+}
+
+export async function recommendPolicy(
+  client: PoolClient,
+  tenantId: string,
+  policy: PolicyLoad,
+  request: ChatRequest,
+  live: ReadonlyMap<string, { cost: number | null; latencyMs: number | null }>,
+): Promise<{ outcome: RankOutcome; expectedCost: number | null }> {
+  const started = Date.now();
+  const features = featuresFrom(request);
+  const loaded = await loadRankMaterial(client, policy, features);
+  const evidence = loaded.evidence.map((item) => {
+    const overlay = live.get(item.deploymentId);
+    if (overlay === undefined) return item;
+    return {
+      ...item,
+      expectedCost: item.expectedCost ?? overlay.cost,
+      expectedLatencyMs: item.expectedLatencyMs ?? overlay.latencyMs,
+    };
+  });
+  const outcome = rankShadow({
+    tenantId,
+    nowMs: started,
+    deadlineMs: started + 5_000,
+    clock: () => Date.now(),
+    features,
+    policy: toRankPolicy(policy),
+    deployments: loaded.deployments,
+    evidence,
+  });
+  const winner = outcome.recommendedDeploymentId;
+  const priced = winner === null ? undefined : evidence.find((item) => item.deploymentId === winner);
+  return { outcome, expectedCost: priced?.expectedCost ?? null };
 }
 
 async function rankAndStore(

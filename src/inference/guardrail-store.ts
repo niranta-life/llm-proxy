@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { readRollout, type RolloutView } from './canary-rollout.js';
+import { retirePromotion } from './promotion-store.js';
 import { invalidRequest, proxyError } from './errors.js';
 import {
   CONSERVATIVE_DEFAULTS,
@@ -254,14 +255,21 @@ export async function recordFeedback(
   if ((request.rowCount ?? 0) !== 1) {
     throw proxyError(404, 'invalid_request_error', 'not_found', 'requestId', 'The request was not found.');
   }
+  // A promoted request skips the canary assignment. The same rollout guardrail set still names the approved sources.
   const approved = await client.query<{ approved_sources: string[] }>(
     `SELECT s.approved_sources
      FROM routing_canary_assignments a
      JOIN routing_guardrail_sets s ON s.tenant_id = a.tenant_id AND s.rollout_id = a.rollout_id
-     WHERE a.request_id = $1`,
+     WHERE a.request_id = $1
+     UNION ALL
+     SELECT s.approved_sources
+     FROM routing_selection_decisions d
+     JOIN routing_promotions p ON p.tenant_id = d.tenant_id AND p.id = d.promotion_id
+     JOIN routing_guardrail_sets s ON s.tenant_id = p.tenant_id AND s.rollout_id = p.rollout_id
+     WHERE d.request_id = $1`,
     [write.requestId],
   );
-  const sources = approved.rows[0]?.approved_sources ?? [];
+  const sources = approved.rows.flatMap((row) => row.approved_sources ?? []);
   if (!sources.includes(write.source)) {
     throw invalidRequest('source', 'unapproved_source', 'The feedback source is not approved.');
   }
@@ -562,6 +570,7 @@ export async function rollbackRollout(
   );
   const violationRow = inserted.rows[0];
   if (violationRow === undefined) throw new Error('violation was not stored');
+  await retirePromotion(client, rolloutId);
   return {
     rollout: await readRollout(client, rolloutId),
     violation: {

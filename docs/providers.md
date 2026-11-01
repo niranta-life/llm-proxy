@@ -72,7 +72,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
   --tenant-id <tenant-id> --name primary --enabled false
 ```
 
-`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. `npm test` uses a mock server and does not call OpenAI.
+`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. Store `tools`, `tool_choice`, and `parallel_tool_calls` only on an OpenAI deployment. `npm test` uses a mock server and does not call OpenAI.
 
 ## Anthropic
 
@@ -178,7 +178,7 @@ A live Vertex test runs only when `VERTEX_LIVE` is `1`. `npm test` does not set 
 
 ## xAI
 
-Each tenant has one xAI connection. The base URL is fixed at `https://api.x.ai/v1`. The connection stores no endpoint. The caller cannot send `base_url`. Capabilities match an OpenAI deployment. Do not pass `--default-max-output-tokens` or an OpenRouter routing flag. The proxy does not send `X-OpenRouter-Metadata` to xAI.
+Each tenant has one xAI connection. The base URL is fixed at `https://api.x.ai/v1`. The connection stores no endpoint. The caller cannot send `base_url`. Text capabilities match an OpenAI deployment. Function tools stay on OpenAI. Do not pass `--default-max-output-tokens` or an OpenRouter routing flag. The proxy does not send `X-OpenRouter-Metadata` to xAI.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-xai-connection \

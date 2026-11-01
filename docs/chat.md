@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-[llm-proxy](../README.md) accepts one text chat and returns an OpenAI chat completion. The caller uses the same JSON for every provider. Setup for each provider is in [Providers](providers.md).
+[llm-proxy](../README.md) accepts one chat completion and returns an OpenAI chat completion. An OpenAI deployment can accept function tools. The proxy does not execute the function. The caller uses the same JSON for every provider. Setup for each provider is in [Providers](providers.md).
 
 ## Where it fits
 
@@ -10,7 +10,7 @@ This page covers the whole path. See the [request path](architecture.md#request-
 
 ## Request
 
-`POST /v1/chat/completions` needs `model` and text `messages`.
+`POST /v1/chat/completions` needs `model` and `messages`.
 
 `model` is `auto` or the name of an enabled deployment. The deployment and its connection must both be enabled. The only alias is `auto`. Do not name a deployment `auto`. A shadow routing policy can record that choice. An evidence snapshot does not by itself change the deployment. A shadow ranking can name a different deployment. The ranking is not executed. Without an active canary rollout and without enabled selection, the chat uses the alias baseline. An operator can activate a rollout that sends a bounded share of `auto` to one qualified challenger. A named deployment stays on that deployment. An attached guardrail can stop that rollout. A request that already started keeps its pinned deployment. New `auto` requests then use the alias baseline. The guardrail does not promote the challenger. An operator can promote the rollout and enable selection for one task segment. Selection stays off until that enablement. When it is on, `auto` in that segment selects the lowest expected cost that meets the policy limits. See [Routing policy](operations.md#routing-policy), [Evidence qualification](operations.md#evidence-qualification), [Shadow ranking](operations.md#shadow-ranking), [Canary routing](operations.md#canary-routing), and [Governed promotion](operations.md#governed-promotion).
 
@@ -153,7 +153,7 @@ An error body is an OpenAI error object:
 | 504 | `timeout` | The deployment timeout finished, or a stream timeout finished before the response headers. |
 | 529 | `overloaded` | Anthropic returned HTTP 529. |
 
-HTTP 400 covers `stream: true` when streaming is off, a tool, an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
+HTTP 400 covers `stream: true` when streaming is off. HTTP 400 covers tools on a stream. HTTP 400 covers tools on a provider other than OpenAI. HTTP 400 covers tools when the deployment does not list them. HTTP 400 covers an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
 
 These cases never call the provider:
 
@@ -181,7 +181,7 @@ The proxy returns HTTP 502 for a `tool_use` block, a content block it cannot rep
 
 With retry off and no fallback, the proxy sends the request once. Provider clients set `maxRetries` to `0`.
 
-An enabled retry can make one more attempt on the same deployment. An enabled fallback on `auto` can try one other approved deployment, and only before any output. The same request does not retry and fall back. The cap is two upstream attempts. See [Retry](retry.md) and [Fallback](fallback.md).
+An enabled retry can make one more attempt on the same deployment. An enabled fallback on `auto` can try one other approved deployment, and only before any output. A function-tool request does not move to another provider. The same request does not retry and fall back. The cap is two upstream attempts. See [Retry](retry.md) and [Fallback](fallback.md).
 
 ## Related
 

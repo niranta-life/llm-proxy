@@ -70,7 +70,7 @@ A sample is stored only after the operator sets the mode to `encrypted_sample` a
 
 The stored bytes are an AES-256-GCM envelope. Each sample has its own data key. That key is wrapped by `PROVIDER_CREDENTIAL_KEY`. A retained previous wrapping key can open an older sample after rotation. The same retained key can open a provider credential that was sealed with it. A new credential and a new sample use the current key only. The tenant id, the sample id, and the schema version are bound to the ciphertext. A wrong key returns no plaintext. A changed ciphertext returns no plaintext. The stored row is left unchanged.
 
-Capture runs after a completed non-streaming text chat. A completed text stream is captured only when streaming capture is also on. The default is off. The insert stores a row only when the latest policy still allows encrypted capture. A capture failure does not change the chat response and does not retry the provider. The stored stream text is the caller-visible text in order. Hidden thinking, tool-use arguments and results, credentials, and caller metadata are not stored. A failed, cancelled, truncated, revoked, or over-size stream stores no replay-ready sample.
+Capture runs after a completed non-streaming text chat. A tool round stores no sample. A completed text stream is captured only when streaming capture is also on. The default is off. The insert stores a row only when the latest policy still allows encrypted capture. A capture failure does not change the chat response and does not retry the provider. The stored stream text is the caller-visible text in order. Hidden thinking, tool-use arguments and results, credentials, and caller metadata are not stored. A failed, cancelled, truncated, revoked, or over-size stream stores no replay-ready sample.
 
 `POST /internal/v1/samples/{sampleId}/eligibility-check` takes `{ "deployment": "<name>" }`. It returns `eligible`, `reasons`, one result for each metadata check, and the policy version. A check that needs the sample text is `unknown`. `eligible` is true only when every check passes. The route does not decrypt the sample, call a provider, start a replay, reserve budget, call a judge, change rankings, or change routing.
 
@@ -84,7 +84,7 @@ Turn metadata collection on before content capture. Leave content capture off un
 
 Categories are `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, and `unknown`. A caller may send `task` with one of those values. Any other `task` value is rejected and is not stored. When `task` is absent, local rules choose the category, or the category stays `unknown`. The proxy does not call a model to classify the request.
 
-A successful chat records structured output and tool use as false. `tools` and a non-text `response_format` are still rejected before a provider call. The feature row does not contain the prompt, the completion, or a credential.
+A successful chat records `structured_output` as false. A non-text `response_format` is still rejected before a provider call. `tool_required` is true only when `tool_choice` is `required` or one named function. An OpenAI deployment that lists `tools` can accept function tools. A tool round is not stored as a sample. The feature row does not contain the prompt, the completion, a credential, or raw tool arguments.
 
 ## Limits and budgets
 

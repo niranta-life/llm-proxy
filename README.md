@@ -22,6 +22,7 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 ### What Does It Provide?
 
 - **Standard Interface:** Drop-in OpenAI-compatible endpoints (`POST /v1/chat/completions` and `GET /v1/models`) supporting Server-Sent Events (SSE) streaming and unary modes.
+- **Function Tools:** An OpenAI deployment can accept a function tool and return a tool call. The application executes the function. The proxy does not execute the function.
 - **Multi-Provider Adapters:** Native adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and private self-hosted endpoints (e.g., NVIDIA DGX).
 - **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets.
 - **Resilience Controls:** Configurable request deadlines, circuit breakers, and retry policies before any stream output begins.
@@ -95,7 +96,7 @@ Explore technical documentation organized by intent:
 - **[Market Comparison](docs/comparison.md)** – Detailed comparison table with sources across LiteLLM, Kong, Portkey, Envoy AI Gateway, Bedrock, and Cloudflare.
 
 ### Core Proxy Capabilities
-- **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, error shapes, and header conventions.
+- **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, function tools, error shapes, and header conventions.
 - **[Tenant Isolation & Security](docs/tenants.md)** – PostgreSQL Row-Level Security, key rotation, and credential management.
 - **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and manual registration via `--api-key-stdin`.
 - **[Streaming](docs/streaming.md)** – Server-Sent Events architecture, streaming leases, and concurrency caps.
@@ -136,7 +137,7 @@ Explore technical documentation organized by intent:
 ## What is Not Included
 
 - Login, OAuth, SSO, user accounts, and saved caller state.
-- Images, audio, embeddings, and MCP. An OpenAI deployment can accept a function tool and return a tool call. The proxy does not execute the function.
+- Images, audio, embeddings, and MCP.
 - An optimizer that promotes a policy without an operator.
 - An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI.
 - TLS on the Node.js listen port. Nginx in Compose terminates TLS on port 443. The Node.js port stays private.

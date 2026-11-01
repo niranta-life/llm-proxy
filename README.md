@@ -84,13 +84,13 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
 
 Explore comprehensive technical documentation organized by intent:
 
-### 🚀 Getting Started & Operations
+### Getting Started & Operations
 - **[Operations Guide](docs/operations.md)** – CLI commands, interactive management, environment variables, health checks, migrations, and incident runbooks.
 - **[Architecture Deep Dive](docs/architecture.md)** – Detailed module map, trust boundaries, data schema, and local runtime design.
 - **[GCP Deployment](docs/gcp-deployment.md)** – Cloud deployment guide using OpenTofu / Terraform for Google Cloud VPC.
 - **[Market Comparison](docs/comparison.md)** – Technical comparison against LiteLLM, Kong, Portkey, Envoy AI Gateway, and Cloudflare.
 
-### 🛡️ Core Proxy Capabilities
+### Core Proxy Capabilities
 - **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, error shapes, and header conventions.
 - **[Tenant Isolation](docs/tenants.md)** – PostgreSQL Row-Level Security, key rotation, and credential management.
 - **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and pricing models.
@@ -100,13 +100,13 @@ Explore comprehensive technical documentation organized by intent:
 - **[Resilience (Retry, Fallback & Breakers)](docs/retry.md)** – Deep dives into [Retry Policies](docs/retry.md), [Auto Fallback](docs/fallback.md), and [Circuit Breakers](docs/breaker.md).
 - **[Metrics & Characteristics](docs/metrics.md)** – Telemetry logging, latency percentiles, and optional encrypted sample capture.
 
-### 🧠 Continuous Learning & Governance
+### Continuous Learning & Governance
 - **[Routing & Governed Selection](docs/operations.md#routing-policy)** – Shadow ranking, evidence qualification, and cost-optimal model routing.
 - **[Performance Rig](docs/performance-rig.md)** – Blind LLM evaluation harness and automated benchmark suites.
 - **[Performance Benchmarks](docs/performance.md)** – Baseline execution timings, throughput, and memory profiles.
 - **[Statistical Significance Analysis](docs/statistical-significant.md)** – Formal statistical verification, Welch's $t$-tests ($p$-values), confidence intervals, and concurrency regression ($R^2 = 0.97$).
 
-### 🧪 Live End-to-End Validation
+### Live End-to-End Validation
 - **[Test 1: Core Lifecycle](docs/e2e/test-1.md)** – Full end-to-end setup and smoke execution.
 - **[Test 2: Failure & Recovery](docs/e2e/test-2.md)** – Resiliency, error handling, and recovery validations.
 - **[Test 3: Provider Interoperability](docs/e2e/test-3.md)** – Multi-provider integration across live endpoints.

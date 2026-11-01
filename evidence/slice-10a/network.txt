@@ -1,0 +1,37 @@
+=== published ports ===
+NAME                   IMAGE                     COMMAND                  SERVICE    CREATED              STATUS                        PORTS
+llm-proxy-app-1        llm-proxy-app             "docker-entrypoint.s…"   app        About a minute ago   Up About a minute (healthy)   8080/tcp
+llm-proxy-ingress-1    llm-proxy-ingress:local   "/bin/sh /entrypoint…"   ingress    32 seconds ago       Up 31 seconds (healthy)       80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+llm-proxy-postgres-1   postgres:16               "docker-entrypoint.s…"   postgres   About a minute ago   Up About a minute (healthy)   5432/tcp
+
+=== docker port app ===
+
+=== docker port ingress ===
+443/tcp -> 0.0.0.0:443
+443/tcp -> [::]:443
+
+=== host node port ===
+curl: (7) Failed to connect to 127.0.0.1 port 8080 after 0 ms: Couldn't connect to server
+
+http_code:000
+host_8080_exit:7
+
+=== ingress network to app ===
+HTTP/1.1 200 OK
+content-type: application/json; charset=utf-8
+content-length: 37
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Connection: keep-alive
+Keep-Alive: timeout=620
+
+{"status":"ready","database":"ready"}
+http_code:200
+
+=== app command ===
+cmd=["node","dist/index.js"] entrypoint=["docker-entrypoint.sh"]
+
+=== image command slice tag ===
+cmd=["node","dist/index.js"]
+
+Port 80 is exposed by the Nginx image. Docker does not publish it.
+The Node port 8080 is not published.

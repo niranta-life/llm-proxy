@@ -1,0 +1,25 @@
+needle_count 182
+scratch
+pem_blocks 0
+body_hits 0
+evidence
+pem_blocks 0
+body_hits 0
+host_key_mode
+0o600
+scan_files_done
+=== image app command ===
+["node","dist/index.js"]
+=== image app dist ===
+none
+=== image ingress scripts ===
+none
+=== logs ===
+ingress_log_pem 0
+app_log_pem 0
+=== mount ===
+ca.crt
+server.crt
+server.key
+ca_key_not_mounted
+SCAN_DONE

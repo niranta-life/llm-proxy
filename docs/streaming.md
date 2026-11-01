@@ -71,7 +71,7 @@ Send `SIGTERM` before the platform stops the process. Set the platform stop grac
 
 On a stream the proxy sends `X-Accel-Buffering: no` and `Cache-Control: no-cache, no-transform`. It does not compress a stream.
 
-Configure the reverse proxy so it does not buffer or gzip `text/event-stream`. Set its read timeout longer than the stream idle timeout and the stream total timeout. Set its connect timeout longer than the stream connect timeout.
+Configure the reverse proxy so it does not buffer or gzip `text/event-stream`. Set its read timeout longer than the stream idle timeout and the stream total timeout. Set its connect timeout longer than the stream connect timeout. The local Compose Nginx ingress does not buffer or compress `text/event-stream`. Its read timeout and its send timeout are longer than 600000 milliseconds.
 
 ## Smoke check
 

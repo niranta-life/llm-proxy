@@ -31,7 +31,8 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 
 ```mermaid
 flowchart LR
-    A["Apps / Agents<br/>(OpenAI SDK)"] -->|"Bearer <tenant-secret>"| B["llm-proxy<br/>(Node.js + RLS)"]
+    A["Apps / Agents<br/>(OpenAI SDK)"] -->|"HTTPS 443"| N["Nginx"]
+    N -->|"HTTP private"| B["llm-proxy<br/>(Node.js + RLS)"]
     B --> C[("PostgreSQL 16<br/>(Ledger, Limits, Keys)")]
     B --> D["OpenAI"]
     B --> E["Anthropic"]
@@ -71,7 +72,7 @@ This enables inference, registers deployments, and creates your initial credenti
 ### 3. Send a Chat Completion
 Use `curl` or any OpenAI SDK:
 ```bash
-curl -s http://127.0.0.1:8080/v1/chat/completions \
+curl -s --cacert config/ingress/live/ca.crt https://127.0.0.1/v1/chat/completions \
   -H "X-Tenant-ID: <tenant-id>" \
   -H "Authorization: Bearer <tenant-secret>" \
   -H "Content-Type: application/json" \
@@ -138,7 +139,7 @@ Explore technical documentation organized by intent:
 - Tools, function calling, images, audio, embeddings, and MCP.
 - An optimizer that promotes a policy without an operator.
 - An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI.
-- TLS on the proxy listen port. Put TLS on the reverse proxy in front of it.
+- TLS on the Node.js listen port. Nginx in Compose terminates TLS on port 443. The Node.js port stays private.
 - A payment or billing collection flow.
 
 ---

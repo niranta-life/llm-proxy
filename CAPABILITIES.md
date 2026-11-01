@@ -1,0 +1,87 @@
+# Capabilities
+
+## Ingress
+
+The local Compose stack runs Nginx in front of the Node.js process.
+
+Nginx terminates TLS on published port 443.
+
+The Node.js process serves HTTP on port 8080.
+
+Compose does not publish port 8080.
+
+Nginx accepts TLS 1.2.
+
+Nginx accepts TLS 1.3.
+
+Nginx rejects TLS 1.0.
+
+Nginx rejects TLS 1.1.
+
+The operator stores the server certificate in `config/ingress/live`.
+
+The server private key stays in that directory on the host.
+
+The CA private key stays outside the mounted directory.
+
+Git does not track `config/ingress`.
+
+The app image does not contain the private key.
+
+The ingress image does not contain the private key.
+
+A reload copies the mounted certificate into the runtime directory.
+
+Nginx then loads the new certificate.
+
+The same file paths accept a private CA or a public CA.
+
+Nginx sends the client value of `X-Tenant-Id` to the application.
+
+Nginx sends the client value of `Authorization` to the application.
+
+Nginx overwrites `X-Forwarded-For` with the TCP client address.
+
+Nginx overwrites `X-Real-IP` with the TCP client address.
+
+Nginx overwrites `X-Forwarded-Proto`.
+
+Nginx overwrites `X-Forwarded-Host`.
+
+Nginx overwrites `Forwarded`.
+
+Nginx does not buffer a `text/event-stream` response.
+
+Nginx does not compress a `text/event-stream` response.
+
+The proxy read timeout is longer than 600000 milliseconds.
+
+The proxy send timeout is longer than 600000 milliseconds.
+
+The keep-alive timeout is at least 620000 milliseconds.
+
+Nginx does not retry a failed proxy request.
+
+Nginx rejects a request body larger than 1048576 bytes.
+
+Nginx proxies `/internal/` only for an approved client network.
+
+Nginx denies every other client for `/internal/`.
+
+A spoofed forwarding header does not change that decision.
+
+Nginx rejects `/mcp` when `X-Tenant-Id` is missing.
+
+Nginx rejects `/mcp` when `Authorization` is missing.
+
+Nginx forwards `/mcp` when both headers are present.
+
+The application does not implement MCP.
+
+`GET /health/ingress` reports Nginx readiness and application readiness.
+
+The certificate check reports `certificate valid` or `certificate expired`.
+
+The certificate check does not print the private key.
+
+The app command stays `node dist/index.js`.

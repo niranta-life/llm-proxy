@@ -1,0 +1,59 @@
+ Image llm-proxy-ingress:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 950B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 537B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.28-alpine
+#3 DONE 0.7s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [1/8] FROM docker.io/library/nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+#5 resolve docker.io/library/nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 999B done
+#6 DONE 0.0s
+
+#7 [2/8] RUN apk add --no-cache openssl curl
+#7 CACHED
+
+#8 [3/8] COPY install-certs.sh /usr/local/bin/install-certs
+#8 DONE 0.0s
+
+#9 [4/8] COPY entrypoint.sh /entrypoint.sh
+#9 DONE 0.0s
+
+#10 [5/8] COPY reload-ingress.sh /usr/local/bin/reload-ingress
+#10 DONE 0.0s
+
+#11 [6/8] COPY check-certificate.sh /usr/local/bin/check-certificate
+#11 DONE 0.0s
+
+#12 [7/8] COPY check-ingress.sh /usr/local/bin/check-ingress
+#12 DONE 0.1s
+
+#13 [8/8] RUN chmod 755 /usr/local/bin/install-certs /entrypoint.sh /usr/local/bin/reload-ingress /usr/local/bin/check-certificate /usr/local/bin/check-ingress
+#13 DONE 0.3s
+
+#14 exporting to image
+#14 exporting layers 0.1s done
+#14 exporting manifest sha256:8faba4caee3d9143ca777a1610f49969333452b61bb2351491582a68b109d82d done
+#14 exporting config sha256:d9b7eda911f25a8eca2151e91fd9e1646ff5fd573e92ee53c7b34068ea656caf done
+#14 exporting attestation manifest sha256:2ac6e854b8561dd6127b73200269b8a58119126cc70ec19afed083675a05d201 0.0s done
+#14 exporting manifest list sha256:f6c5cc351754ce7b056409b44939a2519be2579f00761c379bb45a6c7298fb4d done
+#14 naming to docker.io/library/llm-proxy-ingress:local done
+#14 unpacking to docker.io/library/llm-proxy-ingress:local 0.1s done
+#14 DONE 0.3s
+
+#15 resolving provenance for metadata file
+#15 DONE 0.0s
+ Image llm-proxy-ingress:local Built 
+BUILD:0

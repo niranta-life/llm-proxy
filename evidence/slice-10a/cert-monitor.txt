@@ -1,0 +1,14 @@
+=== valid certificate ===
+certificate valid
+valid_exit:0
+=== expired certificate file ===
+certificate expired
+expired_file_exit:1
+=== key path ===
+certificate check refuses a private key path
+key_path_exit:2
+=== ingress health ===
+{"nginx":"ready","application":"ready"}
+
+=== application health ===
+{"status":"ready","database":"ready"}

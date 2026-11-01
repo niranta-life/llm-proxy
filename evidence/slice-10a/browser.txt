@@ -1,0 +1,9 @@
+[5770:17320100:1101/005828.493106:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.515690:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.516008:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.516084:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.516141:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.516198:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[5770:17320100:1101/005828.516257:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+<html><head><meta name="color-scheme" content="light dark"><meta charset="utf-8"></head><body><pre>{"status":"ready","database":"ready"}</pre><div class="json-formatter-container"></div></body></html>
+Trying to load the allocator multiple times. This is *not* supported.

@@ -1,0 +1,27 @@
+=== restart app and ingress ===
+ Container llm-proxy-ingress-1 Restarting 
+ Container llm-proxy-app-1 Restarting 
+ Container llm-proxy-app-1 Started 
+ Container llm-proxy-ingress-1 Started 
+=== wait ===
+ready
+=== https after restart ===
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 01 Nov 2026 07:54:20 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 37
+Connection: keep-alive
+
+{"status":"ready","database":"ready"}
+http_code:200
+=== ports after restart ===
+NAME                   IMAGE                     COMMAND                  SERVICE    CREATED          STATUS                            PORTS
+llm-proxy-app-1        llm-proxy-app             "docker-entrypoint.s…"   app        10 seconds ago   Up 2 seconds (health: starting)   8080/tcp
+llm-proxy-ingress-1    llm-proxy-ingress:local   "/bin/sh /entrypoint…"   ingress    6 minutes ago    Up 2 seconds (health: starting)   80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+llm-proxy-postgres-1   postgres:16               "docker-entrypoint.s…"   postgres   6 minutes ago    Up 6 minutes (healthy)            5432/tcp
+=== host node port after restart ===
+curl: (7) Failed to connect to 127.0.0.1 port 8080 after 0 ms: Couldn't connect to server
+host_8080_exit:7
+=== app command after restart ===
+cmd=["node","dist/index.js"]

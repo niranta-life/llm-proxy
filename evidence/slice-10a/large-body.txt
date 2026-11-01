@@ -1,0 +1,13 @@
+body_bytes 1100058
+HTTP/1.1 413 Request Entity Too Large
+Server: nginx
+Date: Sun, 01 Nov 2026 07:52:52 GMT
+Content-Type: text/html
+Content-Length: 176
+Connection: close
+
+413
+
+curl_exit 0
+
+The mock log for this window has no request body above 1000 bytes.

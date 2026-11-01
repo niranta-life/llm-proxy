@@ -8,6 +8,7 @@ config/docker.env
 config/provider-keys.env
 config/local-tenant.json
 config/.image-stamp
+config/ingress/
 perf/runs/
 deploy/gcp/settings.env
 deploy/gcp/tofu/*/generated.auto.tfvars.json

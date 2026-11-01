@@ -18,6 +18,8 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+    networks:
+      - private
 
   app:
     build:
@@ -47,8 +49,6 @@ services:
       MIGRATION_STATEMENT_TIMEOUT_MS: ${MIGRATION_STATEMENT_TIMEOUT_MS:-600000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +69,59 @@ services:
       timeout: 5s
       retries: 30
       start_period: 15s
+    networks:
+      - private
+
+  ingress:
+    build:
+      context: ./docker/nginx
+    image: llm-proxy-ingress:local
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/admin-allowlist.conf:/etc/nginx/admin-allowlist.conf:ro
+      - ./config/ingress/live:/etc/nginx/ingress:ro
+    tmpfs:
+      - /etc/nginx/tls:mode=755
+      - /var/cache/nginx:mode=1777
+      - /run:mode=1777
+      - /tmp:mode=1777
+    read_only: true
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - FOWNER
+      - SETUID
+      - SETGID
+      - DAC_READ_SEARCH
+      - DAC_OVERRIDE
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/usr/local/bin/check-ingress"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    networks:
+      private: {}
+      approved:
+        ipv4_address: 10.90.10.20
+
+networks:
+  private:
+    name: llm-proxy-private
+  approved:
+    name: llm-proxy-approved
+    ipam:
+      config:
+        - subnet: 10.90.10.0/24
 
 volumes:
   pgdata:

@@ -1,0 +1,23 @@
+=== one https request while the app is stopped ===
+HTTP/1.1 502 Bad Gateway
+Server: nginx
+Date: Sun, 01 Nov 2026 07:54:10 GMT
+Content-Type: text/html
+Content-Length: 150
+Connection: keep-alive
+
+<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+http_code:502
+curl_exit:0
+=== probe log ===
+LISTEN 8080
+HIT 1 GET /health/ready
+=== hit count ===
+1

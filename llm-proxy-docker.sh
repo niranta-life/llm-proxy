@@ -16,7 +16,10 @@ KEYS_EXAMPLE="${ROOT}/config/provider-keys.env.example"
 KEYS_FILE="${LLM_PROXY_KEYS_FILE:-${ROOT}/config/provider-keys.env}"
 TENANT_FILE="${ROOT}/config/local-tenant.json"
 STAMP="${ROOT}/config/.image-stamp"
-READY_URL="${PROXY_BASE_URL:-http://127.0.0.1:8080}/health/ready"
+INGRESS_DIR="${ROOT}/config/ingress"
+INGRESS_LIVE="${INGRESS_DIR}/live"
+INGRESS_CA="${INGRESS_CA_FILE:-${INGRESS_LIVE}/ca.crt}"
+READY_URL="${PROXY_BASE_URL:-https://127.0.0.1}/health/ready"
 WATCH_SECONDS="${LLM_PROXY_WATCH_SECONDS:-2}"
 CONFIG_KEYS=(
   LOG_LEVEL
@@ -59,6 +62,8 @@ The script creates config/docker.env only when you do not set LLM_PROXY_ENV_FILE
 Set LLM_PROXY_KEYS_FILE only when that file already exists.
 The image command stays node dist/index.js.
 The image does not start the evaluation worker, the guardrail worker, or the promotion worker.
+Nginx publishes port 443. The Node.js port stays private.
+The host ready check uses HTTPS and the ingress CA file.
 EOF
 }
 
@@ -116,12 +121,19 @@ app_image_name() {
   printf '%s-app' "$(compose_project)"
 }
 
+ready_curl() {
+  curl -fsS --cacert "$INGRESS_CA" --max-time 10 "$READY_URL"
+}
+
 wait_ready() {
   if ! command -v curl >/dev/null 2>&1; then
     die "curl is not installed"
   fi
+  if [[ ! -f "$INGRESS_CA" ]]; then
+    die "ingress CA is missing. Run ./llm-proxy-docker.sh setup"
+  fi
   for _ in $(seq 1 45); do
-    if curl -fsS "$READY_URL" >/dev/null 2>&1; then
+    if ready_curl >/dev/null 2>&1; then
       echo "ready ${READY_URL}"
       return 0
     fi
@@ -208,6 +220,7 @@ build_image() {
   echo "building the app image"
   compose build app || return 1
   assert_image_command || return 1
+  compose build ingress || return 1
   hash="$(source_hash)"
   mkdir -p "$(dirname "$STAMP")"
   printf '%s\n' "$hash" > "$STAMP"
@@ -400,6 +413,34 @@ ensure_config() {
   fill_provider_key
 }
 
+ensure_ingress() {
+  local work
+  if [[ -f "${INGRESS_LIVE}/server.crt" && -f "${INGRESS_LIVE}/server.key" && -f "${INGRESS_LIVE}/ca.crt" ]]; then
+    chmod 700 "$INGRESS_DIR" "$INGRESS_LIVE" 2>/dev/null || true
+    chmod 600 "${INGRESS_LIVE}/server.key" 2>/dev/null || true
+    if [[ -f "${INGRESS_DIR}/ca.key" ]]; then
+      chmod 600 "${INGRESS_DIR}/ca.key" 2>/dev/null || true
+    fi
+    return 0
+  fi
+  if ! command -v openssl >/dev/null 2>&1; then
+    die "openssl is not installed"
+  fi
+  mkdir -p "$INGRESS_LIVE"
+  chmod 700 "$INGRESS_DIR" "$INGRESS_LIVE"
+  work="$(mktemp -d "${INGRESS_DIR}/.issue.XXXXXX")"
+  "${ROOT}/docker/nginx/issue-certificate.sh" "$work" local valid
+  mv "$work/ca.key" "${INGRESS_DIR}/ca.key"
+  mv "$work/ca.crt" "${INGRESS_LIVE}/ca.crt"
+  mv "$work/server.crt" "${INGRESS_LIVE}/server.crt"
+  mv "$work/server.key" "${INGRESS_LIVE}/server.key"
+  rm -rf "$work"
+  chmod 600 "${INGRESS_DIR}/ca.key" "${INGRESS_LIVE}/server.key"
+  chmod 644 "${INGRESS_LIVE}/ca.crt" "${INGRESS_LIVE}/server.crt"
+  echo "A local ingress certificate is stored in ${INGRESS_LIVE}."
+  echo "The private key stays on the host."
+}
+
 image_state() {
   local hash stamp
   hash="$(source_hash)"
@@ -431,6 +472,7 @@ image_exists() {
 recreate_app() {
   compose up -d --wait postgres
   compose up -d --wait --no-deps --force-recreate app
+  compose up -d --wait --no-deps --force-recreate ingress
   wait_ready
 }
 
@@ -1380,11 +1422,13 @@ cmd_setup() {
   ensure_keys_file
   if [[ -f "$ENV_FILE" ]]; then
     validate_env_file
+    ensure_ingress
     echo "Config file already exists: ${ENV_FILE}"
     echo "inference: $(config_value INFERENCE_ENABLED || echo missing)"
     return 0
   fi
   ensure_config
+  ensure_ingress
   validate_env_file
   echo "Edit ${ENV_FILE}, then run ./llm-proxy-docker.sh start."
 }
@@ -1393,10 +1437,13 @@ cmd_start() {
   local rebuilt=0
   ensure_config
   load_env_file
+  ensure_ingress
   ensure_colima
   if [[ "${1:-0}" -eq 1 || "$(source_hash)" != "$(stamp_value)" ]] || ! image_exists; then
     build_image
     rebuilt=1
+  else
+    compose build ingress
   fi
   echo "starting the llm-proxy Compose project"
   if [[ "$rebuilt" -eq 1 ]]; then
@@ -1404,6 +1451,7 @@ cmd_start() {
   else
     compose up -d --wait postgres
     compose up -d --wait --no-deps app
+    compose up -d --wait --no-deps ingress
     wait_ready
   fi
 }
@@ -1447,7 +1495,7 @@ cmd_status() {
     export DOCKER_HOST="unix://${SOCKET}"
     compose --no-env-file ps || true
     if command -v curl >/dev/null 2>&1; then
-      if curl -fsS "$READY_URL" >/dev/null 2>&1; then
+      if [[ -f "$INGRESS_CA" ]] && ready_curl >/dev/null 2>&1; then
         echo "ready ${READY_URL}"
       else
         echo "not ready ${READY_URL}"

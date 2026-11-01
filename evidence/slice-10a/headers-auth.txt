@@ -1,0 +1,120 @@
+=== host /internal with spoofed approved address ===
+HTTP/1.1 403 Forbidden
+Server: nginx
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Content-Type: application/json
+Content-Length: 30
+Connection: keep-alive
+
+{"error":"ingress_forbidden"}
+
+http_code:403
+
+=== host /mcp missing both ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Content-Type: application/json
+Content-Length: 33
+Connection: keep-alive
+
+{"error":"ingress_unauthorized"}
+
+http_code:401
+
+=== host /mcp tenant only ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Content-Type: application/json
+Content-Length: 33
+Connection: keep-alive
+
+{"error":"ingress_unauthorized"}
+
+http_code:401
+
+=== host /mcp authorization only ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Content-Type: application/json
+Content-Length: 33
+Connection: keep-alive
+
+{"error":"ingress_unauthorized"}
+
+http_code:401
+
+=== host /v1/tenant missing credential ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:48:44 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 24
+Connection: keep-alive
+
+{"error":"unauthorized"}
+http_code:401
+
+=== valid tenant credential on /v1/tenant ===
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 01 Nov 2026 07:49:35 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 190
+Connection: keep-alive
+
+{"id":"235bf9d7-384f-43b0-8933-cbe4b59ffefa","name":"ingress-proof","keys":[{"id":"58cf4864-aa53-4491-86f5-366a426dfff9","label":"","createdAt":"2026-11-01T07:49:34.867Z","revokedAt":null}]}
+http_code:200
+
+curl_exit 0
+
+=== mcp with tenant headers ===
+HTTP/1.1 404 Not Found
+Server: nginx
+Date: Sun, 01 Nov 2026 07:49:35 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 21
+Connection: keep-alive
+
+{"error":"not_found"}
+http_code:404
+
+curl_exit 0
+
+=== wrong secret ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:49:35 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 24
+Connection: keep-alive
+
+{"error":"unauthorized"}
+http_code:401
+
+curl_exit 0
+
+=== approved network without credential ===
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sun, 01 Nov 2026 07:49:35 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 115
+Connection: keep-alive
+
+{"error":{"message":"Invalid authentication.","type":"authentication_error","param":null,"code":"invalid_api_key"}}
+http_code:401
+
+=== approved network with credential ===
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 01 Nov 2026 07:49:36 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 609
+Connection: keep-alive
+
+{"configuredLimits":{"mode":null,"requestsPerMinute":null,"concurrentRequests":null,"concurrentStreams":null,"tokenRatePerMinute":null,"leaseMs":null,"apiKeys":[],"connections":[],"deployments":[]},"observedUsage":{"requestsInWindow":"0","tokensInWindow":"0","concurrentRequests":"0","concurrentStreams":"0"},"reservedCapacity":{"concurrency":"0","activeReservations":"0","provisional":"0","unknownCharges":"0"},"remainingBudget":null,"costStatus":"none","budget":{"mode":null,"currency":null,"allocated":null,"recognized":"0","activeReservations":"0","provisional":"0","available":null,"unknownCharges":"0"}}
+http_code:200
+

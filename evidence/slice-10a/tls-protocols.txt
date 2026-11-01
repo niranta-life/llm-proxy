@@ -1,0 +1,40 @@
+=== tls1_2 ===
+CONNECTED(00000004)
+SSL handshake has read 1330 bytes and written 300 bytes
+New, TLSv1.2, Cipher is ECDHE-RSA-AES256-GCM-SHA384
+Protocol: TLSv1.2
+    Protocol  : TLSv1.2
+    Cipher    : ECDHE-RSA-AES256-GCM-SHA384
+    Verify return code: 0 (ok)
+
+=== tls1_3 ===
+CONNECTED(00000004)
+SSL handshake has read 2496 bytes and written 1547 bytes
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+Verify return code: 0 (ok)
+
+=== tls1_0 ===
+40EC300602000000:error:0A00042E:SSL routines:ssl3_read_bytes:tlsv1 alert protocol version:ssl/record/rec_layer_s3.c:918:SSL alert number 70
+CONNECTED(00000004)
+no peer certificate available
+SSL handshake has read 7 bytes and written 120 bytes
+New, (NONE), Cipher is (NONE)
+Protocol: TLSv1
+    Protocol  : TLSv1
+    Cipher    : 0000
+    Verify return code: 0 (ok)
+40EC300602000000:error:0A000197:SSL routines:SSL_shutdown:shutdown while in init:ssl/ssl_lib.c:2804:
+
+=== tls1_1 ===
+40EC300602000000:error:0A00042E:SSL routines:ssl3_read_bytes:tlsv1 alert protocol version:ssl/record/rec_layer_s3.c:918:SSL alert number 70
+CONNECTED(00000004)
+no peer certificate available
+SSL handshake has read 7 bytes and written 123 bytes
+New, (NONE), Cipher is (NONE)
+Protocol: TLSv1.1
+    Protocol  : TLSv1.1
+    Cipher    : 0000
+    Verify return code: 0 (ok)
+40EC300602000000:error:0A000197:SSL routines:SSL_shutdown:shutdown while in init:ssl/ssl_lib.c:2804:
+

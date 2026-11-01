@@ -1,0 +1,22 @@
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 01 Nov 2026 07:52:42 GMT
+Content-Type: text/event-stream; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+cache-control: no-cache, no-transform
+x-request-id: b4d95808-4cbb-48a3-8cc8-b793ce386c4e
+x-deployment: primary
+x-attempt-count: 1
+x-fallback: false
+
+
+CHUNK 1 t=0.069 bytes=183
+curl_exit -9
+chunk_count 1
+
+upstream_log
+HIT POST /v1/chat/completions bytes=124 stream=true xff=absent proto=absent real=absent
+COMPLETE
+HIT POST /v1/chat/completions bytes=127 stream=true xff=absent proto=absent real=absent
+ABORT

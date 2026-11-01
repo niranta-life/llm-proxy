@@ -7,7 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROFILE="${COLIMA_PROFILE:-default}"
 SOCKET="${COLIMA_SOCKET:-${HOME}/.colima/${PROFILE}/docker.sock}"
-READY_URL="${PROXY_BASE_URL:-http://127.0.0.1:8080}/health/ready"
+INGRESS_CA="${INGRESS_CA_FILE:-${ROOT}/config/ingress/live/ca.crt}"
+READY_URL="${PROXY_BASE_URL:-https://127.0.0.1}/health/ready"
 
 usage() {
   cat <<'EOF'
@@ -57,8 +58,12 @@ compose() {
 
 wait_ready() {
   local attempt
+  if [[ ! -f "$INGRESS_CA" ]]; then
+    echo "ingress CA is missing. Run ./llm-proxy-docker.sh setup" >&2
+    return 1
+  fi
   for attempt in $(seq 1 45); do
-    if curl -fsS "$READY_URL" >/dev/null 2>&1; then
+    if curl -fsS --cacert "$INGRESS_CA" "$READY_URL" >/dev/null 2>&1; then
       echo "ready ${READY_URL}"
       return 0
     fi

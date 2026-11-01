@@ -1,0 +1,52 @@
+=== second CA ===
+mount serial=3840275D1B955DC4911FD811252BDD625507FF92 want serial=3840275D1B955DC4911FD811252BDD625507FF92
+2026/11/01 07:57:54 [notice] 884#884: signal process started
+ingress reloaded
+served_try 2 serial=3840275D1B955DC4911FD811252BDD625507FF92
+serial=3840275D1B955DC4911FD811252BDD625507FF92
+issuer=CN=llm-proxy-public-ca
+notBefore=Nov  1 07:54:16 2026 GMT
+notAfter=Feb  3 07:54:16 2029 GMT
+public_ca:200
+public_ca_exit:0
+curl: (60) SSL certificate problem: unable to get local issuer certificate
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+old_ca:000
+old_ca_exit:60
+=== expired ===
+mount serial=5F188BE3EE5072463C3A165ED7DDC81492E34542 want serial=5F188BE3EE5072463C3A165ED7DDC81492E34542
+2026/11/01 07:57:56 [notice] 931#931: signal process started
+ingress reloaded
+served_try 2 serial=5F188BE3EE5072463C3A165ED7DDC81492E34542
+serial=5F188BE3EE5072463C3A165ED7DDC81492E34542
+issuer=CN=llm-proxy-expired-ca
+notBefore=Jan  1 00:00:00 2020 GMT
+notAfter=Jan  2 00:00:00 2020 GMT
+curl: (60) SSL certificate problem: certificate has expired
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+expired:000
+expired_exit:60
+certificate expired
+expired_check_exit:1
+=== restore ===
+mount serial=21140BA4F119603F025724161971A6B64F38B0BA want serial=21140BA4F119603F025724161971A6B64F38B0BA
+2026/11/01 07:57:56 [notice] 973#973: signal process started
+ingress reloaded
+served_try 2 serial=21140BA4F119603F025724161971A6B64F38B0BA
+serial=21140BA4F119603F025724161971A6B64F38B0BA
+issuer=CN=llm-proxy-local-ca
+notBefore=Nov  1 07:35:36 2026 GMT
+notAfter=Feb  3 07:35:36 2029 GMT
+{"status":"ready","database":"ready"}
+restored:200
+restored_exit:0
+certificate valid
+valid_check_exit:0

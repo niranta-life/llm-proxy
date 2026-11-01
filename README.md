@@ -100,7 +100,7 @@ Explore technical documentation organized by intent:
 - **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, function tools, error shapes, and header conventions.
 - **[Tenant Isolation & Security](docs/tenants.md)** – PostgreSQL Row-Level Security, key rotation, and credential management.
 - **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and manual registration via `--api-key-stdin`.
-- **[Streaming](docs/streaming.md)** – Server-Sent Events architecture, streaming leases, and concurrency caps.
+- **[Streaming](docs/streaming.md)** – Server-Sent Events architecture, tool-call deltas, streaming leases, and concurrency caps.
 - **[Limits and Budgets](docs/limits.md)** – Rate limits (RPM/TPM), concurrency ceilings, and monthly spend controls.
 - **[Cost Tracking](docs/cost.md)** – Transparent price registration, provisional states, and immutable accounting ledgers.
 - **[Circuit Breaker](docs/breaker.md)** – Per-deployment failure tracking and automated 503 fast rejection.

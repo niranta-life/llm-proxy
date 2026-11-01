@@ -15,7 +15,7 @@ docker compose run --rm app node dist/cli.js set-deployment-streaming \
   --tenant-id <tenant-id> --deployment primary --enabled true
 ```
 
-`set-deployment-streaming` also takes `--connect-timeout-ms`, `--idle-timeout-ms`, `--total-timeout-ms`, and `--backpressure-timeout-ms`. Each is an integer from 100 through 600000. If you omit a flag, the deployment timeout covers that stage: the connection, a provider that sends no text, the full stream, and a caller that does not read. Each run of the command replaces all four stored values. Each text chunk resets the idle timer. The total timer can still end the stream while text is arriving.
+`set-deployment-streaming` also takes `--connect-timeout-ms`, `--idle-timeout-ms`, `--total-timeout-ms`, and `--backpressure-timeout-ms`. Each is an integer from 100 through 600000. If you omit a flag, the deployment timeout covers that stage: the connection, a provider that sends no bytes, the full stream, and a caller that does not read. Each run of the command replaces all four stored values. Each upstream chunk resets the idle timer. The total timer can still end the stream while chunks are arriving.
 
 `stream_options` may only be `{"include_usage":true}` or `{"include_usage":false}`. When the caller omits `stream_options`, a completed stream requests usage. When the caller sets `include_usage` false, the proxy keeps it false. The request shape is in [Chat](chat.md).
 

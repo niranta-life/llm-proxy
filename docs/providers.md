@@ -72,7 +72,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
   --tenant-id <tenant-id> --name primary --enabled false
 ```
 
-`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. Store `tools`, `tool_choice`, and `parallel_tool_calls` on OpenAI, Anthropic, Vertex, xAI, OpenRouter, and DGX. OpenAI, xAI, and OpenRouter keep the OpenAI tool body. The proxy does not call the function. Vertex does not accept `parallel_tool_calls`. A live DGX host does not receive function tools. `npm test` uses a mock server and does not call OpenAI.
+`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. Store `tools`, `tool_choice`, and `parallel_tool_calls` on OpenAI, Anthropic, Vertex, xAI, OpenRouter, and DGX. OpenAI, xAI, and OpenRouter keep the OpenAI tool body. The proxy does not call the function. A stream on OpenAI, Anthropic, Vertex, xAI, and OpenRouter returns tool-call deltas. Vertex does not accept `parallel_tool_calls`. A live DGX host does not receive function tools. A loopback DGX mock can stream a tool call. `npm test` uses a mock server and does not call OpenAI.
 
 ## Anthropic
 
@@ -104,7 +104,7 @@ Adding Anthropic does not change an OpenAI deployment that is already stored.
 
 A non-stream chat uses the Anthropic SDK. A stream is one HTTP request to the Messages API and does not use the SDK stream helper. The proxy accepts the configured model, and that model plus an 8-digit snapshot suffix. The caller still receives the configured model. A different model fails the stream. The proxy ignores Anthropic `inference_geo` and `speed`. It does not invent a cache count. A cache count is stored only when Anthropic sends one.
 
-A function tool becomes `tool_use`. A tool result becomes `tool_result`. A user message after tool results stays in that same user message. The proxy does not call the function.
+A function tool becomes `tool_use`. A tool result becomes `tool_result`. A user message after tool results stays in that same user message. A stream maps `tool_use` and `input_json_delta` onto the public tool deltas. The content-block index stays the public index. The proxy does not call the function.
 
 `scripts/anthropic-smoke.mjs` sends nothing unless `ANTHROPIC_SMOKE` is `1`. `npm test` does not run it. The script does not read a provider API key.
 
@@ -174,7 +174,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
 
 For `service_account`, pass `--api-key` with the key material instead of `--auth-mode adc`.
 
-A function tool becomes a function declaration. A call becomes a function call. A result becomes a function response. A user message after tool results stays in that same user turn. Vertex does not accept `parallel_tool_calls` or `additionalProperties`. The proxy does not call the function.
+A function tool becomes a function declaration. A call becomes a function call. A result becomes a function response. A user message after tool results stays in that same user turn. A stream maps a function call onto the public tool deltas. The proxy does not invent a call id. Vertex does not accept `parallel_tool_calls` or `additionalProperties`. The proxy does not call the function.
 
 `validate-vertex-credential` checks that a token can be minted and does not print the token. `validate-vertex-access` lists models in the stored project and location. That list is not the publisher catalog. A failed list does not mark the project valid. `test-vertex-inference` sends one small text request and can run while the deployment is disabled. `POST /v1/chat/completions` still refuses a disabled deployment.
 
@@ -182,7 +182,7 @@ A live Vertex test runs only when `VERTEX_LIVE` is `1`. `npm test` does not set 
 
 ## xAI
 
-Each tenant has one xAI connection. The base URL is fixed at `https://api.x.ai/v1`. The connection stores no endpoint. The caller cannot send `base_url`. Text capabilities match an OpenAI deployment. Function tools keep the OpenAI body. The proxy does not call the function. Do not pass `--default-max-output-tokens` or an OpenRouter routing flag. The proxy does not send `X-OpenRouter-Metadata` to xAI.
+Each tenant has one xAI connection. The base URL is fixed at `https://api.x.ai/v1`. The connection stores no endpoint. The caller cannot send `base_url`. Text capabilities match an OpenAI deployment. Function tools keep the OpenAI body. A stream returns those calls as tool-call deltas. The proxy does not call the function. Do not pass `--default-max-output-tokens` or an OpenRouter routing flag. The proxy does not send `X-OpenRouter-Metadata` to xAI.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-xai-connection \
@@ -209,7 +209,7 @@ You store 1 to 8 unique downstream slugs. A slug uses lowercase letters, digits,
 
 `--require-serving-provider true` demands a provider id in the response. The proxy sends `X-OpenRouter-Metadata: enabled` and reads the selected provider from `openrouter_metadata`. The name must match a stored slug, ignoring letter case. The proxy keeps the name OpenRouter reported. It does not treat the model name as the provider, and it does not read a provider out of a summary sentence. On a stream, it can read the name from the final chunk. A complete stream then ends with `[DONE]`.
 
-A required provider that the response does not name does not succeed. A reported provider outside the stored list does not succeed. These four flags are invalid on every provider except OpenRouter. Function tools keep the OpenAI body. The stored provider restriction stays on that body. The proxy does not call the function.
+A required provider that the response does not name does not succeed. A reported provider outside the stored list does not succeed. These four flags are invalid on every provider except OpenRouter. Function tools keep the OpenAI body. A stream returns those calls as tool-call deltas. The stored provider restriction stays on that body. The proxy does not call the function.
 
 ```bash
 docker compose run --rm app node dist/cli.js register-openrouter-connection \
@@ -236,7 +236,7 @@ A live OpenRouter test runs only when `OPENROUTER_LIVE` is `1`. `npm test` does 
 
 Each tenant can store one private DGX endpoint. Chat uses the stored endpoint, model, API key, and auth mode. The endpoint is `https`, with no user name and no password. The host is not a public provider host. The proxy does not follow a redirect. Keep TLS verification on for production.
 
-The endpoint must be on that tenant's allowlist, and the allowlist pins the addresses for the host. Chat uses `/v1/models` and `/v1/chat/completions`. A health check uses only the stored health endpoint. DGX does not use `OPENAI_BASE_URL`. Do not pass `--default-max-output-tokens` or an OpenRouter flag. Function tools are sent only when the stored endpoint host is a loopback address. A live DGX host does not receive function tools.
+The endpoint must be on that tenant's allowlist, and the allowlist pins the addresses for the host. Chat uses `/v1/models` and `/v1/chat/completions`. A health check uses only the stored health endpoint. DGX does not use `OPENAI_BASE_URL`. Do not pass `--default-max-output-tokens` or an OpenRouter flag. Function tools are sent only when the stored endpoint host is a loopback address. A loopback DGX mock can stream a tool call. A live DGX host does not receive function tools.
 
 `set-deployment-concurrency` is a limit inside this process. A limit shared by every process uses `set-deployment-limit`. See [Limits and budgets](limits.md).
 

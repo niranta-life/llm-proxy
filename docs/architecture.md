@@ -2,20 +2,20 @@
 
 Back to [README](../README.md)
 
-This page maps the [high-level architecture](../README.md#high-level-architecture) to the code. It also lists the data model, the trust boundaries, and the [local runtime](#local-runtime).
+This page maps the [high-level architecture](../README.md#how-does-it-work) to the code. It also lists the data model, the trust boundaries, and the [local runtime](#local-runtime).
 
 ## Components and code
 
 | Component | What it does | Code |
 | --- | --- | --- |
 | API + Authentication | Fastify routes. Checks `X-Tenant-ID` and the tenant secret against a scrypt verifier. Opens a tenant-scoped database transaction. | `src/http/app.ts`, `src/auth/authenticate.ts`, `src/secrets.ts`, `src/db/tenant-context.ts` |
-| Request Normalization | Parses the OpenAI body into one canonical chat request. An OpenAI request can include function tools. | `src/inference/contract.ts`, `src/inference/validate.ts` |
-| Capability Validation | Refuses any field that the deployment does not list. | `src/inference/validate.ts`, `src/inference/registry.ts` |
+| Request Normalization | Parses the OpenAI body into one canonical chat request. The request can include function tools. | `src/inference/contract.ts`, `src/inference/validate.ts` |
+| Capability Validation | Refuses any field that the deployment does not list. A schema or tool choice the provider does not support is refused before the provider call. | `src/inference/validate.ts`, `src/inference/registry.ts` |
 | Model Router | Resolves `auto` or a deployment name to one enabled deployment. A shadow policy records that choice. Without an active canary and without enabled selection, that record does not change the deployment. An active canary can pin one qualified challenger for a bounded share of `auto`. A shadow ranker can store a recommendation beside the baseline and the executed deployment. The router does not execute that shadow recommendation. An operator can enable selection for one task segment. Selection stays off until then. When selection is on, the router sends `auto` in that segment to the lowest qualified expected cost inside the policy limits. An attached guardrail can stop that canary. The canary does not promote itself. | `src/inference/resolve.ts`, `src/inference/routing-policy.ts`, `src/inference/qualification.ts`, `src/inference/shadow-rank.ts`, `src/inference/canary-assignment.ts`, `src/inference/canary-rollout.ts`, `src/inference/guardrail-decision.ts`, `src/inference/guardrail-store.ts`, `src/inference/promotion-gate.ts`, `src/inference/promotion-store.ts`, `src/inference/promotion-select.ts`, `src/inference/execute.ts` |
 | Circuit breaker | Rejects an attempt on an open deployment before the provider call. | `src/inference/breaker.ts`, `src/db/breaker.ts` |
 | Admission | Rate and concurrency limits, and budget reservation. | `src/inference/admission.ts`, `src/db/admission.ts` |
-| Provider Adapters | Turn the canonical request into each provider API and back. | `src/inference/adapter.ts`, `openai-stream.ts`, `anthropic.ts`, `anthropic-stream.ts`, `vertex*.ts`, `compatible.ts` (xAI, OpenRouter), `private.ts`, `private-serve.ts` (DGX) |
-| Retries + Failover | One deadline and retry policy per deployment. Policy-checked fallback for `auto`, before any output. | `src/inference/execution-policy.ts`, `src/inference/fallback.ts`, `src/db/execution-policy.ts`, `src/db/fallback-policy.ts` |
+| Provider Adapters | Turn the canonical request into each provider API and back. Anthropic converts a call to `tool_use` and a result to `tool_result`. Vertex converts tools to function declarations and a result to a function response. xAI and OpenRouter keep the OpenAI tool body. A live DGX host does not receive function tools. The proxy does not call the function. | `src/inference/adapter.ts`, `src/inference/tool-adapter.ts`, `openai-stream.ts`, `anthropic.ts`, `anthropic-stream.ts`, `vertex*.ts`, `compatible.ts` (xAI, OpenRouter), `private.ts`, `private-serve.ts` (DGX) |
+| Retries + Failover | One deadline and retry policy per deployment. A function-tool request can retry on that same deployment. It does not move to a different provider. Policy-checked fallback for `auto`, before any output. | `src/inference/execution-policy.ts`, `src/inference/fallback.ts`, `src/db/execution-policy.ts`, `src/db/fallback-policy.ts` |
 | Execution | Runs the attempt loop for JSON and SSE responses. | `src/inference/execute.ts`, `src/inference/execute-stream.ts`, `src/inference/stream.ts` |
 | Usage + Cost Tracking | Prices each attempt from registered prices. Settles the budget reservation. | `src/inference/cost.ts`, `src/inference/cost-store.ts`, `src/db/prices.ts` |
 | Request Telemetry | Stores each request and attempt. Serves per-tenant metrics. | `src/inference/store.ts`, `src/inference/window.ts` |

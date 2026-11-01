@@ -8,7 +8,7 @@ This page covers the retry decision in step 6. See the [request path](architectu
 
 [llm-proxy](../README.md) sends one upstream attempt unless you turn retry on for that deployment. Retry stays off by default. There is no HTTP route that changes the policy.
 
-An enabled policy makes at most two upstream attempts. The second attempt uses the same provider and the same deployment. The proxy does not switch the model after an error. The same request does not retry and also fall back. Fallback is a separate control. See [Fallback](fallback.md).
+An enabled policy makes at most two upstream attempts. The second attempt uses the same provider and the same deployment. A function-tool request can use that second attempt. It does not move to a different provider. The proxy does not switch the model after an error. The same request does not retry and also fall back. Fallback is a separate control. See [Fallback](fallback.md).
 
 Provider clients set `maxRetries` to `0`, so the SDK does not retry on its own.
 

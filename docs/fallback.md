@@ -18,7 +18,7 @@ This page covers the fallback choice in step 6. See the [request path](architect
 
 ## When it runs
 
-Fallback runs only before the proxy sends a response header or a response byte. After output starts, the model stays put and the body is not restarted. A failure after output starts does not end with a successful `[DONE]`. The proxy records that partial failure. A caller cancellation does not start a fallback. A function-tool request does not move to xAI, OpenRouter, DGX, or a private endpoint. The proxy refuses that dispatch before the next provider call.
+Fallback runs only before the proxy sends a response header or a response byte. After output starts, the model stays put and the body is not restarted. A failure after output starts does not end with a successful `[DONE]`. The proxy records that partial failure. A caller cancellation does not start a fallback. A function-tool request does not move to a different provider. The proxy refuses that dispatch before the next provider call.
 
 The failed attempt still holds its concurrency lease until settlement. The fallback check does not count that lease, so a hard cap of one still allows the next deployment for this request. A different request that holds the only permit still blocks the candidate. The primary budget reservation stays active during the check. A hard budget must fit the secondary while that reservation is active.
 

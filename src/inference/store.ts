@@ -7,6 +7,7 @@ import type { ExpenseCertainty, StoredExecutionPolicy } from './execution-policy
 import type { AliasCandidate, DeploymentCandidate, FallbackPolicy, ResolvedRoute } from './resolve.js';
 import type { TokenUsage } from './adapter.js';
 import type { StreamStatus } from './stream.js';
+import type { ToolAttemptAudit } from './tool-adapter.js';
 
 type DeploymentRow = {
   id: string;
@@ -270,6 +271,7 @@ export async function insertPending(
   client: PoolClient,
   tenantId: string,
   route: ResolvedRoute,
+  audit?: ToolAttemptAudit | null,
 ): Promise<{ requestId: string; attemptId: string; protectedCredential: string | null }> {
   const request = await client.query<{ id: string }>(
     `INSERT INTO proxy_requests (
@@ -291,8 +293,9 @@ export async function insertPending(
     `INSERT INTO model_attempts (
        tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status,
        attempt_ordinal, policy_id, policy_version,
-       trigger_reason, fallback_policy_id, fallback_policy_version
-     ) VALUES ($1, $2, $3, $4, $5, 'pending', 1, $6, $7, $8, $9, $10)
+       trigger_reason, fallback_policy_id, fallback_policy_version,
+       enforced_capabilities, adapter_version
+     ) VALUES ($1, $2, $3, $4, $5, 'pending', 1, $6, $7, $8, $9, $10, $11::text[], $12::integer)
      RETURNING id`,
     [
       tenantId,
@@ -305,6 +308,8 @@ export async function insertPending(
       'primary',
       route.fallbackPolicy?.id ?? null,
       route.fallbackPolicy?.version ?? null,
+      audit?.capabilities ?? null,
+      audit?.adapterVersion ?? null,
     ],
   );
   const attemptId = attempt.rows[0]?.id;
@@ -389,13 +394,15 @@ export async function insertAttempt(
   route: ResolvedRoute,
   ordinal: number,
   facts?: { triggerReason: string },
+  audit?: ToolAttemptAudit | null,
 ): Promise<string> {
   const attempt = await client.query<{ id: string }>(
     `INSERT INTO model_attempts (
        tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status,
        attempt_ordinal, policy_id, policy_version,
-       trigger_reason, fallback_policy_id, fallback_policy_version
-     ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)
+       trigger_reason, fallback_policy_id, fallback_policy_version,
+       enforced_capabilities, adapter_version
+     ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12::text[], $13::integer)
      RETURNING id`,
     [
       tenantId,
@@ -409,6 +416,8 @@ export async function insertAttempt(
       facts?.triggerReason ?? 'retry',
       route.fallbackPolicy?.id ?? null,
       route.fallbackPolicy?.version ?? null,
+      audit?.capabilities ?? null,
+      audit?.adapterVersion ?? null,
     ],
   );
   const attemptId = attempt.rows[0]?.id;

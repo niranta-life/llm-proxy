@@ -84,7 +84,7 @@ Turn metadata collection on before content capture. Leave content capture off un
 
 Categories are `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, and `unknown`. A caller may send `task` with one of those values. Any other `task` value is rejected and is not stored. When `task` is absent, local rules choose the category, or the category stays `unknown`. The proxy does not call a model to classify the request.
 
-A successful chat records `structured_output` as false. A non-text `response_format` is still rejected before a provider call. `tool_required` is true only when `tool_choice` is `required` or one named function. An OpenAI deployment that lists `tools` can accept function tools. A tool round is not stored as a sample. The feature row does not contain the prompt, the completion, a credential, or raw tool arguments.
+A successful chat records `structured_output` as false. A non-text `response_format` is still rejected before a provider call. `tool_required` is true only when `tool_choice` is `required` or one named function. Anthropic, Vertex, xAI, and OpenRouter accept function tools when the deployment lists `tools`. A stored tool attempt records the deployment capability set and the adapter version. A tool round is not stored as a sample. The feature row does not contain the prompt, the completion, a credential, or raw tool arguments.
 
 ## Limits and budgets
 

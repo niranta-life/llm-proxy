@@ -1,7 +1,7 @@
 import { GoogleGenAI, type GoogleGenAIOptions } from '@google/genai';
 import { Compute, GoogleAuth, Impersonated, JWT, type AuthClient } from 'google-auth-library';
 import { proxyError } from './errors.js';
-import type { VertexContent } from './vertex-convert.js';
+import type { VertexContent, VertexFunctionCallingConfig } from './vertex-convert.js';
 
 const CLOUD_PLATFORM = 'https://www.googleapis.com/auth/cloud-platform';
 const REFRESH_SKEW_MS = 60_000;
@@ -42,6 +42,8 @@ export type VertexGenerateRequest = {
     abortSignal?: AbortSignal;
     automaticContinuation: false;
     httpOptions?: { fetch?: typeof fetch };
+    tools?: Array<{ functionDeclarations: Array<Record<string, unknown>> }>;
+    toolConfig?: { functionCallingConfig: VertexFunctionCallingConfig };
   };
 };
 

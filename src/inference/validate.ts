@@ -1,4 +1,5 @@
 import { ProxyError, invalidRequest } from './errors.js';
+import { loopbackHost } from './private.js';
 import { isTaskCategory } from './task-categories.js';
 
 const UNSUPPORTED = new Set([
@@ -187,9 +188,31 @@ export function requestUsesTools(request: ChatRequest): boolean {
   );
 }
 
-export function assertToolProvider(request: ChatRequest, provider: string): void {
+const VERIFIED_TOOL_PROVIDERS = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter']);
+
+function dgxMockEndpoint(endpoint: string | null | undefined): boolean {
+  if (endpoint === null || endpoint === undefined || endpoint.length === 0) return false;
+  try {
+    return loopbackHost(new URL(endpoint).hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function assertToolProvider(
+  request: ChatRequest,
+  provider: string,
+  options?: { endpoint?: string | null; originProvider?: string },
+): void {
   if (!requestUsesTools(request)) return;
-  if (request.stream || provider !== 'openai') {
+  if (request.stream) {
+    throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
+  }
+  if (options?.originProvider !== undefined && options.originProvider !== provider) {
+    throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
+  }
+  const allowed = VERIFIED_TOOL_PROVIDERS.has(provider) || (provider === 'dgx' && dgxMockEndpoint(options?.endpoint));
+  if (!allowed) {
     throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
   }
 }

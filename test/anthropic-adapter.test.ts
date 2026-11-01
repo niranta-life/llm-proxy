@@ -90,7 +90,7 @@ describe('Anthropic request conversion', () => {
     expect(() => validateChatRequest({
       model: 'claude-deploy',
       messages: [{ role: 'developer', content: 'hidden' }],
-    })).toThrow(/system, user, and assistant/i);
+    })).toThrow(/system, user, assistant, and tool/i);
   });
 
   it('omits temperature for claude-sonnet-5-5 without rejecting the request', () => {
@@ -160,14 +160,14 @@ describe('Anthropic response normalization', () => {
     expect(completion.stopReason).toBe('refusal');
   });
 
-  it('rejects a tool-use block and keeps the reported attempt facts off the public body', () => {
+  it('rejects an unrepresentable block and keeps the reported attempt facts off the public body', () => {
     const payload = {
       id: 'msg_tool',
       type: 'message',
       role: 'assistant',
       model: 'claude-test',
       stop_reason: 'tool_use',
-      content: [{ type: 'tool_use', id: 'toolu_1', name: 'lookup', input: { q: 'hidden-tool-input' } }],
+      content: [{ type: 'web_search_tool_result', id: 'toolu_1', name: 'lookup', input: { q: 'hidden-tool-input' } }],
       usage: { input_tokens: 1, output_tokens: 1 },
     };
     expect(() => normalizeAnthropicMessage(payload, 100)).toThrow(ProxyError);
@@ -359,5 +359,111 @@ describe('Anthropic error normalization', () => {
     );
     expect(missing.nativeReason).toBeNull();
     expect(missing.attempt.providerRequestId).toBeNull();
+  });
+});
+
+describe('Anthropic tool conversion', () => {
+  const parameters = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      order_id: {
+        type: 'string',
+        description: 'The order identifier.',
+        minLength: 4,
+        maxLength: 32,
+        enum: ['ord_1001', 'ord_1002'],
+      },
+      priority: { type: 'integer', enum: [1, 2] },
+    },
+    required: ['order_id'],
+  };
+
+  it('copies schema keywords and keeps call ids in conversation order', () => {
+    const request = validateChatRequest({
+      model: 'alias',
+      messages: [
+        { role: 'user', content: 'Check the order.' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            { id: 'call_order_1001', type: 'function', function: { name: 'get_order_status', arguments: '{"order_id":"ord_1001"}' } },
+            { id: 'call_ship_2002', type: 'function', function: { name: 'get_shipment', arguments: '{"shipment_id":"shp_2002"}' } },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'call_order_1001', content: 'packed' },
+        { role: 'tool', tool_call_id: 'call_ship_2002', content: 'shipped' },
+        { role: 'user', content: 'Thanks' },
+      ],
+      tools: [
+        { type: 'function', function: { name: 'get_order_status', description: 'Read one order status.', parameters } },
+        { type: 'function', function: { name: 'get_shipment', parameters: { type: 'object' } } },
+      ],
+      tool_choice: { type: 'function', function: { name: 'get_order_status' } },
+      parallel_tool_calls: false,
+    });
+    const body = toAnthropicMessageBody(request, 'claude-test', 64);
+    expect(body.tools?.[0]?.input_schema).toEqual(parameters);
+    expect(body.tools?.[0]?.description).toBe('Read one order status.');
+    expect(body.tool_choice).toEqual({
+      type: 'tool',
+      name: 'get_order_status',
+      disable_parallel_tool_use: true,
+    });
+    expect(body.messages.map((message) => message.role)).toEqual(['user', 'assistant', 'user']);
+    expect(body.messages[1]?.content).toEqual([
+      { type: 'tool_use', id: 'call_order_1001', name: 'get_order_status', input: { order_id: 'ord_1001' } },
+      { type: 'tool_use', id: 'call_ship_2002', name: 'get_shipment', input: { shipment_id: 'shp_2002' } },
+    ]);
+    expect(body.messages[2]?.content).toEqual([
+      { type: 'tool_result', tool_use_id: 'call_order_1001', content: 'packed' },
+      { type: 'tool_result', tool_use_id: 'call_ship_2002', content: 'shipped' },
+      { type: 'text', text: 'Thanks' },
+    ]);
+  });
+
+  it('rejects a null schema type and does not return a weakened schema', () => {
+    const request = validateChatRequest({
+      model: 'alias',
+      messages: [{ role: 'user', content: 'Check the order.' }],
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'get_order_status',
+          parameters: { type: 'object', properties: { flag: { type: 'null' } } },
+        },
+      }],
+    });
+    expect(() => toAnthropicMessageBody(request, 'claude-test', 64)).toThrow(/schema type is not supported/i);
+  });
+
+  it('returns provider tool ids and a tool_calls finish reason', () => {
+    const completion = normalizeAnthropicMessage({
+      id: 'msg_calls',
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-test',
+      stop_reason: 'tool_use',
+      content: [
+        { type: 'text', text: 'Looking.' },
+        { type: 'tool_use', id: 'call_order_1001', name: 'get_order_status', input: { order_id: 'ord_1001' } },
+        { type: 'tool_use', id: 'call_ship_2002', name: 'get_shipment', input: { shipment_id: 'shp_2002' } },
+      ],
+      usage: { input_tokens: 11, output_tokens: 7 },
+    }, 100);
+    expect(completion.response.choices[0]).toEqual({
+      index: 0,
+      message: {
+        role: 'assistant',
+        content: 'Looking.',
+        tool_calls: [
+          { id: 'call_order_1001', type: 'function', function: { name: 'get_order_status', arguments: '{"order_id":"ord_1001"}' } },
+          { id: 'call_ship_2002', type: 'function', function: { name: 'get_shipment', arguments: '{"shipment_id":"shp_2002"}' } },
+        ],
+      },
+      finish_reason: 'tool_calls',
+    });
+    expect(completion.stopReason).toBe('tool_use');
   });
 });

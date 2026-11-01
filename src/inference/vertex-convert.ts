@@ -1,4 +1,4 @@
-import { ApiError } from '@google/genai';
+import { ApiError, FunctionCallingConfigMode } from '@google/genai';
 import type { UpstreamCompletion } from './adapter.js';
 import {
   emptyAttemptFacts,
@@ -9,9 +9,17 @@ import {
   type FailedAttemptFacts,
 } from './errors.js';
 import type { CanonicalEvent } from './stream.js';
-import { messageText, type ChatRequest } from './validate.js';
+import {
+  messageText,
+  requestUsesTools,
+  type ChatMessage,
+  type ChatRequest,
+  type FunctionTool,
+  type FunctionToolCall,
+  type ToolChoice,
+} from './validate.js';
 
-const VERTEX_FIELDS = new Set(['temperature', 'stop', 'max_tokens', 'max_completion_tokens']);
+const VERTEX_FIELDS = new Set(['temperature', 'stop', 'max_tokens', 'max_completion_tokens', 'tools', 'tool_choice']);
 const SAFETY_REASONS = new Set(['SAFETY', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'RECITATION']);
 const PART_FIELDS = [
   'inlineData',
@@ -26,9 +34,20 @@ const PART_FIELDS = [
   'videoMetadata',
 ] as const;
 
+export type VertexPart = {
+  text?: string;
+  functionCall?: { name: string; args: Record<string, unknown>; id: string };
+  functionResponse?: { name: string; response: Record<string, unknown>; id: string };
+};
+
 export type VertexContent = {
   role: 'user' | 'model';
-  parts: Array<{ text: string }>;
+  parts: VertexPart[];
+};
+
+export type VertexFunctionCallingConfig = {
+  mode: FunctionCallingConfigMode;
+  allowedFunctionNames?: string[];
 };
 
 export type VertexUsageParts = {
@@ -50,6 +69,8 @@ export type VertexRequestBody = {
     temperature?: number;
     stopSequences?: string[];
     automaticContinuation: false;
+    tools?: Array<{ functionDeclarations: Array<Record<string, unknown>> }>;
+    toolConfig?: { functionCallingConfig: VertexFunctionCallingConfig };
   };
 };
 
@@ -138,6 +159,147 @@ function invalidVertex(value: unknown): never {
   );
 }
 
+const VERTEX_SCHEMA_TYPE: Record<string, string> = {
+  object: 'OBJECT',
+  array: 'ARRAY',
+  string: 'STRING',
+  number: 'NUMBER',
+  integer: 'INTEGER',
+  boolean: 'BOOLEAN',
+};
+const CALL_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const FUNCTION_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_TOOL_CALLS = 16;
+
+function vertexSchema(schema: Record<string, unknown>, param: string): Record<string, unknown> {
+  if (schema.type === 'null' || typeof schema.type !== 'string' || VERTEX_SCHEMA_TYPE[schema.type] === undefined) {
+    throw invalidRequest(param, 'unsupported_parameter', 'The schema type is not supported.');
+  }
+  if ('additionalProperties' in schema) {
+    throw invalidRequest(`${param}.additionalProperties`, 'unsupported_parameter', 'additionalProperties is not supported.');
+  }
+  if (Array.isArray(schema.enum) && schema.enum.some((item) => typeof item !== 'string')) {
+    throw invalidRequest(`${param}.enum`, 'unsupported_parameter', 'enum is not supported.');
+  }
+  const converted: Record<string, unknown> = { type: VERTEX_SCHEMA_TYPE[schema.type] };
+  if (typeof schema.description === 'string') converted.description = schema.description;
+  if (Array.isArray(schema.enum)) converted.enum = [...schema.enum];
+  for (const key of ['minimum', 'maximum', 'minLength', 'maxLength', 'minItems', 'maxItems'] as const) {
+    if (key in schema) converted[key] = schema[key];
+  }
+  if (isRecord(schema.properties)) {
+    const properties: Record<string, unknown> = {};
+    for (const [name, child] of Object.entries(schema.properties)) {
+      if (!isRecord(child)) throw invalidRequest(param, 'unsupported_parameter', 'The schema type is not supported.');
+      properties[name] = vertexSchema(child, `${param}.${name}`);
+    }
+    converted.properties = properties;
+  }
+  if (Array.isArray(schema.required)) converted.required = [...schema.required];
+  if (isRecord(schema.items)) converted.items = vertexSchema(schema.items, `${param}.items`);
+  return converted;
+}
+
+function argumentsObject(value: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw invalidRequest('messages', 'invalid_parameter', 'Tool call arguments must be a JSON object.');
+  }
+  if (!isRecord(parsed)) {
+    throw invalidRequest('messages', 'invalid_parameter', 'Tool call arguments must be a JSON object.');
+  }
+  return parsed;
+}
+
+function functionNameFor(dialog: ChatMessage[], index: number, id: string): string {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const message = dialog[cursor];
+    if (message?.role !== 'assistant' || message.tool_calls === undefined) continue;
+    const call = message.tool_calls.find((item) => item.id === id);
+    if (call !== undefined) return call.function.name;
+  }
+  throw invalidRequest('messages', 'invalid_parameter', 'The tool result id does not match a tool call.');
+}
+
+function vertexDialog(dialog: ChatMessage[]): VertexContent[] {
+  const contents: VertexContent[] = [];
+  let pending: VertexPart[] = [];
+  const flushPending = (): void => {
+    if (pending.length === 0) return;
+    contents.push({ role: 'user', parts: pending });
+    pending = [];
+  };
+  dialog.forEach((message, index) => {
+    if (message.role === 'tool') {
+      const id = message.tool_call_id ?? '';
+      pending.push({
+        functionResponse: {
+          name: functionNameFor(dialog, index, id),
+          id,
+          response: { content: messageText(message) },
+        },
+      });
+      return;
+    }
+    if (message.role === 'user' && pending.length > 0) {
+      const text = messageText(message);
+      if (text.length > 0) pending.push({ text });
+      flushPending();
+      return;
+    }
+    flushPending();
+    if (message.role === 'user') {
+      contents.push({ role: 'user', parts: [{ text: messageText(message) }] });
+      return;
+    }
+    const parts: VertexPart[] = [];
+    const text = messageText(message);
+    if (text.length > 0 || message.tool_calls === undefined || message.tool_calls.length === 0) {
+      parts.push({ text });
+    }
+    for (const call of message.tool_calls ?? []) {
+      parts.push({
+        functionCall: {
+          name: call.function.name,
+          id: call.id,
+          args: argumentsObject(call.function.arguments),
+        },
+      });
+    }
+    contents.push({ role: 'model', parts });
+  });
+  flushPending();
+  return contents;
+}
+
+function vertexToolConfig(choice: ToolChoice | undefined): VertexFunctionCallingConfig {
+  if (choice === 'none') return { mode: FunctionCallingConfigMode.NONE };
+  if (choice === 'required') return { mode: FunctionCallingConfigMode.ANY };
+  if (choice !== undefined && typeof choice === 'object') {
+    return { mode: FunctionCallingConfigMode.ANY, allowedFunctionNames: [choice.function.name] };
+  }
+  return { mode: FunctionCallingConfigMode.AUTO };
+}
+
+function applyVertexTools(body: VertexRequestBody, request: ChatRequest): void {
+  const tools = request.optional.tools;
+  if (!Array.isArray(tools)) return;
+  const declarations = (tools as FunctionTool[]).map((tool, index) => {
+    const declaration: Record<string, unknown> = { name: tool.function.name };
+    if (tool.function.description !== undefined) declaration.description = tool.function.description;
+    if (tool.function.parameters !== undefined) {
+      declaration.parameters = vertexSchema(tool.function.parameters, `tools[${index}].function.parameters`);
+    }
+    return declaration;
+  });
+  body.config.tools = [{ functionDeclarations: declarations }];
+  body.config.toolConfig = {
+    functionCallingConfig: vertexToolConfig(request.optional.tool_choice as ToolChoice | undefined),
+  };
+}
+
 export function toVertexRequest(request: ChatRequest, upstreamModel: string): VertexRequestBody {
   for (const key of Object.keys(request.optional)) {
     if (!VERTEX_FIELDS.has(key)) {
@@ -177,18 +339,22 @@ export function toVertexRequest(request: ChatRequest, upstreamModel: string): Ve
   if (stopSequences !== undefined && stopSequences.length > 5) {
     throw invalidRequest('stop', 'invalid_parameter', 'stop must be a string or up to five strings.');
   }
+  const usesTools = requestUsesTools(request);
   const body: VertexRequestBody = {
     model: upstreamModel,
-    contents: dialog.map((message) => ({
-      role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: messageText(message) }],
-    })),
+    contents: usesTools
+      ? vertexDialog(dialog)
+      : dialog.map((message) => ({
+          role: message.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: messageText(message) }],
+        })),
     config: { automaticContinuation: false },
   };
   if (system !== undefined) body.config.systemInstruction = system;
   if (limit !== undefined) body.config.maxOutputTokens = limit;
   if (typeof temperature === 'number') body.config.temperature = temperature;
   if (stopSequences !== undefined) body.config.stopSequences = stopSequences;
+  if (usesTools) applyVertexTools(body, request);
   return body;
 }
 
@@ -230,6 +396,51 @@ function visibleText(parts: unknown, source: unknown): string {
     text += part.text;
   }
   return text;
+}
+
+function readVertexFunctionCall(value: unknown, source: unknown, seen: Set<string>): FunctionToolCall {
+  if (!isRecord(value)) invalidVertex(source);
+  const extra = Object.keys(value).filter((key) => key !== 'name' && key !== 'args' && key !== 'id');
+  if (extra.length > 0) invalidVertex(source);
+  const id = value.id;
+  const name = value.name;
+  const args = value.args;
+  if (typeof id !== 'string' || !CALL_ID.test(id) || seen.has(id)) invalidVertex(source);
+  seen.add(id);
+  if (typeof name !== 'string' || !FUNCTION_NAME.test(name)) invalidVertex(source);
+  if (!isRecord(args)) invalidVertex(source);
+  const encoded = JSON.stringify(args);
+  if (encoded.length === 0 || encoded.length > 8192) invalidVertex(source);
+  return { id, type: 'function', function: { name, arguments: encoded } };
+}
+
+function readVertexModelParts(parts: unknown, source: unknown): { content: string; toolCalls: FunctionToolCall[] } {
+  if (!Array.isArray(parts)) invalidVertex(source);
+  const toolCalls: FunctionToolCall[] = [];
+  const seen = new Set<string>();
+  let content = '';
+  for (const part of parts) {
+    if (!isRecord(part)) invalidVertex(source);
+    if (part.functionCall !== undefined) {
+      if (part.text !== undefined || part.thought === true) invalidVertex(source);
+      if (PART_FIELDS.some((field) => field !== 'functionCall' && part[field] !== undefined)) invalidVertex(source);
+      const keys = Object.keys(part).filter((key) => key !== 'functionCall' && key !== 'thoughtSignature' && key !== 'partMetadata');
+      if (keys.length > 0) invalidVertex(source);
+      if (toolCalls.length >= MAX_TOOL_CALLS) invalidVertex(source);
+      toolCalls.push(readVertexFunctionCall(part.functionCall, source, seen));
+      continue;
+    }
+    if (PART_FIELDS.some((field) => part[field] !== undefined)) invalidVertex(source);
+    if (part.thought === true) continue;
+    if (part.text === undefined) {
+      const keys = Object.keys(part).filter((key) => key !== 'thoughtSignature' && key !== 'partMetadata');
+      if (keys.length > 0) invalidVertex(source);
+      continue;
+    }
+    if (typeof part.text !== 'string') invalidVertex(source);
+    content += part.text;
+  }
+  return { content, toolCalls };
 }
 
 function publicUsage(usage: VertexUsageParts): Record<string, number> {
@@ -301,13 +512,16 @@ export function normalizeVertexResponse(
   }
   const contentRecord = candidate.content;
   const parts = isRecord(contentRecord) ? contentRecord.parts : [];
-  let content = '';
+  let read: { content: string; toolCalls: FunctionToolCall[] };
   try {
-    content = visibleText(parts ?? [], value);
+    read = readVertexModelParts(parts ?? [], value);
   } catch (error) {
     if (error instanceof Error && error.name === 'ProxyError') throw error;
     invalidVertex(value);
   }
+  if (read.toolCalls.length > 0 && candidate.finishReason !== 'STOP') invalidVertex(value);
+  const content = read.toolCalls.length > 0 && read.content.length === 0 ? null : read.content;
+  const finishReason = read.toolCalls.length > 0 ? 'tool_calls' : mapped.finish;
   const shown = publicUsage(usage);
   return {
     response: {
@@ -315,7 +529,15 @@ export function normalizeVertexResponse(
       object: 'chat.completion',
       created: createdSeconds,
       model,
-      choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: mapped.finish }],
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content,
+          ...(read.toolCalls.length > 0 ? { tool_calls: read.toolCalls } : {}),
+        },
+        finish_reason: finishReason,
+      }],
       ...(Object.keys(shown).length > 0 ? { usage: shown } : {}),
     },
     usage: {

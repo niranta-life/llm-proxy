@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-[llm-proxy](../README.md) accepts one chat completion and returns an OpenAI chat completion. An OpenAI deployment can accept function tools. The proxy does not execute the function. The caller uses the same JSON for every provider. Setup for each provider is in [Providers](providers.md).
+[llm-proxy](../README.md) accepts one chat completion and returns an OpenAI chat completion. Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request. The proxy does not execute the function. The caller uses the same JSON for every provider. Setup for each provider is in [Providers](providers.md).
 
 ## Where it fits
 
@@ -43,7 +43,17 @@ The proxy does not accept images or audio. It does not remove a field it cannot 
 
 ## Function tools
 
-An OpenAI deployment can accept function tools when it lists `tools`.
+Anthropic, Vertex, xAI, and OpenRouter accept function tools when the deployment lists `tools`.
+
+Anthropic converts a call to `tool_use` and a result to `tool_result`.
+
+Vertex converts the tools to function declarations, a call to a function call, and a result to a function response.
+
+xAI and OpenRouter keep the OpenAI tool body.
+
+A loopback DGX mock can show that OpenAI body.
+
+A live DGX host does not receive function tools.
 
 A request can send from 1 to 32 function tools.
 
@@ -75,7 +85,15 @@ A stream cannot send tools.
 
 `functions` and `function_call` stay refused.
 
-Anthropic, Vertex, xAI, OpenRouter, DGX, and a private endpoint stay text only.
+A schema keyword or `tool_choice` the provider cannot represent is rejected before the provider call.
+
+The proxy does not drop a schema keyword to force success.
+
+Vertex does not accept `parallel_tool_calls` or `additionalProperties`.
+
+A schema type of `null` is rejected.
+
+A stored tool attempt records the deployment capability set and the adapter version.
 
 The proxy returns `choices[0].message.tool_calls` with the provider id.
 
@@ -109,9 +127,9 @@ curl -s --cacert config/ingress/live/ca.crt https://127.0.0.1/v1/chat/completion
 
 Anthropic accepts `temperature` from 0 through 1, `stop`, `max_tokens`, and `max_completion_tokens`. If you send both token limits, the values must be equal. If you send neither, the proxy uses the deployment's default max output tokens. If the deployment has no default, the request is refused with 400 `invalid_parameter`.
 
-Anthropic also needs a first system message if you send one, then user and assistant text that alternates, and a user message last. A developer message is refused. A tool, an image, or a capability the deployment does not list is refused.
+Anthropic also needs a first system message if you send one, then user and assistant turns that alternate, and a user message last. A developer message is refused. An image or a capability the deployment does not list is refused. A function tool is accepted when the deployment lists `tools`. Consecutive tool results become one user message. A user message after those results stays in that same user message.
 
-Vertex accepts `temperature` from 0 through 2, `stop`, `max_tokens`, and `max_completion_tokens`. One system message is allowed, and it must be first. Assistant messages go upstream with role `model`. Messages do not have to alternate. Vertex does not use a default max output tokens, and it does not put hidden thinking text in the assistant message. Thinking tokens can be stored on the attempt. A cached count stays inside the prompt count. Public `usage` still has the three OpenAI fields.
+Vertex accepts `temperature` from 0 through 2, `stop`, `max_tokens`, `max_completion_tokens`, `tools`, and `tool_choice`. One system message is allowed, and it must be first. Assistant messages go upstream with role `model`. Messages do not have to alternate. A user message after tool results stays in that same user turn. Vertex does not accept `parallel_tool_calls`. Vertex does not use a default max output tokens, and it does not put hidden thinking text in the assistant message. Thinking tokens can be stored on the attempt. A cached count stays inside the prompt count. Public `usage` still has the three OpenAI fields.
 
 ## Response
 
@@ -153,7 +171,7 @@ An error body is an OpenAI error object:
 | 504 | `timeout` | The deployment timeout finished, or a stream timeout finished before the response headers. |
 | 529 | `overloaded` | Anthropic returned HTTP 529. |
 
-HTTP 400 covers `stream: true` when streaming is off. HTTP 400 covers tools on a stream. HTTP 400 covers tools on a provider other than OpenAI. HTTP 400 covers tools when the deployment does not list them. HTTP 400 covers an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
+HTTP 400 covers `stream: true` when streaming is off. HTTP 400 covers tools on a stream. HTTP 400 covers tools when the deployment does not list them. HTTP 400 covers a schema or `tool_choice` the provider cannot represent. HTTP 400 covers function tools on a live DGX host. HTTP 400 covers an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
 
 These cases never call the provider:
 
@@ -165,7 +183,7 @@ These cases never call the provider:
 - A hard admission check cannot reach the database.
 - The breaker for that deployment is open.
 
-A tool-use block, a content block the proxy cannot represent, and an unknown stop reason use `invalid_upstream_response`.
+A content block the proxy cannot represent and an unknown stop reason use `invalid_upstream_response`.
 
 After a stream has sent response headers, a later failure does not change the HTTP status. The proxy does not invent a success chunk and does not send `[DONE]`.
 
@@ -175,7 +193,7 @@ Anthropic stop reasons map like this:
 - `max_tokens` and `model_context_window_exceeded` become `length`.
 - `refusal` becomes `content_filter`.
 
-The proxy returns HTTP 502 for a `tool_use` block, a content block it cannot represent, and a stop reason it cannot represent. It does not put a `thinking` block in the assistant text. A response that has only thinking blocks has empty assistant text.
+A representable Anthropic `tool_use` block becomes `assistant.tool_calls` when `stop_reason` is `tool_use`. The proxy returns HTTP 502 for a content block it cannot represent and for a stop reason it cannot represent. It does not put a `thinking` block in the assistant text. A response that has only thinking blocks has empty assistant text.
 
 ## What one request will do
 

@@ -1,0 +1,81 @@
+{
+  "proxyExecutedFunction": false,
+  "localExecutions": 15,
+  "journeys": [
+    {
+      "provider": "anthropic",
+      "toolCall": {
+        "id": "call_order_1001",
+        "name": "get_order_status",
+        "arguments": "{\"order_id\":\"ord_1001\"}",
+        "finishReason": "tool_calls"
+      },
+      "toolResult": {
+        "tool_call_id": "call_order_1001",
+        "content": "shipped"
+      },
+      "finalAnswer": "The order is shipped.",
+      "proxyExecutedFunction": false
+    },
+    {
+      "provider": "vertex",
+      "toolCall": {
+        "id": "call_order_1001",
+        "name": "get_order_status",
+        "arguments": "{\"order_id\":\"ord_1001\"}",
+        "finishReason": "tool_calls"
+      },
+      "toolResult": {
+        "tool_call_id": "call_order_1001",
+        "content": "shipped"
+      },
+      "finalAnswer": "The order is shipped.",
+      "proxyExecutedFunction": false
+    },
+    {
+      "provider": "xai",
+      "toolCall": {
+        "id": "call_order_1001",
+        "name": "get_order_status",
+        "arguments": "{\"order_id\":\"ord_1001\"}",
+        "finishReason": "tool_calls"
+      },
+      "toolResult": {
+        "tool_call_id": "call_order_1001",
+        "content": "shipped"
+      },
+      "finalAnswer": "The order is shipped.",
+      "proxyExecutedFunction": false
+    },
+    {
+      "provider": "openrouter",
+      "toolCall": {
+        "id": "call_order_1001",
+        "name": "get_order_status",
+        "arguments": "{\"order_id\":\"ord_1001\"}",
+        "finishReason": "tool_calls"
+      },
+      "toolResult": {
+        "tool_call_id": "call_order_1001",
+        "content": "shipped"
+      },
+      "finalAnswer": "The order is shipped.",
+      "proxyExecutedFunction": false
+    },
+    {
+      "provider": "dgx",
+      "toolCall": {
+        "id": "call_order_1001",
+        "name": "get_order_status",
+        "arguments": "{\"order_id\":\"ord_1001\"}",
+        "finishReason": "tool_calls"
+      },
+      "toolResult": {
+        "tool_call_id": "call_order_1001",
+        "content": "shipped"
+      },
+      "finalAnswer": "The order is shipped.",
+      "proxyExecutedFunction": false
+    }
+  ]
+}

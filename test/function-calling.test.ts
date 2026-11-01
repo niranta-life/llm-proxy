@@ -188,8 +188,15 @@ describe('function tool validation', () => {
     expect(parsed.optional.tools).toHaveLength(1);
     expect(parsed.optional.tool_choice).toEqual({ type: 'function', function: { name: 'get_order_status' } });
     expect(() => assertToolProvider(parsed, 'openai')).not.toThrow();
-    expect(() => assertToolProvider(parsed, 'anthropic')).toThrow(/tools is not supported/i);
-    expect(() => assertToolProvider(parsed, 'xai')).toThrow(/tools is not supported/i);
+    expect(() => assertToolProvider(parsed, 'anthropic')).not.toThrow();
+    expect(() => assertToolProvider(parsed, 'vertex')).not.toThrow();
+    expect(() => assertToolProvider(parsed, 'xai')).not.toThrow();
+    expect(() => assertToolProvider(parsed, 'openrouter')).not.toThrow();
+    expect(() => assertToolProvider(parsed, 'dgx', { endpoint: 'https://127.0.0.1:9/v1' })).not.toThrow();
+    expect(() => assertToolProvider(parsed, 'dgx')).toThrow(/tools is not supported/i);
+    expect(() => assertToolProvider(parsed, 'dgx', { endpoint: 'https://dgx.lab.internal/v1' })).toThrow(/tools is not supported/i);
+    expect(() => assertToolProvider(parsed, 'other')).toThrow(/tools is not supported/i);
+    expect(() => assertToolProvider(parsed, 'xai', { originProvider: 'openai' })).toThrow(/tools is not supported/i);
     expect(() => assertCapabilities(parsed, ['tools', 'tool_choice'])).toThrow(/parallel_tool_calls is not supported by this model/i);
     expect(() => assertCapabilities(parsed, ['tools', 'tool_choice', 'parallel_tool_calls'])).not.toThrow();
     expect(() => validateChatRequest({ model: 'auto', messages: [{ role: 'user', content: 'hi' }], tools: [] })).toThrow(/1 to 32/i);
@@ -374,10 +381,19 @@ describe('function tool validation', () => {
       { downstreamProviders: null, dataCollection: null, allowFallbacks: null, requireServingProvider: false },
       { tools: [orderTool], tool_choice: 'auto', parallel_tool_calls: true, temperature: 0.1 },
     );
-    expect(fields.tools).toBeUndefined();
-    expect(fields.tool_choice).toBeUndefined();
-    expect(fields.parallel_tool_calls).toBeUndefined();
+    expect(fields.tools).toEqual([orderTool]);
+    expect(fields.tool_choice).toBe('auto');
+    expect(fields.parallel_tool_calls).toBe(true);
     expect(fields.temperature).toBe(0.1);
+    const dropped = compatibleRequestFields(
+      'other',
+      { downstreamProviders: null, dataCollection: null, allowFallbacks: null, requireServingProvider: false },
+      { tools: [orderTool], tool_choice: 'auto', parallel_tool_calls: true, temperature: 0.1 },
+    );
+    expect(dropped.tools).toBeUndefined();
+    expect(dropped.tool_choice).toBeUndefined();
+    expect(dropped.parallel_tool_calls).toBeUndefined();
+    expect(dropped.temperature).toBe(0.1);
   });
 });
 
@@ -1031,28 +1047,19 @@ describe('function calling failures', () => {
       ],
       cliEnv(),
     );
-    expect(() =>
-      runCli(
-        db,
-        [
-          'set-deployment-capabilities',
-          '--tenant-id',
-          tenant.tenantId,
-          '--deployment',
-          'xai-fallback',
-          '--capabilities',
-          'temperature,tools,tool_choice,parallel_tool_calls',
-        ],
-        cliEnv(),
-      ),
-    ).toThrow(/deployment arguments are invalid/);
-    await expect(
-      admin.query('SELECT set_deployment_capabilities($1::uuid, $2, $3::text[])', [
+    runCli(
+      db,
+      [
+        'set-deployment-capabilities',
+        '--tenant-id',
         tenant.tenantId,
+        '--deployment',
         'xai-fallback',
-        ['temperature', 'tools', 'tool_choice', 'parallel_tool_calls'],
-      ]),
-    ).rejects.toThrow(/capabilities are invalid/);
+        '--capabilities',
+        'temperature,tools,tool_choice,parallel_tool_calls',
+      ],
+      cliEnv(),
+    );
     runCli(
       db,
       [
@@ -1068,8 +1075,7 @@ describe('function calling failures', () => {
     );
     await admin.query(
       `UPDATE model_deployments
-       SET validation_status = 'validated_live',
-           capabilities = ARRAY['temperature','tools','tool_choice','parallel_tool_calls']::text[]
+       SET validation_status = 'validated_live'
        WHERE tenant_id = $1 AND name = 'xai-fallback'`,
       [tenant.tenantId],
     );

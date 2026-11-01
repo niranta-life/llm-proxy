@@ -702,7 +702,11 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       return;
     }
     const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls'];
-    if (provider !== 'openai' && capabilities.some((item) => toolCapabilities.includes(item))) {
+    const toolProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
+    if (
+      (!toolProviders.has(provider) && capabilities.some((item) => toolCapabilities.includes(item)))
+      || (provider === 'vertex' && capabilities.includes('parallel_tool_calls'))
+    ) {
       logger.error('deployment arguments are invalid');
       process.exitCode = 1;
       return;

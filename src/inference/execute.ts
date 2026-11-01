@@ -48,8 +48,15 @@ import {
 import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, loadCatalog } from './store.js';
+import { toolAttemptAudit, type ToolAttemptAudit } from './tool-adapter.js';
 import type { StreamGate } from './stream.js';
-import { assertCapabilities, assertStreamAllowed, assertToolProvider, validateChatRequest } from './validate.js';
+import {
+  assertCapabilities,
+  assertStreamAllowed,
+  assertToolProvider,
+  requestUsesTools,
+  validateChatRequest,
+} from './validate.js';
 
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
@@ -214,7 +221,10 @@ export async function executeChat(input: {
     }
     throw error;
   }
-  assertToolProvider(request, route.provider);
+  const auditFor = (selected: ResolvedRoute): ToolAttemptAudit | null => (
+    requestUsesTools(request) ? toolAttemptAudit(selected.provider, selected.capabilities) : null
+  );
+  assertToolProvider(request, route.provider, { endpoint: route.endpoint });
   let adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {
@@ -263,7 +273,7 @@ export async function executeChat(input: {
   try {
     const store = input.store;
     const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
-      const pending = await insertPending(client, input.tenantId, route);
+      const pending = await insertPending(client, input.tenantId, route, auditFor(route));
       await recordRoutingDecision(client, input.tenantId, pending.requestId, route);
       await recordSelection(client, input.tenantId, pending.requestId, selection);
       await recordCanaryAssignment(client, input.tenantId, pending.requestId, plan);
@@ -524,11 +534,15 @@ export async function executeChat(input: {
               fetchImpl: input.fetchImpl,
               resolveHost: input.resolveHost,
               prepare: (selected) => {
-                assertToolProvider(request, selected.provider);
+                assertToolProvider(request, selected.provider, {
+                  endpoint: selected.endpoint,
+                  originProvider: route.provider,
+                });
                 assertCapabilities(request, selected.capabilities);
                 adapter = adapterFor(selected.provider);
                 adapter.prepare(request, selected);
               },
+              audit: () => auditFor(next),
             });
             const previous = transport;
             transport = adopted.transport;
@@ -560,7 +574,7 @@ export async function executeChat(input: {
         ordinal += 1;
         if (ordinal > ceiling) throw normalized;
         attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
-          insertAttempt(client, input.tenantId, requestId, route, ordinal),
+          insertAttempt(client, input.tenantId, requestId, route, ordinal, undefined, auditFor(route)),
         );
       } finally {
         window.cancel();

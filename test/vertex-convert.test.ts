@@ -166,3 +166,161 @@ describe('vertex response conversion', () => {
     expect(second.events[2]).toMatchObject({ promptTokens: 5, completionTokens: 2, totalTokens: 9, thoughtsTokens: 2 });
   });
 });
+
+describe('vertex tool conversion', () => {
+  const parameters = {
+    type: 'object',
+    properties: {
+      order_id: {
+        type: 'string',
+        description: 'The order identifier.',
+        minLength: 4,
+        maxLength: 32,
+      },
+    },
+    required: ['order_id'],
+  };
+
+  function toolRequest(extra: Record<string, unknown> = {}, schema: Record<string, unknown> = parameters): ChatRequest {
+    return request({
+      messages: [
+        { role: 'user', content: 'Check the order.' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            { id: 'call_order_1001', type: 'function', function: { name: 'get_order_status', arguments: '{"order_id":"ord_1001"}' } },
+            { id: 'call_ship_2002', type: 'function', function: { name: 'get_shipment', arguments: '{"shipment_id":"shp_2002"}' } },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'call_order_1001', content: 'packed' },
+        { role: 'tool', tool_call_id: 'call_ship_2002', content: 'shipped' },
+        { role: 'user', content: 'Thanks' },
+      ],
+      optional: {
+        tools: [
+          { type: 'function', function: { name: 'get_order_status', description: 'Read one order status.', parameters: schema } },
+          { type: 'function', function: { name: 'get_shipment', parameters: { type: 'object', properties: { shipment_id: { type: 'string' } } } } },
+        ],
+        tool_choice: { type: 'function', function: { name: 'get_order_status' } },
+        ...extra,
+      },
+    });
+  }
+
+  it('maps function declarations and keeps call ids in conversation order', () => {
+    const body = toVertexRequest(toolRequest(), 'gemini-2.5-flash');
+    expect(body.config.tools).toEqual([{
+      functionDeclarations: [
+        {
+          name: 'get_order_status',
+          description: 'Read one order status.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              order_id: { type: 'STRING', description: 'The order identifier.', minLength: 4, maxLength: 32 },
+            },
+            required: ['order_id'],
+          },
+        },
+        {
+          name: 'get_shipment',
+          parameters: {
+            type: 'OBJECT',
+            properties: { shipment_id: { type: 'STRING' } },
+          },
+        },
+      ],
+    }]);
+    expect(body.config.toolConfig).toEqual({
+      functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['get_order_status'] },
+    });
+    expect(JSON.stringify(body)).not.toContain('additionalProperties');
+    expect(body.contents.map((item) => item.role)).toEqual(['user', 'model', 'user']);
+    expect(body.contents[1]?.parts).toEqual([
+      { functionCall: { name: 'get_order_status', id: 'call_order_1001', args: { order_id: 'ord_1001' } } },
+      { functionCall: { name: 'get_shipment', id: 'call_ship_2002', args: { shipment_id: 'shp_2002' } } },
+    ]);
+    expect(body.contents[2]?.parts).toEqual([
+      { functionResponse: { name: 'get_order_status', id: 'call_order_1001', response: { content: 'packed' } } },
+      { functionResponse: { name: 'get_shipment', id: 'call_ship_2002', response: { content: 'shipped' } } },
+      { text: 'Thanks' },
+    ]);
+  });
+
+  it('rejects a schema or tool choice Vertex cannot represent', () => {
+    expect(() => toVertexRequest(toolRequest({ parallel_tool_calls: false }), 'gemini-2.5-flash')).toThrow(
+      /parallel_tool_calls is not supported/,
+    );
+    const extra = {
+      type: 'object',
+      additionalProperties: false,
+      properties: { order_id: { type: 'string' } },
+    };
+    expect(() => toVertexRequest(toolRequest({}, extra), 'gemini-2.5-flash')).toThrow(/additionalProperties is not supported/);
+    const nullable = {
+      type: 'object',
+      properties: { flag: { type: 'null' } },
+    };
+    expect(() => toVertexRequest(toolRequest({}, nullable), 'gemini-2.5-flash')).toThrow(/schema type is not supported/);
+    const numbered = {
+      type: 'object',
+      properties: { priority: { type: 'integer', enum: [1, 2] } },
+    };
+    expect(() => toVertexRequest(toolRequest({}, numbered), 'gemini-2.5-flash')).toThrow(/enum is not supported/);
+  });
+
+  it('returns provider function-call ids only for a STOP finish', () => {
+    const completion = normalizeVertexResponse({
+      responseId: 'resp-tool',
+      modelVersion: 'gemini-2.5-flash',
+      candidates: [{
+        finishReason: 'STOP',
+        content: {
+          parts: [
+            { text: 'Looking.' },
+            { functionCall: { name: 'get_order_status', id: 'call_order_1001', args: { order_id: 'ord_1001' } } },
+            { functionCall: { name: 'get_shipment', id: 'call_ship_2002', args: { shipment_id: 'shp_2002' } } },
+          ],
+        },
+      }],
+      usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 7, totalTokenCount: 18 },
+    }, 100, 'configured');
+    expect(completion.response.choices[0]).toEqual({
+      index: 0,
+      message: {
+        role: 'assistant',
+        content: 'Looking.',
+        tool_calls: [
+          { id: 'call_order_1001', type: 'function', function: { name: 'get_order_status', arguments: '{"order_id":"ord_1001"}' } },
+          { id: 'call_ship_2002', type: 'function', function: { name: 'get_shipment', arguments: '{"shipment_id":"shp_2002"}' } },
+        ],
+      },
+      finish_reason: 'tool_calls',
+    });
+    expect(completion.stopReason).toBe('stop');
+    expect(() => normalizeVertexResponse({
+      candidates: [{
+        finishReason: 'STOP',
+        content: { parts: [{ functionCall: { name: 'get_order_status', args: { order_id: 'ord_1001' } } }] },
+      }],
+    }, 100, 'm')).toThrow(/invalid/);
+    expect(() => normalizeVertexResponse({
+      candidates: [{
+        finishReason: 'MAX_TOKENS',
+        content: { parts: [{ functionCall: { name: 'get_order_status', id: 'call_order_1001', args: { order_id: 'ord_1001' } } }] },
+      }],
+    }, 100, 'm')).toThrow(/invalid/);
+    expect(() => normalizeVertexResponse({
+      candidates: [{
+        finishReason: 'STOP',
+        content: { parts: [{ text: 'x', functionCall: { name: 'get_order_status', id: 'call_order_1001', args: {} } }] },
+      }],
+    }, 100, 'm')).toThrow(/invalid/);
+    expect(() => eventsFromVertexChunk({
+      candidates: [{
+        content: { parts: [{ functionCall: { name: 'get_order_status', id: 'call_order_1001', args: { order_id: 'ord_1001' } } }] },
+      }],
+    }, { started: true, finished: false }, 'm', 1)).toThrow(/invalid/);
+  });
+});

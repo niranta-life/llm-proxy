@@ -70,7 +70,9 @@ export function compatibleRequestFields(
   delete fields.provider;
   delete fields.models;
   delete fields.route;
-  if (provider !== 'openai') {
+  // xAI, OpenRouter, and a loopback DGX mock keep the OpenAI tool body.
+  // A live DGX host is refused before this function runs.
+  if (provider !== 'openai' && provider !== 'xai' && provider !== 'openrouter' && provider !== 'dgx') {
     delete fields.tools;
     delete fields.tool_choice;
     delete fields.parallel_tool_calls;

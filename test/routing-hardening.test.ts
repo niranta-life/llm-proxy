@@ -1937,7 +1937,7 @@ describe('routing hardening', () => {
     const applied = await admin.query<{ version: string }>(`SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1`);
     const latest = await latestMigrationVersion();
     expect(applied.rows[0]?.version).toBe(latest);
-    expect(latest).toBe('034_openai_function_tools.sql');
+    expect(latest).toBe('035_cross_provider_tools.sql');
     const docker = readFileSync(join(projectRoot, 'Dockerfile'), 'utf8');
     const entry = readFileSync(join(projectRoot, 'src', 'index.ts'), 'utf8');
     expect(docker).toContain('CMD ["node", "dist/index.js"]');

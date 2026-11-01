@@ -35,7 +35,7 @@ This page compares llm-proxy with other LLM gateways, proxies, and routers. All 
 
 ## Where llm-proxy is behind
 
-- No images, audio, embeddings, or MCP. An OpenAI deployment can accept function tools and return a tool call. The application executes the function. The proxy does not execute the function.
+- No images, audio, embeddings, or MCP. Anthropic, Vertex, xAI, and OpenRouter accept function tools and return a tool call. The application executes the function. The proxy does not execute the function. A stream does not accept tools. A live DGX host does not receive function tools.
 - No admin API or UI, no SSO or RBAC, and no external secret manager. The Node.js listen port has no TLS. The local Compose ingress terminates TLS on port 443.
 - Six providers, at most two attempts, no response cache, no clustering guide. Guardrails are off until an operator attaches them to one canary. A violation stops that canary. It does not promote the challenger.
 - The private endpoint (DGX) is not live-validated.

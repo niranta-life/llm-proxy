@@ -313,6 +313,7 @@ describe('Anthropic integration', () => {
       '032_deployment_ops.sql',
       '033_evaluation_budget_ceilings.sql',
       '034_openai_function_tools.sql',
+      '035_cross_provider_tools.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',
@@ -560,7 +561,7 @@ describe('Anthropic integration', () => {
           ...anthropicMessage(model, 'hidden'),
           id: 'msg_tool',
           stop_reason: 'tool_use',
-          content: [{ type: 'tool_use', id: 'toolu_1', name: 'lookup', input: { q: 'prompt-block' } }],
+          content: [{ type: 'web_search_tool_result', id: 'toolu_1', name: 'lookup', input: { q: 'prompt-block' } }],
         }));
       },
     });

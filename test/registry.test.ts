@@ -104,6 +104,7 @@ describe('provider registry', () => {
       '032_deployment_ops.sql',
       '033_evaluation_budget_ceilings.sql',
       '034_openai_function_tools.sql',
+      '035_cross_provider_tools.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -501,7 +502,7 @@ describe('provider registry', () => {
         message: 'provider connection already exists',
       },
       {
-        args: ['register-deployment', '--tenant-id', tenant.tenantId, '--provider', 'xai', '--name', 'bad-caps', '--upstream-model', 'grok-test', '--timeout-ms', '5000', '--capabilities', 'tools', '--enabled', 'true'],
+        args: ['register-deployment', '--tenant-id', tenant.tenantId, '--provider', 'xai', '--name', 'bad-caps', '--upstream-model', 'grok-test', '--timeout-ms', '5000', '--capabilities', 'not-a-cap', '--enabled', 'true'],
         provider: 'xai',
         message: 'deployment arguments are invalid',
       },

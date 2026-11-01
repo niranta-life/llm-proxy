@@ -1,0 +1,749 @@
+{
+  "anthropicSingle": {
+    "model": "claude-cross",
+    "max_tokens": 64,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "name": "get_order_status",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "string",
+              "description": "The order identifier.",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "order_id"
+          ]
+        },
+        "description": "Read one order status."
+      }
+    ],
+    "tool_choice": {
+      "type": "auto"
+    }
+  },
+  "vertexSingle": {
+    "model": "gemini-cross",
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Check the order."
+          }
+        ]
+      }
+    ],
+    "config": {
+      "automaticContinuation": false,
+      "tools": [
+        {
+          "functionDeclarations": [
+            {
+              "name": "get_order_status",
+              "description": "Read one order status.",
+              "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                  "order_id": {
+                    "type": "STRING",
+                    "description": "The order identifier.",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "order_id"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "toolConfig": {
+        "functionCallingConfig": {
+          "mode": "AUTO"
+        }
+      }
+    }
+  },
+  "xaiSingle": {
+    "url": "https://api.x.ai/v1/chat/completions",
+    "metadata": "",
+    "body": {
+      "model": "grok-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "order_id"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto"
+    }
+  },
+  "openrouterSingle": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "metadata": "enabled",
+    "body": {
+      "model": "openai/gpt-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "order_id"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "provider": {
+        "only": [
+          "anthropic"
+        ],
+        "data_collection": "deny",
+        "allow_fallbacks": false
+      }
+    }
+  },
+  "dgxSingle": {
+    "url": "https://127.0.0.1:59637/v1/chat/completions",
+    "metadata": "",
+    "body": {
+      "model": "dgx-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "order_id"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto"
+    }
+  },
+  "anthropicFollowUp": {
+    "model": "claude-cross",
+    "max_tokens": 64,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "call_order_1001",
+            "name": "get_order_status",
+            "input": {
+              "order_id": "ord_1001"
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "call_order_1001",
+            "content": "shipped"
+          }
+        ]
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "name": "get_order_status",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "string",
+              "description": "The order identifier.",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "order_id"
+          ]
+        },
+        "description": "Read one order status."
+      }
+    ]
+  },
+  "vertexFollowUp": {
+    "model": "gemini-cross",
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Check the order."
+          }
+        ]
+      },
+      {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "get_order_status",
+              "id": "call_order_1001",
+              "args": {
+                "order_id": "ord_1001"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "parts": [
+          {
+            "functionResponse": {
+              "name": "get_order_status",
+              "id": "call_order_1001",
+              "response": {
+                "content": "shipped"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "config": {
+      "automaticContinuation": false,
+      "tools": [
+        {
+          "functionDeclarations": [
+            {
+              "name": "get_order_status",
+              "description": "Read one order status.",
+              "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                  "order_id": {
+                    "type": "STRING",
+                    "description": "The order identifier.",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "order_id"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "toolConfig": {
+        "functionCallingConfig": {
+          "mode": "AUTO"
+        }
+      }
+    }
+  },
+  "xaiFollowUp": {
+    "model": "grok-cross",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_order_1001",
+            "type": "function",
+            "function": {
+              "name": "get_order_status",
+              "arguments": "{\"order_id\":\"ord_1001\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "shipped",
+        "tool_call_id": "call_order_1001"
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_order_status",
+          "description": "Read one order status.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string",
+                "description": "The order identifier.",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "openrouterFollowUp": {
+    "model": "openai/gpt-cross",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_order_1001",
+            "type": "function",
+            "function": {
+              "name": "get_order_status",
+              "arguments": "{\"order_id\":\"ord_1001\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "shipped",
+        "tool_call_id": "call_order_1001"
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_order_status",
+          "description": "Read one order status.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string",
+                "description": "The order identifier.",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      }
+    ],
+    "provider": {
+      "only": [
+        "anthropic"
+      ],
+      "data_collection": "deny",
+      "allow_fallbacks": false
+    }
+  },
+  "dgxFollowUp": {
+    "model": "dgx-cross",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_order_1001",
+            "type": "function",
+            "function": {
+              "name": "get_order_status",
+              "arguments": "{\"order_id\":\"ord_1001\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "shipped",
+        "tool_call_id": "call_order_1001"
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_order_status",
+          "description": "Read one order status.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string",
+                "description": "The order identifier.",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "anthropicNative": {
+    "model": "claude-cross",
+    "max_tokens": 64,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Check the order."
+      }
+    ],
+    "stream": false,
+    "tools": [
+      {
+        "name": "get_order_status",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "string",
+              "description": "The order identifier.",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "priority": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Read one order status."
+      }
+    ],
+    "tool_choice": {
+      "type": "tool",
+      "name": "get_order_status",
+      "disable_parallel_tool_use": true
+    }
+  },
+  "vertexNative": {
+    "model": "gemini-cross",
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Check both orders."
+          }
+        ]
+      }
+    ],
+    "config": {
+      "automaticContinuation": false,
+      "tools": [
+        {
+          "functionDeclarations": [
+            {
+              "name": "get_order_status",
+              "description": "Read one order status.",
+              "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                  "order_id": {
+                    "type": "STRING",
+                    "description": "The order identifier.",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "order_id"
+                ]
+              }
+            },
+            {
+              "name": "get_shipment",
+              "description": "Read one shipment.",
+              "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                  "shipment_id": {
+                    "type": "STRING",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "shipment_id"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "toolConfig": {
+        "functionCallingConfig": {
+          "mode": "ANY",
+          "allowedFunctionNames": [
+            "get_order_status"
+          ]
+        }
+      }
+    }
+  },
+  "xaiNative": {
+    "url": "https://api.x.ai/v1/chat/completions",
+    "body": {
+      "model": "grok-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "priority": {
+                  "type": "integer",
+                  "enum": [
+                    1,
+                    2
+                  ]
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": {
+        "type": "function",
+        "function": {
+          "name": "get_order_status"
+        }
+      }
+    }
+  },
+  "openrouterNative": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "metadata": "enabled",
+    "body": {
+      "model": "openai/gpt-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "priority": {
+                  "type": "integer",
+                  "enum": [
+                    1,
+                    2
+                  ]
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "required",
+      "provider": {
+        "only": [
+          "anthropic"
+        ],
+        "data_collection": "deny",
+        "allow_fallbacks": false
+      }
+    }
+  },
+  "dgxMock": {
+    "url": "https://127.0.0.1:59637/v1/chat/completions",
+    "body": {
+      "model": "dgx-cross",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the order."
+        }
+      ],
+      "stream": false,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_order_status",
+            "description": "Read one order status.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "The order identifier.",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "priority": {
+                  "type": "integer",
+                  "enum": [
+                    1,
+                    2
+                  ]
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto"
+    }
+  }
+}

@@ -6,7 +6,7 @@ Back to [README](../README.md)
 
 This page covers step 6 for streams. Streams also pass steps 4 and 5 before the first byte is sent. See the [request path](architecture.md#request-path).
 
-[llm-proxy](../README.md) can stream a text chat for OpenAI, Anthropic, Vertex, xAI, OpenRouter, and an approved DGX deployment. A stream does not accept tools. Streaming stays off until you enable it for the tenant and for that deployment. The caller changes only `model`.
+[llm-proxy](../README.md) can stream a text chat for OpenAI, Anthropic, Vertex, xAI, OpenRouter, and an approved DGX deployment. A stream does not accept tools. The proxy does not assemble tool-call deltas. Streaming stays off until you enable it for the tenant and for that deployment. The caller changes only `model`.
 
 ```bash
 docker compose run --rm app node dist/cli.js set-tenant-streaming \

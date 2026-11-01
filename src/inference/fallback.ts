@@ -11,6 +11,7 @@ import {
   type ResolvedRoute,
 } from './resolve.js';
 import { insertAttempt, loadCatalog, openRouteCredential } from './store.js';
+import type { ToolAttemptAudit } from './tool-adapter.js';
 import type { ChatRequest } from './validate.js';
 
 export function contextNeed(request: ChatRequest): number {
@@ -118,6 +119,7 @@ export async function beginFallbackAttempt(input: {
   fetchImpl?: typeof fetch;
   resolveHost?: (host: string) => Promise<readonly string[]>;
   prepare: (route: ResolvedRoute) => void;
+  audit?: () => ToolAttemptAudit | null;
 }): Promise<{ transport: RouteTransport; apiKey: string; attemptId: string }> {
   const transport = await bindRouteTransport({
     runtimePool: input.runtimePool,
@@ -138,6 +140,7 @@ export async function beginFallbackAttempt(input: {
         input.route,
         input.ordinal,
         { triggerReason: input.triggerReason },
+        input.audit?.() ?? null,
       );
       return { attemptId, protectedCredential };
     });

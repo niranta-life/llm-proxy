@@ -88,7 +88,15 @@ The app command stays `node dist/index.js`.
 
 ## Function calling
 
-The OpenAI backend accepts function tools.
+Anthropic, Vertex, xAI, and OpenRouter accept the same OpenAI function-calling request.
+
+Anthropic receives `tool_use` and `tool_result`.
+
+Vertex receives function declarations, a function call, and a function response.
+
+A user message after tool results stays in that same user turn.
+
+xAI and OpenRouter keep the OpenAI tool body.
 
 The application sends `get_order_status` or another function definition.
 
@@ -97,6 +105,8 @@ The model can return `assistant.tool_calls`.
 Each tool call keeps the provider id.
 
 `finish_reason` is `tool_calls`.
+
+More than one call in a round is returned when the provider response contains more than one call.
 
 The application executes the function.
 
@@ -120,9 +130,23 @@ A deployment lists `parallel_tool_calls` before a request can send that flag.
 
 The flag is a boolean.
 
-Other providers stay text only.
+A live DGX host does not receive function tools.
+
+A loopback DGX mock can show the OpenAI tool body.
 
 A stream does not accept tools.
+
+A schema keyword or `tool_choice` the provider cannot represent is rejected before the provider call.
+
+The proxy does not drop a schema keyword to force success.
+
+Vertex does not accept `parallel_tool_calls`.
+
+Vertex does not accept `additionalProperties`.
+
+A schema type of `null` is rejected.
+
+A stored tool attempt records the deployment capability set and the adapter version.
 
 `functions` and `function_call` stay refused.
 

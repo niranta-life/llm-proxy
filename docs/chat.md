@@ -39,7 +39,7 @@ Any other field is sent only when the deployment lists that capability:
 The proxy does not accept tools, images, or audio. It does not remove a field it cannot accept. It refuses the request instead.
 
 ```bash
-curl -s http://127.0.0.1:8080/v1/chat/completions \
+curl -s --cacert config/ingress/live/ca.crt https://127.0.0.1/v1/chat/completions \
   -H "X-Tenant-ID: <tenant-id>" \
   -H "Authorization: Bearer <tenant-secret>" \
   -H "content-type: application/json" \

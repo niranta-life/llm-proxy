@@ -107,10 +107,13 @@ A non-stream chat uses the Anthropic SDK. A stream is one HTTP request to the Me
 `scripts/anthropic-smoke.mjs` sends nothing unless `ANTHROPIC_SMOKE` is `1`. `npm test` does not run it. The script does not read a provider API key.
 
 ```bash
-ANTHROPIC_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
+ANTHROPIC_SMOKE=1 PROXY_BASE_URL=https://127.0.0.1 \
+  NODE_EXTRA_CA_CERTS=config/ingress/live/ca.crt \
   TENANT_ID=<tenant-id> TENANT_SECRET=<tenant-secret> MODEL=claude \
   node scripts/anthropic-smoke.mjs
 ```
+
+Compose publishes that HTTPS address. The Node.js port stays private. `NODE_EXTRA_CA_CERTS` makes Node trust the local ingress CA.
 
 ## Vertex
 

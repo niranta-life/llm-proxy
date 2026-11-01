@@ -54,7 +54,7 @@ node dist/perf/cli.js --analyze-only --out perf/runs/scale-20261031
 
 Useful flags:
 
-- `--base-url` defaults to `http://127.0.0.1:8080`
+- `--base-url` defaults to `http://127.0.0.1:8080`. Compose does not publish that port. Pass `--base-url https://127.0.0.1` for the local ingress. Set `NODE_EXTRA_CA_CERTS` to `config/ingress/live/ca.crt`.
 - `--tenant-file` defaults to `config/local-tenant.json`
 - `--models` defaults to `openai,anthropic,xai`
 - `--out` defaults to `perf/runs/<utc-timestamp>`

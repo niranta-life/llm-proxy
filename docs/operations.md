@@ -69,7 +69,7 @@ node scripts/check-deployed.mjs --prepare-local
 
 `npm run check:deployed -- --prepare-local` is the same command. It needs Colima, Docker, and Node.js. If Colima is down, the script starts the local Compose project, uses a mock server, checks HTTP, database, and process cases, restores the proxy environment, and removes the mock. The database volume stays. `--leave-prepared` does not restore the proxy environment.
 
-For a proxy that is already in operation, pass `--base-url` or set `PROXY_BASE_URL`. `--help` shows the tenant ids, the secrets, and the mock URL that proxy must have. `--http-only` stops after the HTTP cases. Database and process cases run with `--prepare-local`, and also when `CHECK_ADMIN` is `local`.
+For a proxy that is already in operation, pass `--base-url` or set `PROXY_BASE_URL`. The local Compose address is `https://127.0.0.1`. Set `NODE_EXTRA_CA_CERTS` to `config/ingress/live/ca.crt`. `--help` shows the tenant ids, the secrets, and the mock URL that proxy must have. `--http-only` stops after the HTTP cases. Database and process cases run with `--prepare-local`, and also when `CHECK_ADMIN` is `local`. `--prepare-local` still calls `http://127.0.0.1:8080`. Compose does not publish that port.
 
 Only `npm test` can read the backend process id of a pooled database session. The check script opens one session that does not set `app.tenant_id`, so that session reads no rows.
 
@@ -109,6 +109,8 @@ The Node.js process does not listen with TLS. The local Compose ingress terminat
 ## Health
 
 `GET /health/live` returns `{"status":"live"}`.
+
+`GET /health/ingress` returns `{"nginx":"ready","application":"ready"}` when Nginx can read the application ready check. The host calls `https://127.0.0.1/health/ready` with `config/ingress/live/ca.crt`.
 
 `GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` only when Postgres is reachable and `schema_migrations` contains the latest migration for this image. Otherwise it returns HTTP 503 `{"status":"not_ready","database":"unavailable"}`. Live stays 200.
 

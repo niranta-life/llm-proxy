@@ -78,10 +78,13 @@ Configure the reverse proxy so it does not buffer or gzip `text/event-stream`. S
 `scripts/openai-stream-smoke.mjs` sends nothing unless `OPENAI_STREAM_SMOKE` is `1`. `npm test` does not run it. When the flag is set, the script sends one stream with `curl -N` and then reads it with the OpenAI SDK.
 
 ```bash
-OPENAI_STREAM_SMOKE=1 PROXY_BASE_URL=http://127.0.0.1:8080 \
+OPENAI_STREAM_SMOKE=1 PROXY_BASE_URL=https://127.0.0.1 \
+  NODE_EXTRA_CA_CERTS=config/ingress/live/ca.crt \
   TENANT_ID=<tenant-id> TENANT_SECRET=<tenant-secret> MODEL=auto \
   node scripts/openai-stream-smoke.mjs
 ```
+
+Compose publishes that HTTPS address. The Node.js port stays private. Node trusts `NODE_EXTRA_CA_CERTS`. The curl step in that script uses the same file when the variable is set.
 
 ## Related
 

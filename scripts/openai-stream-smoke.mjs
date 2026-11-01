@@ -26,18 +26,14 @@ const payload = JSON.stringify({
   stream: true,
 });
 
+const curlArgs = ['-N', '-sS', '-D', '-', '-o', '-', '-X', 'POST', endpoint];
+if (process.env.NODE_EXTRA_CA_CERTS) {
+  curlArgs.push('--cacert', process.env.NODE_EXTRA_CA_CERTS);
+}
 const curl = spawn(
   'curl',
   [
-    '-N',
-    '-sS',
-    '-D',
-    '-',
-    '-o',
-    '-',
-    '-X',
-    'POST',
-    endpoint,
+    ...curlArgs,
     '-H',
     'content-type: application/json',
     '-H',

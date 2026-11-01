@@ -149,7 +149,7 @@ The laptop path is one Compose project on the Colima profile you already use. Th
 
 The rebuild hash covers `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, and `docker/postgres/`. The script stores that hash in `config/.image-stamp`. Git does not track that file. `start` rebuilds when the hash changes, when the image is missing, or when you pass `--build`. A start with those files unchanged does not rebuild the image. `watch` rebuilds when that hash changes. `watch` recreates the app when `config/docker.env` changes. `stop` stops the containers and keeps the database volume. Colima stops only with `stop --vm`.
 
-`GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` when Postgres is up and the schema is current. `status` prints the `INFERENCE_ENABLED` value from the config file. `setup` leaves that value false. When the program-file stamp matches and Colima is down, `status` prints `image: not checked`. See [Operations](operations.md).
+`GET /health/ready` returns HTTP 200 `{"status":"ready","database":"ready"}` when Postgres is up and the schema is current. Through Nginx, `GET /health/ingress` reports Nginx and that application check. `status` prints the `INFERENCE_ENABLED` value from the config file. `setup` leaves that value false. `setup` stores a local ingress certificate in `config/ingress/live` when those files are missing. The CA private key stays beside that directory. Git does not track `config/ingress`. When the program-file stamp matches and Colima is down, `status` prints `image: not checked`. See [Operations](operations.md).
 
 ## Evaluation
 

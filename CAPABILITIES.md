@@ -124,7 +124,7 @@ An explicitly marked legacy server uses the compatibility adapter.
 
 A protocol mismatch does not switch to SSE, stdio, or an older handshake.
 
-The proxy does not call a discovered tool.
+Discovery does not call a tool.
 
 ## MCP execution
 

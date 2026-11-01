@@ -146,7 +146,7 @@ Explore technical documentation organized by intent:
 
 - Login, OAuth, SSO, user accounts, and saved caller state.
 - Images and audio.
-- Execution of a discovered MCP tool.
+- Execution of an unapproved MCP tool, a chat function, or an arbitrary function.
 - An optimizer that promotes a policy without an operator.
 - An HTTP admin UI for tenants, providers, limits, and prices. Those change through the CLI.
 - TLS on the Node.js listen port. Nginx in Compose terminates TLS on port 443. The Node.js port stays private.

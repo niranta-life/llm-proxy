@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-A chat can send function tools on `POST /v1/chat/completions`. The body is the OpenAI function-calling shape. The application executes the function. The proxy does not call the function. The proxy does not run tool code.
+A chat can send function tools on `POST /v1/chat/completions`. The body is the OpenAI function-calling shape. The application executes the function. The proxy does not call the function. The proxy does not run tool code. An approved MCP tool uses a separate route. See [MCP catalog](mcp.md).
 
 This page is the caller contract. Provider differences are in [Cross-provider tool calls](cross-provider-tools.md). The returned call is in [Tool call results](tool-calls.md). The chat path is in [Chat](chat.md).
 

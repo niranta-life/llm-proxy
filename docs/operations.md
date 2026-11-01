@@ -116,7 +116,7 @@ The Node.js process does not listen with TLS. The local Compose ingress terminat
 
 If the database drops after the process is listening, the process keeps running. Ready goes to 503. Live stays 200.
 
-Tenant routes are `GET /v1/tenant`, `GET /v1/models`, `POST /v1/chat/completions`, and `POST /v1/embeddings`. See [Embeddings](embeddings.md). The read routes under `/internal/v1/` use the same two tenant headers. MCP catalog routes under `/internal/v1/mcp` use the same two tenant headers. Those routes discover tools. They do not call a tool. See [MCP catalog](mcp.md). A path with no route returns HTTP 404 `{"error":"not_found"}`. An unhandled error returns HTTP 500 `{"error":"internal_error"}`.
+Tenant routes are `GET /v1/tenant`, `GET /v1/models`, `POST /v1/chat/completions`, and `POST /v1/embeddings`. See [Embeddings](embeddings.md). The read routes under `/internal/v1/` use the same two tenant headers. MCP catalog routes under `/internal/v1/mcp` use the same two tenant headers. Discovery does not call a tool. A separate route calls one approved tool. A write waits for approval. See [MCP catalog](mcp.md). A path with no route returns HTTP 404 `{"error":"not_found"}`. An unhandled error returns HTTP 500 `{"error":"internal_error"}`.
 
 ## Database roles
 
@@ -136,7 +136,7 @@ Each log line is one JSON object. Redaction removes a bearer token, a `yck_` ten
 
 ## Migrations
 
-SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `036`. It drops no table and no column.
+SQL files in `migrations/` apply in lexical order, once, before the proxy listens. Each file is recorded in `schema_migrations`. A later start does not apply a file that is already recorded, and it does not delete rows. Do not edit a file after it has been applied. This tree has migrations `001` through `038`. It drops no table and no column.
 
 | File | What it adds |
 | --- | --- |

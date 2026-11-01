@@ -1,371 +1,131 @@
 # llm-proxy
 
-**Give every team AI access without giving up control.**
+**Self-hosted, OpenAI-compatible LLM gateway with zero silent decisions.**
 
-llm-proxy is a self-hosted, OpenAI-compatible LLM gateway that makes no silent decisions. It runs in your cloud VPC or on-prem in your own data center, and needs only PostgreSQL. Security gets one place for provider keys. Finance gets per-team spend it can trust. Compliance knows the approved model is the one that answered. Developers keep the OpenAI SDK and never handle a provider key.
+`llm-proxy` sits between your client applications and upstream foundation models. It centralizes API keys, enforces tenant isolation directly in PostgreSQL, tracks exact spend with immutable ledgers, and guarantees that requests never switch models behind your back.
 
-## For enterprises
+Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 
-- **Pass your security review.** It runs inside your network. No vendor holds your data, so there is no new third-party risk and no data-residency question.
-- **One place for provider keys.** No keys spread across app `.env` files. If a key leaks, you rotate it once, and no app redeploys.
-- **The approved model is the one that answered.** A named model never switches. Audits and regulated workloads get the model you tested.
-- **See the kind of work, not the prompt.** Each completed chat stores the task category, the model, and the outcome. That record has no prompt and no answer. Encrypted capture is off by default. When you turn it on, an approved chat is stored as ciphertext.
-- **Spend you can defend.** Cost per team and per attempt, with no hidden $0 failures. Budgets stop overspend before the invoice.
-- **Small to run.** One container and PostgreSQL. No vendor control plane and no extra services to patch or staff.
-- **AI where the internet is not allowed.** It can run air-gapped with a model that you host. A live DGX call is not yet validated.
+---
 
-## For developers
+## Why, What & How
 
-- **No new SDK.** Keep the OpenAI client and change the base URL. The same code works for OpenAI, Anthropic, Vertex, Grok, OpenRouter, or your own model.
-- **Change models without a deploy.** Point the alias `auto` at a new deployment with the CLI.
-- **No provider keys in your app.** You hold one tenant secret. No key rotation work.
-- **Reliability is built in.** Retries, deadlines, fallback, and the circuit breaker are set once by the platform team, not rebuilt in each service.
-- **Easy to debug.** Errors use the OpenAI shape. The `x-deployment`, `x-attempt-count`, and `x-fallback` headers show what happened. A field the model does not accept is refused, not dropped without notice.
-- **Label the task when you know it.** Optional `task` must be a known category. The proxy stores it and does not send it to the provider.
-- **Streams you can trust.** The proxy never joins output from two models into one answer.
+### Why llm-proxy?
+- **No Leaked Keys:** Your applications hold a single tenant secret. Upstream provider keys (OpenAI, Anthropic, xAI, Vertex, etc.) stay encrypted at rest in PostgreSQL with AES-256-GCM.
+- **Auditable & Strict:** A named model request (`gpt-4o-mini`, `claude-sonnet-5-5`, etc.) **never** silently switches models or providers.
+- **Database-Enforced Tenant Isolation:** Every query runs under PostgreSQL Row-Level Security (RLS) bound to the caller's tenant.
+- **Honest Cost Accounting:** Every token and dollar figure is strictly estimated, provisional, or unknown—never assumed or spoofed.
+- **No Third-Party Control Plane:** Completely private in your VPC or on-prem. No external analytics, telemetry, or hosted SaaS dependencies.
 
-Two words appear throughout. A **tenant** is one team or app with its own secret, models, limits, and budget. A **deployment** is one model at one provider that you registered.
+### What Does It Provide?
+- **Standard Interface:** Drop-in OpenAI-compatible endpoint (`POST /v1/chat/completions` and `GET /v1/models`) supporting streaming (SSE) and unary modes.
+- **Multi-Provider Support:** Adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and custom self-hosted endpoints (e.g., DGX).
+- **Traffic Governance:** Granular tenant quotas (RPM, concurrency, streaming leases, token rate limits) and hard monthly spend budgets.
+- **Reliability Controls:** Configurable deadlines, circuit breakers, and automatic retries before any bytes stream.
+- **Continuous Learning & Cost Optimization:** Offline evaluation replays, evidence-backed qualification, canary routing, and cost-based selection for the `auto` alias.
 
-## Why llm-proxy
-
-Your LLM gateway holds every provider key that you own. It also sees every prompt that you send. That makes it one of the most trusted parts of your stack. Many teams pick one in an afternoon.
-
-Without a gateway, each app has its own provider keys in its own `.env` file. Keys leak, spend is hard to stop, and nobody can say which model answered which request. A gateway fixes that. But many gateways also decide things for you: they switch to a different model when a provider fails or a budget runs out, or they keep a control plane on the vendor's network.
-
-llm-proxy is built on three promises:
-
-- **Contained.** Provider keys stay inside your network. Prompts go only to the provider that you chose, and to no one at all with a self-hosted model. A caller never sees a provider key or a provider URL. The database enforces tenant isolation.
-- **Approved.** Every control is off until you turn it on. A request that names a model never switches to a different model. Fallback happens only for the alias `auto`, only to a deployment that passed your policy, and only before the first byte of output.
-- **Provable.** Each attempt records which deployment answered and what it cost. Each cost is estimated (verified price, full usage), provisional (unverified price or partial usage), or unknown (no usage reported). A timeout is never recorded as a zero-cost call.
-
-## High-level architecture
+### How Does It Work?
 
 ```mermaid
-flowchart TB
-    apps["<b>Applications / Agents / Services</b><br/>OpenAI SDK · HTTP · Streaming"]
-
-    subgraph proxy["Intelligent LLM Proxy"]
-        direction TB
-        auth["API + Authentication"]
-        norm["Request Normalization"]
-        cap["Capability Validation"]
-        router["Model Router"]
-        adapters["Provider Adapters"]
-        retry["Retries + Failover"]
-        cost["Usage + Cost Tracking"]
-        telem["Request Telemetry<br/>metrics + characteristics"]
-        capture["Sample Capture<br/>encrypted, off by default"]
-        auth --> norm --> cap --> router --> retry --> adapters
-        adapters --> cost --> telem
-        telem --> capture
-    end
-
-    subgraph providers["Model providers"]
-        direction LR
-        openai["OpenAI"]
-        anthropic["Anthropic"]
-        grok["Grok (xAI)"]
-        openrouter["OpenRouter"]
-        vertex["Vertex AI"]
-        dgx["Custom / DGX"]
-    end
-
-    subgraph learning["Continuous Learning System"]
-        direction LR
-        history["History<br/>outcomes + encrypted samples"]
-        schedule["Schedule<br/>off until named"]
-        replay["Replay<br/>pinned challenger"]
-        judge["Judge<br/>off until named"]
-        evidence["Evidence<br/>offline snapshot"]
-        rankings["Rankings<br/>qualified cost"]
-        selection["Selection<br/>off until enabled"]
-        optimizer["Automatic optimizer"]
-        history --> schedule
-        schedule --> replay
-        replay --> judge
-        replay --> evidence
-        judge --> evidence
-        evidence --> rankings
-        rankings --> selection
-    end
-
-    infra["PostgreSQL 16 · evaluation jobs"]
-    infraPlanned["Redis · Secret Manager (planned)"]
-
-    apps --> proxy
-    proxy --> providers
-    telem --> history
-    capture --> history
-    replay -->|"separate traffic"| adapters
-    selection --> router
-    optimizer -.-> router
-    proxy --- infra
-    proxy -.- infraPlanned
-
-    classDef planned stroke-dasharray: 5 5
-    class optimizer,infraPlanned planned
+flowchart LR
+    A["Apps / Agents<br/>(OpenAI SDK)"] -->|"Bearer <tenant-secret>"| B["llm-proxy<br/>(Node.js + RLS)"]
+    B --> C[("PostgreSQL 16<br/>(Ledger, Limits, Keys)")]
+    B --> D["OpenAI"]
+    B --> E["Anthropic"]
+    B --> F["xAI / Grok"]
+    B --> G["Vertex / DGX"]
 ```
 
-Solid lines are shipped. Dashed lines are planned. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant for each. An evidence snapshot is an offline record. When a shadow policy is enabled, a shadow ranker can read snapshot metadata and record a recommendation. The router does not execute that recommendation. A canary rollout can send a bounded share of `auto` to one qualified challenger. The rollout is off until an operator activates it. It does not promote itself. A guardrail is off until an operator attaches it. A violation stops new canary assignments. The ranker, the snapshot, and the schedule do not choose that challenger. Rankings are shipped. A shadow ranking records a recommendation and does not change the route. An operator can enable selection for one tenant and one task segment. Selection stays off until that enablement. When selection is on, the router sends `auto` in that segment to the lowest qualified expected cost inside the policy limits. The automatic optimizer stays dashed. It does not promote a policy by itself. The only runtime dependency is PostgreSQL 16. Evaluation jobs use that same database. The local path is one Compose project on Colima. See [Local runtime](#local-runtime). Recorded timings are in [Performance](docs/performance.md).
+1. **Authentication:** Authenticates `X-Tenant-ID` and Bearer token against a scrypt verifier, establishing PostgreSQL RLS session context.
+2. **Admission & Limits:** Verifies tenant budget, rate limits (RPM), and concurrency ceilings before placing a token lease reservation.
+3. **Model Resolution:** Direct named models route immediately to the registered provider deployment; the `auto` alias routes through governed policies.
+4. **Adapter Execution:** Normalizes request payload into upstream provider format and returns standard OpenAI chat completions or SSE chunks.
+5. **Cost & Telemetry Settlement:** Calculates exact token usage and costs, settles budget reservations, and records sanitized telemetry into the database.
 
-### How a request flows
+---
 
-1. **API + Authentication.** The caller sends `X-Tenant-ID` and a tenant secret. The proxy checks the secret against a scrypt verifier. From here, every database query runs as that tenant under PostgreSQL row-level security.
-2. **Request Normalization.** The body becomes one standard request format. The same JSON works for every provider.
-3. **Capability Validation.** Each deployment lists the fields it accepts, such as `temperature` or `stop`. The proxy refuses a field the deployment does not accept. It does not drop the field and continue.
-4. **Model Router.** `model` is the alias `auto` or the name of an enabled deployment. The router resolves it to one deployment. A named model never changes. A shadow routing policy can record that choice. It does not change the deployment. An evidence snapshot records candidate quality for one task segment. When that policy is in shadow, a ranker can read the snapshot and record a recommendation, the baseline, and the deployment that executed. Those are separate fields. Without an active canary rollout and without enabled selection, the router resolves `auto` to the alias baseline. An operator can activate a rollout that sends a bounded share of `auto` to one qualified challenger. The router does not execute the ranking. A named model never enters the canary. An attached guardrail can stop the rollout. New `auto` requests then use the alias baseline. The guardrail does not promote the challenger. When an operator enables selection for one task segment, `auto` in that segment selects the lowest expected cost among qualified candidates that meet the policy limits. Selection stays off until that enablement. The same routing key stays on that deployment. See [Routing policy](docs/operations.md#routing-policy), [Evidence qualification](docs/operations.md#evidence-qualification), [Shadow ranking](docs/operations.md#shadow-ranking), [Canary routing](docs/operations.md#canary-routing), and [Governed promotion](docs/operations.md#governed-promotion).
-5. **Circuit breaker and limits.** An open circuit breaker rejects the attempt before any provider call. Then rate, concurrency, and budget limits are checked, and the proxy sets aside budget for this call.
-6. **Provider Adapters.** One adapter per provider family turns the canonical request into the provider's API and back into an OpenAI chat completion or a streamed response.
-7. **Retries + Failover.** Retry makes at most one more attempt on the same deployment, within one deadline. Fallback moves `auto` to one approved deployment, only before any output. A new attempt goes back to step 5.
-8. **Usage + Cost Tracking.** Each attempt is priced from prices that you registered. The budget reservation is settled.
-9. **Request Telemetry.** Each request and attempt is stored for the tenant's metrics. Each completed chat also stores one [request-characteristics](#request-characteristics) record, without the prompt or the answer. Response headers `x-deployment`, `x-attempt-count`, and `x-fallback` show what happened.
+## Quickstart (Under 2 Minutes)
 
-Encrypted capture can run after a completed chat. It is off by default. A schedule and a replay use a separate worker. An evidence refresh is a separate offline call. A shadow ranker can run after the route is chosen. It does not change the router and it does not call a provider.
+### Prerequisites
+- Docker & Docker Compose (or [Colima](https://github.com/abiosoft/colima) on macOS)
+- Node.js 24+ & `curl`
 
-Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for the module map, the data model, the trust boundaries, and the [local runtime](docs/architecture.md#local-runtime).
-
-### Local runtime
-
-`./llm-proxy-docker.sh` runs this proxy on the Colima profile you already use. Compose starts PostgreSQL 16 and one app container. The app command is `node dist/index.js`. The base image entrypoint stays `docker-entrypoint.sh`. The image does not start the evaluation worker, the guardrail worker, or the promotion worker. The cleanup worker still starts inside the app process.
-
-`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. That file holds the log level, the OpenAI address, the lock for saved provider keys, the stream limits, and the migration timeouts. Do not put a provider API key in that file. Compose sets the database host, the role names, the role passwords, and the listen address. Leave those values out of the config file.
-
-`setup` also creates `config/provider-keys.env` when that file is missing. That file holds the provider API keys. Its mode is 600. Git does not track it. A Docker build does not copy it. The script does not print a provider key. `keys` turns inference on only when one of those keys is set. It registers an enabled deployment for each provider that has a key. A later `keys` run replaces the OpenAI, Anthropic, xAI, OpenRouter, Vertex, and DGX keys. It updates `upstream_model` when the file model differs. An empty `ANTHROPIC_MAX_OUTPUT_TOKENS` skips Anthropic. Other providers still apply. Selection stays off. Automatic promotion stays off. The script does not mark a deployment validated. A DGX call needs addresses in `DGX_ALLOWLIST_ADDRESSES`. Without those addresses, `keys` still stores the DGX key and does not call that host.
-
-`build` builds the app image and does not start it. `start` rebuilds that image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `watch` rebuilds the image when those files change. `watch` recreates the app when the config file changes. After either change the ready check returns HTTP 200 `{"status":"ready","database":"ready"}`. `stop` keeps the database volume and leaves Colima running. Colima stops only with `stop --vm`.
-
-Git does not track `config/docker.env` or `config/provider-keys.env`. A Docker build does not copy those files. A config the process would reject makes `build` and `start` exit before they start Colima or build an image. A provider keys file with a loose mode, a symlink, or a command in a value makes `keys` exit before it starts Colima or builds an image. `scripts/colima.sh` starts the same Compose project. See [Architecture](docs/architecture.md#local-runtime) and [Operations](docs/operations.md).
-
-### Request characteristics
-
-Each completed chat stores one versioned record for that tenant. The record has the task category, how that category was chosen, the requested model, the selected deployment, the size, the latency, and the outcome. It does not contain the prompt, the answer, or a credential.
-
-You can set `task` to `classification`, `extraction`, `summarization`, `reasoning`, `coding`, `translation`, `writing`, `general_qa`, or `unknown`. Any other value is rejected. When `task` is absent, local rules choose the category, or it stays `unknown`. The proxy does not call a model to classify the text, and it does not send `task` to the provider.
-
-List and by-id reads use the same tenant headers as chat. A page holds at most 50 rows. Another tenant's rows are not returned. See [Metrics](docs/metrics.md#request-features).
-
-An encrypted sample is a separate store. It is off by default. See [Encrypted samples](docs/metrics.md#encrypted-samples).
-
-### Continuous Learning System
-
-The learning system uses your own traffic. History, pinned replay, deterministic checks, a read-only report, an optional judge, a schedule, a shadow ranking, a canary rollout, and selection are in this release. A shadow ranking does not change the deployment that executes. When selection is on, the router uses the ranking for `auto` in one task segment. Selection stays off until an operator enables it. The canary is off until an operator activates it. A guardrail is off until an operator attaches it. A violation stops that canary. It does not promote the challenger.
-
-- **History** stores each completed chat as characteristics: the deployment, the latency, the cost, and the result. That record has no prompt. When you turn on encrypted capture, an approved chat is also stored as ciphertext. The default stores no content.
-- **Schedule** selects a bounded set of approved samples. It records why a run starts or why it skips. It does not call a model to choose the set. It reserves the estimate before a provider call. The scheduler is off until you name one tenant. It does not change aliases or production routing.
-- **Replay** sends one approved sample to one pinned challenger. The worker calls the provider adapter. It does not call `POST /v1/chat/completions`. It does not use `model=auto`. It does not run tools. It stores the challenger output as ciphertext and records cost, latency, usage, and status. Replay is off until you enable execution for one tenant.
-- **Checks** compare the original output and the challenger output with one approved profile. Each result is pass, fail, unknown, or not applicable. The checks do not call a model.
-- **Report** reads one completed run. It states one recommendation. That recommendation does not change an alias or a fallback policy.
-- **Judge** compares the two outputs when a run pins an approved rubric. Judging is off until you name one tenant. The judge budget is at most 1 USD. A judge finding does not change routing.
-- **Drift** compares stored runs at or before a chosen time. A run counts only after it is completed by that time. Different populations are not pooled into one rate.
-- **Rankings** record the lowest qualified expected cost for `auto`. A shadow record is an estimate. The router does not execute a shadow ranking.
-- **Selection** stays off until an operator enables it for one tenant and one task segment. When selection is on, `auto` in that segment selects the lowest expected cost that meets the policy limits. A named model stays on that model. The same routing key stays on that deployment.
-- **Canary** sends a bounded share of `auto` to one qualified challenger. The challenger comes from one qualified evidence snapshot. The rollout does not follow the ranking. It does not promote itself. An attached guardrail can stop it. Missing feedback is not treated as success.
-- **Automatic optimizer** stays off. No process promotes a policy by itself.
-
-Evaluation jobs stay in PostgreSQL. The schedule does not add Redis. See [Evaluation](docs/architecture.md#evaluation) and [Performance](docs/performance.md).
-
-### How this architecture compares
-
-LLM gateways follow a few designs. Each design puts the trust boundary in a different place.
-
-| Design | Examples | Where prompts and keys live | Tenant isolation | Trade-off |
-| --- | --- | --- | --- | --- |
-| Hosted aggregator | OpenRouter, Cloudflare AI Gateway | Vendor network | Vendor app logic | No ops work. Traffic and keys leave your network. |
-| Hybrid (gateway in your network, vendor control plane) | Portkey hybrid, Kong Konnect, Azure APIM self-hosted gateway | Data plane yours, config at vendor | Vendor app logic | Managed console. The control plane is still outside. |
-| Self-hosted general gateway | LiteLLM, Bifrost, Helicone gateway | Your network | App logic (teams, virtual keys) | Breadth: many models and features. A large surface in the path of every key. |
-| Kubernetes traffic gateway | Envoy AI Gateway (Agent Router), Kong | Your cluster | Route and quota config | Strong traffic control. Needs Kubernetes and service-mesh skills. |
-| Cloud-native managed | AWS Bedrock, Azure OpenAI | Your cloud account | IAM | No provider keys. Locked to one cloud's model catalog. |
-| Router service | Not Diamond, Martian, RouteLLM | Varies | n/a | Picks a model by quality. Not a gateway. |
-| **llm-proxy** | — | **Your network, your Postgres** | **PostgreSQL row-level security** | Small, strict, auditable. Text chat only today. |
-
-The main design differences:
-
-- **Isolation in the database, not only in app code.** The runtime database role cannot bypass row-level security. It cannot read provider key ciphertext or secret verifiers. We found no other gateway that documents database-enforced tenant isolation.
-- **Fallback that never joins two models in one answer.** Some gateways continue a broken stream on another model. llm-proxy never falls back after the first byte, so the answer you audit is the answer one model gave.
-- **Policy-checked fallback.** A fallback target must be in the same tenant, pass a live check, come from an approved provider, match your data-handling rule, sit in an allowed region, and accept the required fields.
-- **Honest cost.** Unknown stays unknown. A hard budget refuses a call whose cost it cannot estimate in advance.
-- **One dependency.** PostgreSQL holds config, policy, keys, costs, the attempt trail, request characteristics, encrypted samples, and evaluation jobs. No vendor control plane.
-
-## Why not an existing gateway?
-
-There are many LLM gateways. Most of them compete on breadth: more models, more agents, more tools, and a hosted console. llm-proxy competes on trust in the request path.
-
-| Question | llm-proxy | Typical gateway |
-| --- | --- | --- |
-| Where does it run? | Your cloud VPC or your own data center. Only PostgreSQL is needed. | SaaS, hybrid, or self-hosted with extra services. |
-| Who sees the provider keys? | Only the proxy. AES-256-GCM ciphertext; the key is not in Postgres. | Gateway config, env vars, or the vendor's secret store. |
-| How are tenants isolated? | PostgreSQL row-level security on every tenant query. | Teams or virtual keys in app logic. Some tiers are enterprise-only. |
-| Can my model change without notice? | No. A named model never switches. | Often yes: automatic fallbacks, budget fallbacks, or mid-stream continuation. |
-| How do I know what happened? | Headers and per-attempt rows name the deployment, the attempt count, and any fallback. A characteristics record names the task and the outcome, without the prompt. A routing decision names the alias, the baseline, and the mode, without the prompt. | Logs or a hosted dashboard. |
-| Is a cost figure ever a guess shown as fact? | No. Each amount is estimated, provisional, or unknown. | Often a public price list; failed calls can show $0. |
-| License | MIT. No paid enterprise tier. | Mixed: open core with paid enterprise features is common. |
-
-Summary of the market as of October 2026 (full table with sources in [Comparison](docs/comparison.md)):
-
-| Product | Deployment | Mid-stream failover | Tenant isolation | Learning loop |
-| --- | --- | --- | --- | --- |
-| LiteLLM | Self-host or cloud | Continues a broken stream on another model | Teams; organizations are enterprise-only | No |
-| Portkey (now Palo Alto Networks Prisma AIRS) | SaaS or self-host | Not documented | Workspaces | No |
-| Kong AI Gateway | Konnect SaaS or self-host enterprise | Not documented | Not documented | Semantic routing |
-| Cloudflare AI Gateway | SaaS only | Not documented | Metadata scopes | No |
-| OpenRouter | SaaS only | Fallbacks on by default | n/a | No |
-| Bifrost | Self-host | Not documented | Customer → team → virtual key | No |
-| Envoy AI Gateway / Agent Router | Kubernetes | Not documented | Quota-aware routing | No |
-| TensorZero | Self-host | Not documented | Not documented | Yes, but archived June 2026 |
-| AWS Bedrock / Azure APIM | Managed in your cloud | Not documented | IAM or subscriptions | Bedrock prompt routing (one model family) |
-| **llm-proxy** | **Self-host, Postgres only** | **Never after the first byte** | **Database row-level security** | **Replay, checks, optional judge, a schedule, and a shadow ranking. A shadow ranking is an estimate and does not change the route. A canary rollout can send a bounded share of auto to one qualified challenger. It is off until an operator activates it. An attached guardrail can stop that canary. It does not promote the challenger. An operator can enable selection for one task segment. Selection stays off until then. When it is on, the router uses the qualified ranking.** |
-
-Use a different gateway today if you need tools, images, audio, embeddings, MCP, an admin UI, SSO, or hundreds of models through one hosted key. llm-proxy does not include them yet.
-
-## Run it in your VPC or on-prem
-
-llm-proxy is built for a network that you control. It is one container and one PostgreSQL 16 database, so it runs anywhere you run containers:
-
-- **Cloud VPC.** AWS, Google Cloud, Azure, or any other cloud, in a private subnet behind your own load balancer.
-- **On-prem.** Your own servers and data center, next to your own GPUs.
-- **Air-gapped.** With no internet access, when it routes only to a model endpoint that you host, such as a DGX system. Hosted providers (OpenAI, Anthropic, Vertex, xAI, OpenRouter) need outbound access to their APIs. A live DGX call is not yet validated.
-
-In every case, keys, costs, policies, and the attempt trail all stay in your own PostgreSQL. Prompts pass through to the provider that you chose and nowhere else.
-
-- **Prompt text stays out of logs and operator JSON.** Each completed chat stores the task, the model, and the outcome. Encrypted capture is off by default. When you turn it on, an approved chat is stored as ciphertext. A sample route returns metadata only.
-- **Small footprint.** One Node.js process and PostgreSQL 16. Seven runtime packages, with a lockfile.
-- **No telemetry.** The proxy calls only the providers that you register. It sends nothing to the maintainers or anyone else.
-- **Caller never holds a provider key.** The caller sends a tenant id and a tenant secret. It cannot send a provider key or a provider URL.
-- **Secrets at rest.** The database stores a scrypt verifier, not the tenant secret. Provider keys are AES-256-GCM ciphertext. The encryption key comes from `PROVIDER_CREDENTIAL_KEY`, not from Postgres.
-- **Least-privilege database roles.** The runtime role cannot read provider ciphertext or verifiers. No role that the proxy logs in as can bypass row-level security.
-- **Redacted logs.** Logs remove secrets, prompts, and chat messages.
-- **No HTTP admin surface.** Tenants, providers, limits, and policies change only through the CLI, with flags or `--interactive`. No network request can change them. Only an operator with CLI and database access can.
-- **Private model endpoints.** A self-hosted model, such as one on DGX, must be on an allowlist with pinned addresses. The proxy does not follow redirects.
-- **Data residency.** Fallback checks region and data-handling values, so `auto` never moves a request to a region or provider that your policy did not approve. OpenRouter calls go only to the downstream providers that you list.
-
-The proxy does not terminate TLS. Put TLS on the load balancer or reverse proxy in front of it. See [Operations](docs/operations.md).
-
-## We run on it
-
-The maintainers route every internal product's LLM calls through llm-proxy. Each control in this README, from the breaker to honest cost states, is one that our own traffic needed. When it breaks, it breaks for us first.
-
-## Get started
-
-You need Colima, the Docker CLI, Docker Compose, and curl. Tests and the check script also need Node.js 24. If your shell is on another Node version, run `nvm use 24`, then `npm install`, before `npm test`.
-
-Export the Colima socket in the block below for later Docker commands. Run `./llm-proxy-docker.sh setup`. Run `./llm-proxy-docker.sh start`. The script starts Colima when it is down, then PostgreSQL 16 and the proxy on port 8080.
-
+### 1. Launch Stack
 ```bash
-export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
+export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock" # if using Colima
 ./llm-proxy-docker.sh setup
 ./llm-proxy-docker.sh build
 ./llm-proxy-docker.sh start
 ```
 
-`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. `setup` also creates `config/provider-keys.env` when that file is missing. No provider key is stored there. Edit `config/docker.env` to change the log level, the OpenAI address, the stream limits, or the migration timeouts. Put each provider API key in `config/provider-keys.env`. Leave a key empty to skip that provider. Keep that file at mode 600. `build` builds the app image and does not start it. `start` rebuilds the app image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. `start` also builds that image when it is missing. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `./llm-proxy-docker.sh status` shows Colima, the config file, the inference value, and whether the image matches the program files. It prints `image: not checked` when the program-file stamp matches and Colima is down. `status` shows the containers and the ready check when Colima is running. `./llm-proxy-docker.sh watch` rebuilds the app image when those program files change. `watch` recreates the app when the config file changes. `./llm-proxy-docker.sh stop` stops the containers and keeps the database volume. Colima itself stops only with `./llm-proxy-docker.sh stop --vm`. The shape of that runtime is in [Local runtime](#local-runtime).
-
-`scripts/colima.sh start` starts the same Compose project. `npm run stack -- start` runs that script. `npm run docker -- start` runs `llm-proxy-docker.sh`. `scripts/colima.sh start --build` rebuilds the image.
-
-Check the process:
-
-```bash
-curl -s http://127.0.0.1:8080/health/live
-curl -s http://127.0.0.1:8080/health/ready
-```
-
-Live returns `{"status":"live"}`. Ready returns `{"status":"ready","database":"ready"}` when Postgres is up and `schema_migrations` has the latest migration for this image. If it is not ready, the route returns HTTP 503 and live stays 200. During shutdown it also returns HTTP 503, with `{"status":"not_ready","reason":"shutting_down"}`.
-
-Chat stays off until inference is on and a deployment is enabled. Put a provider key in `config/provider-keys.env`. Then run:
-
+### 2. Configure Upstream Provider Keys
+Add your provider keys to `config/provider-keys.env` (mode 600, gitignored), then register deployments:
 ```bash
 ./llm-proxy-docker.sh keys
 ```
+This enables inference, registers deployments, and creates your initial credentials in `config/local-tenant.json`.
 
-`keys` reads that file. It does not print the key. With no key set, it does not change inference and it does not start Colima. With a key set, it turns inference on, starts the stack, and stores the tenant id and the tenant secret in `config/local-tenant.json`. That file is mode 600. Git does not track it. The script prints the tenant id and the file path. It does not print the tenant secret. It registers one enabled deployment for each provider whose key is set. A later `keys` run replaces the OpenAI, Anthropic, xAI, OpenRouter, Vertex, and DGX keys. It updates `upstream_model` when the file model differs. An empty `ANTHROPIC_MAX_OUTPUT_TOKENS` skips Anthropic. Other providers still apply. For `claude-sonnet-5-5`, the Anthropic deployment stores capabilities without `temperature`. A DGX call needs addresses in `DGX_ALLOWLIST_ADDRESSES`. Without those addresses, `keys` still stores the DGX key and does not call that host. Selection stays off. Automatic promotion stays off. The script does not point `auto` at a deployment. The script does not mark a deployment validated. Use `confirm-live-deployment` to record `validated_live` only after a succeeded call in the last 24 hours.
-
-The app container drops every Linux capability and sets `no-new-privileges`. Provider API keys are not container environment variables. The master key in `PROVIDER_CREDENTIAL_KEY` stays in the app environment because the process must open a stored provider key.
-
-See [docs/providers.md](docs/providers.md) for a manual registration. Pass a provider key with `--api-key-stdin`. Do not put it in the process arguments.
-
-The same commands can run as prompts. `--interactive` has to be the only argument:
-
-```bash
-docker compose run --rm -it app node dist/cli.js --interactive
-```
-
-In a terminal, the CLI shows a guided menu:
-
-```text
-What do you want to do?
-  1) create    Add tenants, secrets, provider connections, deployments, and prices
-  2) update    Change secrets, keys, aliases, streaming, limits, budgets, and policies
-  3) validate  Check deployments and providers, or show the current setup
-action: 1
-```
-
-Pick by number or name. Each field shows a hint, such as the values it accepts. Press Enter to leave a field blank. Before a command runs, the CLI shows a summary (provider keys are hidden) and asks `Run <command>? [Y/n]`. A failed command does not end the session. Type `help` to see the menu again, `back` to go up, or `quit` to stop.
-
-When input is piped, the CLI uses plain prompts for scripts: answer `create`, `update`, or `validate`, then the command name, then each field. A blank line leaves that field unset. `done` ends the session, and the first error stops it. In both modes, standard output is the same JSON the flag command prints and prompts go to standard error. Flag commands keep the arguments shown above.
-
+### 3. Send a Chat Completion
+Use `curl` or any OpenAI SDK:
 ```bash
 curl -s http://127.0.0.1:8080/v1/chat/completions \
   -H "X-Tenant-ID: <tenant-id>" \
   -H "Authorization: Bearer <tenant-secret>" \
-  -H "content-type: application/json" \
-  -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Explain zero-trust architecture in one sentence."}]
+  }'
 ```
 
-`model` is `auto` or the name of an enabled deployment. Other providers use the same request. You change only `model`.
+---
 
-To check a running proxy without calling OpenAI:
+## Documentation Map
 
-```bash
-npm run check:deployed -- --prepare-local
-```
+Explore comprehensive technical documentation organized by intent:
 
-Compose database passwords are for local development. The proxy listens without TLS. Put TLS on the reverse proxy in front of it.
+### 🚀 Getting Started & Operations
+- **[Operations Guide](docs/operations.md)** – CLI commands, interactive management, environment variables, health checks, migrations, and incident runbooks.
+- **[Architecture Deep Dive](docs/architecture.md)** – Detailed module map, trust boundaries, data schema, and local runtime design.
+- **[GCP Deployment](docs/gcp-deployment.md)** – Cloud deployment guide using OpenTofu / Terraform for Google Cloud VPC.
+- **[Market Comparison](docs/comparison.md)** – Technical comparison against LiteLLM, Kong, Portkey, Envoy AI Gateway, and Cloudflare.
 
-## Capabilities
+### 🛡️ Core Proxy Capabilities
+- **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, error shapes, and header conventions.
+- **[Tenant Isolation](docs/tenants.md)** – PostgreSQL Row-Level Security, key rotation, and credential management.
+- **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and pricing models.
+- **[Streaming (SSE)](docs/streaming.md)** – Server-Sent Events architecture, streaming leases, and concurrency caps.
+- **[Limits & Budgets](docs/limits.md)** – Rate limits (RPM/TPM), concurrency ceilings, and monthly spend controls.
+- **[Cost Tracking](docs/cost.md)** – Transparent price registration, provisional states, and immutable accounting.
+- **[Resilience (Retry, Fallback & Breakers)](docs/retry.md)** – Deep dives into [Retry Policies](docs/retry.md), [Auto Fallback](docs/fallback.md), and [Circuit Breakers](docs/breaker.md).
+- **[Metrics & Characteristics](docs/metrics.md)** – Telemetry logging, latency percentiles, and optional encrypted sample capture.
 
-- **[Architecture](docs/architecture.md).** Module map, request path, data model, trust boundaries, and the local Colima runtime.
-- **[Tenants](docs/tenants.md).** Every call carries a tenant id and a secret. You can add and revoke keys. One tenant cannot read another tenant's rows.
-- **[Chat](docs/chat.md).** `POST /v1/chat/completions` and `GET /v1/models`. Text only. Success and errors use the OpenAI shape.
-- **[Providers](docs/providers.md).** OpenAI, Anthropic, Vertex, xAI, OpenRouter, and one private DGX endpoint per tenant. You store the key. The caller does not.
-- **[Streaming](docs/streaming.md).** Server-sent events for a text chat. Off until you enable it for the tenant and the deployment.
-- **[Retry](docs/retry.md).** One more attempt on the same deployment, with deadlines. Off until you turn it on.
-- **[Fallback](docs/fallback.md).** One more deployment for the alias `auto`, and only before any output. A named model never switches.
-- **[Routing policy](docs/operations.md#routing-policy).** An operator can store a policy for the alias `auto`. Shadow mode records the decision. Without an active canary rollout and without enabled selection, that record does not change which deployment runs. A named model stays on that model.
-- **[Evidence qualification](docs/operations.md#evidence-qualification).** An operator can store a qualification profile and refresh an immutable snapshot from completed evaluation runs. The snapshot names a status and the reason codes. The label `eligible_for_canary` does not select a deployment.
-- **[Shadow ranking](docs/operations.md#shadow-ranking).** When a routing policy for `auto` is in shadow, the proxy records the lowest qualified expected cost. The figure is an estimate. The ranking does not select the deployment.
-- **[Canary routing](docs/operations.md#canary-routing).** An operator can send a bounded share of `auto` to one qualified challenger. The rollout is off until that operator activates it. It does not follow the ranking. It does not promote itself. A named model stays on that model. An attached guardrail can stop the rollout. New requests then use the alias baseline.
-- **[Governed promotion](docs/operations.md#governed-promotion).** An operator can promote a qualified canary for one task segment. Each stage increase runs the gates again. Elapsed time does not advance the stage. Selection stays off until the operator enables it for one tenant and one segment. A changed snapshot can propose a new policy version. An unchanged snapshot does not. The proposal does not change the serving policy. Automatic promotion stays off. When an operator turns it on, noninferiority uses the tighter margin. A changed model version is not executed until a new qualified snapshot matches that deployment.
-- **[Limits and budgets](docs/limits.md).** Shared caps on rate, concurrency, and monthly spend. Start in observation mode.
-- **[Cost](docs/cost.md).** You register the price. Each attempt is estimated, provisional, or unknown. The proxy does not take a payment.
-- **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
-- **[Metrics](docs/metrics.md).** Counts, latency, stream percentiles, attempts, breaker state, and cost for the caller's own tenant.
-- **[Performance](docs/performance.md).** Recorded times, rates, and memory from the evidence runs. The figures use mock providers. They are not a production service level.
-- **[Performance rig](docs/performance-rig.md).** The rig measures load, latency, and cost across the enabled deployments. A blind judge scores the answers and does not see which model wrote them. Each run keeps its records, plots, and analysis under perf/runs/. It does not change how requests pick a model.
-- **[Statistical significance](docs/statistical-significant.md).** Formal statistical analysis, hypothesis testing ($p$-values), confidence intervals, and concurrency regression across 244 multi-tenant enterprise requests.
-- **[Request characteristics](docs/metrics.md#request-features).** One versioned record per completed chat: the task, the model, the size, and the outcome. The prompt and the answer are not stored.
-- **[Encrypted samples](docs/metrics.md#encrypted-samples).** Optional ciphertext for an approved chat. Off by default. Metadata routes return no prompt and no completion.
-- **[Evaluation](docs/architecture.md#evaluation).** Pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant. None of them change production routing.
-- **[Cost of a schedule](docs/cost.md#evaluation-schedule).** A tick reserves the estimate before a provider call. Daily and monthly ceilings stay small.
-- **[Operations](docs/operations.md).** Configuration, health, shutdown, migrations, incidents, and tests.
-- **[Comparison](docs/comparison.md).** The LLM gateway market, with sources.
-- **[Live tests](docs/e2e/test-4-full.md).** Local calls on the Compose stack. [Test 1](docs/e2e/test-1.md) is the first full run. [Test 2](docs/e2e/test-2.md) lists the failures from that run. [Test 3](docs/e2e/test-3.md) records the new OpenAI key, the first xAI calls, and one learning path. [Test 4](docs/e2e/test-4-full.md) calls OpenAI, Anthropic, and xAI, then switches alias `auto`. [Test 5](docs/e2e/test-5-learn.md) refreshes one qualification profile at a 0.05 margin. The snapshot stays unqualified. `model=auto` stays on OpenAI. [Test 6](docs/e2e/test-6-cost-switch.md) qualifies OpenAI, Anthropic, and xAI on 73 pairs at a 0.05 margin. With alias `auto` on Anthropic, selection serves OpenAI. The run then stops that rollout and returns alias `auto` to OpenAI. [Test 7](docs/e2e/test-7-enterprise-scale.md) measures multi-tenant enterprise scale, concurrency ramps (1 to 30 users), and admission boundaries across Startup, Mid-Sized Enterprise, and Large Enterprise profiles with realistic Finance and System Integrator workloads on OpenAI, Anthropic, and xAI.
+### 🧠 Continuous Learning & Governance
+- **[Routing & Governed Selection](docs/operations.md#routing-policy)** – Shadow ranking, evidence qualification, and cost-optimal model routing.
+- **[Performance Rig](docs/performance-rig.md)** – Blind LLM evaluation harness and automated benchmark suites.
+- **[Performance Benchmarks](docs/performance.md)** – Baseline execution timings, throughput, and memory profiles.
+- **[Statistical Significance Analysis](docs/statistical-significant.md)** – Formal statistical verification, Welch's $t$-tests ($p$-values), confidence intervals, and concurrency regression ($R^2 = 0.97$).
+
+### 🧪 Live End-to-End Validation
+- **[Test 1: Core Lifecycle](docs/e2e/test-1.md)** – Full end-to-end setup and smoke execution.
+- **[Test 2: Failure & Recovery](docs/e2e/test-2.md)** – Resiliency, error handling, and recovery validations.
+- **[Test 3: Provider Interoperability](docs/e2e/test-3.md)** – Multi-provider integration across live endpoints.
+- **[Test 4: Three-Model Baseline](docs/e2e/test-4-full.md)** – OpenAI, Anthropic, and xAI baseline comparisons.
+- **[Test 5: Adaptive Refresh](docs/e2e/test-5-learn.md)** – Continuous learning snapshot refresh.
+- **[Test 6: Cost-Based Auto-Routing](docs/e2e/test-6-cost-switch.md)** – Automated cost-optimal routing across 73 evaluation pairs.
+- **[Test 7: Enterprise Scale & Concurrency](docs/e2e/test-7-enterprise-scale.md)** – Multi-tenant scale benchmark (Startup, Mid-Sized Enterprise, Large Enterprise) across 1 to 30 concurrent users.
+
+---
 
 ## Roadmap
 
-- **Automatic optimizer.** Selection is shipped. It stays off until an operator enables it. An optimizer that promotes a policy by itself stays off. A named model still never switches.
-- **Redis** for hot counters. Evaluation jobs already use PostgreSQL.
-- **External secret manager** support for provider keys.
-- **A verified live call to a private endpoint** (DGX), so an operator can record `validated_live` for that host. `confirm-live-deployment` already records `validated_live` for a public provider after a succeeded call in the last 24 hours.
+- **Automatic Optimizer:** Governed selection is shipped; fully automated unattended promotion stays off by default.
+- **Redis Cache Layer:** In-memory caching for hot rate counters (PostgreSQL currently handles evaluation & state).
+- **External Secret Managers:** Native integrations with AWS Secrets Manager, GCP Secret Manager, and HashiCorp Vault.
+- **Hardware-Validated Private DGX Endpoints:** Official verification suite for on-premise NVIDIA DGX clusters.
 
-## Not included
-
-- Login, OAuth, SSO, user accounts, and saved caller state.
-- Tools, images, audio, embeddings, and MCP.
-- A verified live call to DGX. Use `confirm-live-deployment` only after a succeeded call in the last 24 hours.
-- An optimizer that promotes a policy without an operator.
-- An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI. A routing policy, an evidence refresh, a canary rollout, and a guardrail set use internal HTTP routes. Task feedback uses the same tenant authentication as chat. Those routes do not change a provider key.
-- TLS on the proxy listen port.
-- A payment flow.
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)

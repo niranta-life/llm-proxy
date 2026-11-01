@@ -276,6 +276,9 @@ docker compose run --rm app node dist/cli.js set-deployment-health \
 
 ## Related
 
+- [Embeddings](embeddings.md)
+- [Function tools](function-tools.md)
+- [Cross-provider tool calls](cross-provider-tools.md)
 - [Chat](chat.md)
 - [Streaming](streaming.md)
 - [Cost](cost.md)

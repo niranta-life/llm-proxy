@@ -92,6 +92,8 @@ Compose publishes that HTTPS address. The Node.js port stays private. Node trust
 
 ## Related
 
+- [Tool call results](tool-calls.md)
+- [Function tools](function-tools.md)
 - [Chat](chat.md)
 - [Providers](providers.md)
 - [Retry](retry.md)

@@ -211,6 +211,9 @@ An enabled retry can make one more attempt on the same deployment. An enabled fa
 
 ## Related
 
+- [Function tools](function-tools.md)
+- [Cross-provider tool calls](cross-provider-tools.md)
+- [Tool call results](tool-calls.md)
 - [Tenants](tenants.md)
 - [Providers](providers.md)
 - [Streaming](streaming.md)

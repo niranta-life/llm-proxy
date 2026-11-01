@@ -22,9 +22,9 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 ### What Does It Provide?
 
 - **Standard Interface:** Drop-in OpenAI-compatible endpoints (`POST /v1/chat/completions`, `POST /v1/embeddings`, and `GET /v1/models`) supporting Server-Sent Events (SSE) streaming and unary chat.
-- **Embeddings:** `POST /v1/embeddings` returns one float vector per text input. The caller names one embedding deployment. A versioned contract pins the model, the dimension, and the normalization. OpenAI and approved Vertex text-embedding models are supported. A loopback private mock is supported. A live private host does not receive embeddings. The proxy does not log the input or the vectors. An embedding call does not enter chat routing.
-- **MCP catalog:** A tenant registers an approved MCP server and discovers its tools. The credential is a protected reference. The catalog page shows the tools, the permission, and the connection health. The proxy does not call a discovered tool.
-- **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. A stream returns each tool-call delta with its index, id, and function name. The application executes the function. The proxy does not execute the function. The proxy does not execute a partial argument fragment. A live DGX host does not receive function tools. A loopback DGX mock can stream the same tool call.
+- **Embeddings:** `POST /v1/embeddings` returns one float vector per text input. The caller names one embedding deployment. A versioned contract pins the model, the dimension, and the normalization. OpenAI and approved Vertex text-embedding models are supported. A loopback private mock is supported. A live private host does not receive embeddings. The proxy does not log the input or the vectors. An embedding call does not enter chat routing. See [Embeddings](docs/embeddings.md).
+- **MCP catalog:** A tenant registers an approved MCP server and discovers its tools. The credential is a protected reference. The catalog page shows the tools, the permission, and the connection health. The proxy does not call a discovered tool. See [MCP catalog](docs/mcp.md).
+- **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. A stream returns each tool-call delta with its index, id, and function name. The application executes the function. The proxy does not execute the function. The proxy does not execute a partial argument fragment. A live DGX host does not receive function tools. A loopback DGX mock can stream the same tool call. See [Function tools](docs/function-tools.md), [Cross-provider tool calls](docs/cross-provider-tools.md), and [Tool call results](docs/tool-calls.md).
 - **Multi-Provider Adapters:** Native adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and private self-hosted endpoints (e.g., NVIDIA DGX).
 - **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets.
 - **Resilience Controls:** Configurable request deadlines, circuit breakers, and retry policies before any stream output begins.
@@ -100,6 +100,11 @@ Explore technical documentation organized by intent:
 
 ### Core Proxy Capabilities
 - **[Chat API](docs/chat.md)** – OpenAI-compatible `POST /v1/chat/completions`, function tools, error shapes, and header conventions.
+- **[Embeddings](docs/embeddings.md)** – `POST /v1/embeddings`, the versioned vector-space contract, and the approved models.
+- **[Function Tools](docs/function-tools.md)** – The OpenAI function-calling request, schema bounds, and the rule that the proxy does not execute the function.
+- **[Cross-Provider Tool Calls](docs/cross-provider-tools.md)** – The same function request on Anthropic, Vertex, xAI, OpenRouter, and a loopback DGX mock.
+- **[Tool Call Results](docs/tool-calls.md)** – Unary tool calls and streamed tool-call deltas.
+- **[MCP Catalog](docs/mcp.md)** – Approved MCP server registration, discovery, permissions, and connection health. Discovery does not call a tool.
 - **[Tenant Isolation & Security](docs/tenants.md)** – PostgreSQL Row-Level Security, key rotation, and credential management.
 - **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and manual registration via `--api-key-stdin`.
 - **[Streaming](docs/streaming.md)** – Server-Sent Events architecture, tool-call deltas, streaming leases, and concurrency caps.

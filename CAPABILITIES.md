@@ -207,3 +207,49 @@ A tool round is not stored in a sample.
 Provider usage stays on the attempt.
 
 Tenant and model permissions stay in force.
+
+## Embeddings
+
+`POST /v1/embeddings` accepts one text string or a batch of text strings.
+
+The route serves the named embedding deployment for that tenant.
+
+A versioned contract pins the model, the dimension, and the normalization policy.
+
+The proxy serves the highest contract version.
+
+That version must name the current upstream model.
+
+The proxy does not serve an older vector space.
+
+The proxy does not renormalize a vector into another policy.
+
+Float encoding returns one finite number array per input.
+
+Base64 encoding is accepted on OpenAI.
+
+The decoded values must match the pinned dimension and the pinned normalization.
+
+Vertex and a private deployment reject base64.
+
+Approved OpenAI models are `text-embedding-3-small`, `text-embedding-3-large`, and `text-embedding-ada-002`.
+
+Approved Vertex models are `text-embedding-004`, `text-embedding-005`, and `gemini-embedding-001`.
+
+A private embedding call requires validation status `validated_mock` and a loopback endpoint.
+
+A live private host does not receive embeddings.
+
+Anthropic, xAI, and OpenRouter do not accept embeddings.
+
+An empty input, an over-long input, a bad dimension, a bad vector count, a non-finite value, and an unsupported encoding are rejected.
+
+A successful attempt stores token counts, latency, and cost.
+
+A failed attempt stores the failure.
+
+Logs do not contain the raw input or the vectors.
+
+An embedding call does not store a chat sample.
+
+An embedding call does not write chat quality evidence or routing evidence.

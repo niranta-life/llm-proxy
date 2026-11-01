@@ -5,7 +5,7 @@ import { proxyError } from './errors.js';
 
 const PUBLIC_SUFFIXES = ['openai.com', 'anthropic.com', 'x.ai', 'openrouter.ai', 'googleapis.com'];
 const BLOCKED_ADDRESSES = new Set(['0.0.0.0', '169.254.169.254', '::', '::1']);
-const SERVING_PATHS = new Set(['/v1/models', '/v1/chat/completions']);
+const SERVING_PATHS = new Set(['/v1/models', '/v1/chat/completions', '/v1/embeddings']);
 const HEALTH_PATHS = new Set(['/health', '/health/ready', '/ready', '/v1/health', '/v1/health/ready']);
 const MANAGEMENT_PREFIXES = ['/admin', '/metrics', '/manage', '/management', '/debug'];
 const ADDRESS_TEXT = /^[0-9A-Fa-f:.]{2,45}$/;
@@ -124,12 +124,14 @@ function normalizeHealthEndpoint(value: string | null, host: string, port: numbe
   return url.toString().replace(/\/+$/, '');
 }
 
-export function privatePathKind(pathname: string): 'models' | 'chat' | 'health' | 'blocked' {
+export function privatePathKind(pathname: string): 'models' | 'chat' | 'health' | 'embedding' | 'blocked' {
   const path = cleanPath(pathname);
   if (MANAGEMENT_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) return 'blocked';
+  if (HEALTH_PATHS.has(path)) return 'health';
+  if (!SERVING_PATHS.has(path)) return 'blocked';
   if (path === '/v1/models') return 'models';
   if (path === '/v1/chat/completions') return 'chat';
-  if (HEALTH_PATHS.has(path)) return 'health';
+  if (path === '/v1/embeddings') return 'embedding';
   return 'blocked';
 }
 
@@ -208,7 +210,7 @@ export function createPrivateFetch(input: {
     const health = input.decision.healthEndpoint?.replace(/\/+$/, '') ?? null;
     const allowed =
       input.mode === 'serving'
-        ? kind === 'models' || kind === 'chat'
+        ? kind === 'models' || kind === 'chat' || kind === 'embedding'
         : health !== null && kind === 'health' && target.toString().replace(/\/+$/, '') === health;
     if (!allowed) unavailable();
     const response = await input.fetchImpl(resource, {

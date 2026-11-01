@@ -18,6 +18,7 @@ export const COMMAND_HELP: Readonly<Record<string, string>> = {
   'register-dgx-connection': 'Connect a tenant to a private DGX endpoint',
   'register-deployment': 'Add a model that callers can ask for',
   'register-price': 'Record the price of a provider model',
+  'register-embedding-contract': 'Pin the model, dimension, and normalization of an embedding deployment',
   'approve-private-endpoint': 'Allow a private endpoint host and pin its addresses',
   'revoke-key': 'Turn off one tenant secret',
   'set-openai-credential': 'Replace the OpenAI key',

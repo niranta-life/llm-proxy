@@ -41,6 +41,7 @@ const COMMANDS = [
   'list-private-models',
   'probe-private-health',
   'register-price',
+  'register-embedding-contract',
   'set-deployment-service-tier',
   'reconcile-attempt-cost',
   'set-execution-policy',
@@ -434,6 +435,31 @@ const specs: Spec[] = [
     command: 'register-price',
     configuration: 'price version rates region tier and serving provider',
     prepare: async () => ({ ...PRICE }),
+  },
+  {
+    action: 'create',
+    command: 'register-embedding-contract',
+    configuration: 'pin model dimension and normalization',
+    prepare: async () => {
+      const created = await provision();
+      ok(['register-openai-connection', '--tenant-id', created.tenantId, '--api-key', 'sk-openai-embed']);
+      ok([
+        'register-deployment',
+        '--tenant-id',
+        created.tenantId,
+        '--name',
+        'embed',
+        '--upstream-model',
+        'text-embedding-3-small',
+        '--timeout-ms',
+        '5000',
+        '--capabilities',
+        'embeddings',
+        '--enabled',
+        'true',
+      ]);
+      return { 'tenant-id': created.tenantId, deployment: 'embed', dimension: '4', normalization: 'none' };
+    },
   },
   {
     action: 'create',
@@ -1152,6 +1178,7 @@ describe('interactive CLI', () => {
     const posts = [...source.matchAll(/app\.post\('([^']+)'/g)].map((match) => match[1]);
     expect(posts).toEqual([
       '/v1/chat/completions',
+      '/v1/embeddings',
       '/internal/v1/evaluation-profiles',
       '/internal/v1/evaluation-rubrics',
       '/internal/v1/evaluations/preflight',

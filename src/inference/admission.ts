@@ -164,6 +164,53 @@ export async function admitChatAttempt(
   }
 }
 
+export async function admitEmbeddingAttempt(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    apiKeyId: string;
+    route: ResolvedRoute;
+    inputChars: number;
+    attemptId: string;
+    now: Date;
+  },
+): Promise<void> {
+  try {
+    await withTenant(pool, input.tenantId, async (client) => {
+      const serviceTier = await loadDeploymentServiceTier(client, input.tenantId, input.route.deploymentId);
+      const prices = await loadAdmissionPrices(client, input.route.provider, input.route.upstreamModel, input.now);
+      const selected = selectPrice(prices, {
+        provider: input.route.provider,
+        model: input.route.upstreamModel,
+        location: input.route.location,
+        serviceTier,
+        servingProvider: null,
+        at: input.now,
+      });
+      const quote = estimateCharge(selected, input.inputChars, 0);
+      const decision = await admitAttempt(client, {
+        tenantId: input.tenantId,
+        apiKeyId: input.apiKeyId,
+        connectionId: input.route.connectionId,
+        deploymentId: input.route.deploymentId,
+        attemptId: input.attemptId,
+        stream: false,
+        now: input.now,
+        windowStart: windowStart(input.now.getTime()),
+        periodStart: periodStart(input.now.getTime()),
+        tokenBound: input.inputChars,
+        estimate: quote.amount,
+        estimateKind: quote.kind,
+        priceVersionId: quote.priceVersionId,
+      });
+      if (decision.decision !== 'allow') throw admissionError(decision.reason);
+    });
+  } catch (error) {
+    if (error instanceof ProxyError) throw error;
+    throw admissionError('admission_unavailable');
+  }
+}
+
 export async function settleChatAttempt(
   pool: Pool,
   logger: Logger,

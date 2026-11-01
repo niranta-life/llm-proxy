@@ -378,6 +378,29 @@ export async function setDeploymentCapabilities(
   return version;
 }
 
+export async function registerEmbeddingContract(
+  pool: Pool,
+  tenantId: string,
+  deployment: string,
+  dimension: number,
+  normalization: string,
+): Promise<{ contractId: string; version: number; model: string; dimension: number; normalization: string }> {
+  const result = await pool.query<{ contract_id: string; version: number; model: string }>(
+    `SELECT contract_id, version, model
+     FROM register_embedding_contract($1::uuid, $2, $3, $4)`,
+    [tenantId, deployment, dimension, normalization],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('embedding contract was not stored');
+  return {
+    contractId: row.contract_id,
+    version: row.version,
+    model: row.model,
+    dimension,
+    normalization,
+  };
+}
+
 export async function confirmDeploymentLive(
   pool: Pool,
   tenantId: string,

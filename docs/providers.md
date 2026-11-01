@@ -72,7 +72,7 @@ docker compose run --rm app node dist/cli.js set-deployment-enabled \
   --tenant-id <tenant-id> --name primary --enabled false
 ```
 
-`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. Store `tools`, `tool_choice`, and `parallel_tool_calls` on OpenAI, Anthropic, Vertex, xAI, OpenRouter, and DGX. OpenAI, xAI, and OpenRouter keep the OpenAI tool body. The proxy does not call the function. A stream on OpenAI, Anthropic, Vertex, xAI, and OpenRouter returns tool-call deltas. Vertex does not accept `parallel_tool_calls`. A live DGX host does not receive function tools. A loopback DGX mock can stream a tool call. `npm test` uses a mock server and does not call OpenAI.
+`set-connection-enabled` changes the OpenAI connection when you omit `--provider`. Do not pass `--default-max-output-tokens` for OpenAI. Store `tools`, `tool_choice`, and `parallel_tool_calls` on OpenAI, Anthropic, Vertex, xAI, OpenRouter, and DGX. OpenAI, xAI, and OpenRouter keep the OpenAI tool body. The proxy does not call the function. A stream on OpenAI, Anthropic, Vertex, xAI, and OpenRouter returns tool-call deltas. Vertex does not accept `parallel_tool_calls`. A live DGX host does not receive function tools. A loopback DGX mock can stream a tool call. `embeddings` is a deployment capability for `text-embedding-3-small`, `text-embedding-3-large`, and `text-embedding-ada-002`. `register-embedding-contract` pins the model, the dimension, and the normalization. `POST /v1/embeddings` returns one float vector per text input. The proxy does not log the input or the vectors. `npm test` uses a mock server and does not call OpenAI.
 
 ## Anthropic
 
@@ -119,7 +119,7 @@ Compose publishes that HTTPS address. The Node.js port stays private. `NODE_EXTR
 
 ## Vertex
 
-Each tenant has one Vertex connection. You must pass `--project` and `--location`. Vertex stores no endpoint. The caller cannot pick the project, the location, or the credential on a chat request. A chat does not run `gcloud` and does not change `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, or a credential path.
+Each tenant has one Vertex connection. You must pass `--project` and `--location`. Vertex stores no endpoint. The caller cannot pick the project, the location, or the credential on a chat request. Approved embedding models are `text-embedding-004`, `text-embedding-005`, and `gemini-embedding-001`. The public body is the OpenAI embeddings shape. A chat does not run `gcloud` and does not change `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, or a credential path.
 
 The default auth mode is `service_account`. That mode needs key material in `--api-key`, and the material must contain `private_key`. An email address or a resource name is not a credential. `--service-account` is optional for that mode.
 
@@ -236,7 +236,7 @@ A live OpenRouter test runs only when `OPENROUTER_LIVE` is `1`. `npm test` does 
 
 Each tenant can store one private DGX endpoint. Chat uses the stored endpoint, model, API key, and auth mode. The endpoint is `https`, with no user name and no password. The host is not a public provider host. The proxy does not follow a redirect. Keep TLS verification on for production.
 
-The endpoint must be on that tenant's allowlist, and the allowlist pins the addresses for the host. Chat uses `/v1/models` and `/v1/chat/completions`. A health check uses only the stored health endpoint. DGX does not use `OPENAI_BASE_URL`. Do not pass `--default-max-output-tokens` or an OpenRouter flag. Function tools are sent only when the stored endpoint host is a loopback address. A loopback DGX mock can stream a tool call. A live DGX host does not receive function tools.
+The endpoint must be on that tenant's allowlist, and the allowlist pins the addresses for the host. Serving uses `/v1/models`, `/v1/chat/completions`, and `/v1/embeddings`. A health check uses only the stored health endpoint. DGX does not use `OPENAI_BASE_URL`. Do not pass `--default-max-output-tokens` or an OpenRouter flag. Function tools are sent only when the stored endpoint host is a loopback address. A loopback DGX mock can stream a tool call. A live DGX host does not receive function tools. Embeddings require `validated_mock` and a loopback host. A live DGX host does not receive embeddings.
 
 `set-deployment-concurrency` is a limit inside this process. A limit shared by every process uses `set-deployment-limit`. See [Limits and budgets](limits.md).
 

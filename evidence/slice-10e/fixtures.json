@@ -1,0 +1,96 @@
+{
+  "one": {
+    "input": "one text",
+    "vector": [
+      0.424242,
+      0.1,
+      0,
+      0
+    ],
+    "dimension": 4
+  },
+  "journey": {
+    "inputs": [
+      "embed-secret-phrase",
+      "second text",
+      "third text"
+    ],
+    "vectors": [
+      [
+        0.424242,
+        0.1,
+        0,
+        0
+      ],
+      [
+        0.424242,
+        0.2,
+        0,
+        0
+      ],
+      [
+        0.424242,
+        0.3,
+        0,
+        0
+      ]
+    ],
+    "dimension": 4
+  },
+  "dimensions": [
+    {
+      "model": "text-embedding-3-small",
+      "pin": 4,
+      "request": 8,
+      "accepted": false
+    },
+    {
+      "model": "text-embedding-ada-002",
+      "pin": 4,
+      "accepted": false
+    },
+    {
+      "model": "text-embedding-004",
+      "pin": 800,
+      "accepted": false
+    }
+  ],
+  "ada": {
+    "dimension": 1536,
+    "uniform": 0.001,
+    "upstreamDimensions": false
+  },
+  "base64": {
+    "floats": [
+      0.5,
+      0.25,
+      -0.5,
+      0.125
+    ],
+    "encoded": "AAAAPwAAgD4AAAC/AAAAPg==",
+    "decoded": [
+      0.5,
+      0.25,
+      -0.5,
+      0.125
+    ]
+  },
+  "unit": [
+    0.5,
+    0.5,
+    0.5,
+    0.5
+  ],
+  "spaces": [
+    {
+      "version": 1,
+      "model": "text-embedding-3-small",
+      "dimension": 4
+    },
+    {
+      "version": 2,
+      "model": "text-embedding-3-large",
+      "dimension": 8
+    }
+  ]
+}

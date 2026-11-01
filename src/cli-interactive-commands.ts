@@ -11,6 +11,7 @@ const CREATE = {
   'register-dgx-connection': ['tenant-id', 'api-key', 'endpoint', 'auth-mode', 'project', 'location', 'service-account', 'api-version'],
   'register-deployment': ['tenant-id', 'name', 'upstream-model', 'timeout-ms', 'capabilities', 'enabled', 'provider', 'default-max-output-tokens', 'downstream-providers', 'data-collection', 'allow-fallbacks', 'require-serving-provider'],
   'register-price': ['provider', 'upstream-model', 'effective-at', 'source', 'status', 'location', 'service-tier', 'serving-provider', 'input-rate', 'output-rate', 'cache-read-rate', 'cache-write-rate', 'thinking-rate', 'request-fee', 'allocated-rate'],
+  'register-embedding-contract': ['tenant-id', 'deployment', 'dimension', 'normalization'],
   'approve-private-endpoint': ['tenant-id', 'host', 'port', 'addresses', 'tls-verify', 'health-endpoint'],
 } as const;
 

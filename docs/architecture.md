@@ -47,6 +47,7 @@ Replay is not a step on this path. The evaluation worker reads a queued job, dec
 | `GET /health/live`, `GET /health/ready` | Process and database health. No auth. |
 | `GET /v1/tenant` | The caller's own tenant. |
 | `POST /v1/chat/completions` | Chat completion, JSON or SSE. A function-tool stream returns tool-call deltas. |
+| `POST /v1/embeddings` | One embedding vector per text input. The deployment name selects the pin. |
 | `POST /v1/feedback` | One task result for one chat request. The body has no prompt and no model output. |
 | `GET /v1/models` | Enabled deployments and aliases for the tenant. |
 | `GET /internal/v1/metrics/summary`, `/attempts`, `/breakers`, `/costs` | Per-tenant metrics. See [Metrics](metrics.md). |

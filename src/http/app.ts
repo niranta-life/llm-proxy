@@ -41,6 +41,7 @@ import { parseEligibilityBody, readSampleEligibility } from '../inference/sample
 import { deleteStoredSample, listSamples, parseSampleId, parseSampleListQuery, readSample, readSampleStats } from '../inference/samples.js';
 import { withTenant } from '../db/tenant-context.js';
 import { executeChat } from '../inference/execute.js';
+import { executeEmbeddings } from '../inference/execute-embeddings.js';
 import { parseRoutingKey } from '../inference/canary-assignment.js';
 import { createRollout, parseRolloutId, parseRolloutWrite, readRollout, stopRollout } from '../inference/canary-rollout.js';
 import {
@@ -396,6 +397,46 @@ export function buildApp(deps: AppDeps): ProxyApp {
       if (reply.sent || reply.raw.headersSent) return;
       if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
       deps.logger.error('chat request failed', { message: errorMessage(error) });
+      return reply
+        .code(500)
+        .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());
+    } finally {
+      request.raw.off('aborted', abortUpstream);
+      reply.raw.off('close', onClose);
+    }
+  });
+
+  app.post('/v1/embeddings', async (request, reply) => {
+    const auth = await rejectUnauthenticated(request, reply);
+    if (auth === null) return;
+    const controller = new AbortController();
+    const abortUpstream = (): void => {
+      if (!controller.signal.aborted) controller.abort();
+    };
+    const onClose = (): void => {
+      if (!reply.raw.writableEnded) abortUpstream();
+    };
+    request.raw.on('aborted', abortUpstream);
+    reply.raw.on('close', onClose);
+    try {
+      return await executeEmbeddings({
+        runtimePool: deps.runtimePool,
+        logger: deps.logger,
+        inferenceEnabled: deps.inferenceEnabled,
+        upstreamBaseUrl: deps.upstreamBaseUrl,
+        store: credentialStore,
+        tenantId: auth.tenantId,
+        apiKeyId: auth.keyId,
+        body: request.body,
+        signal: controller.signal,
+        vertexClientFactory: deps.vertexClientFactory,
+        fetchImpl: deps.compatibleFetch,
+        resolveHost: deps.privateResolve,
+        nowMs,
+      });
+    } catch (error) {
+      if (error instanceof ProxyError) return reply.code(error.status).send(error.body());
+      deps.logger.error('embedding request failed', { message: errorMessage(error) });
       return reply
         .code(500)
         .send(proxyError(500, 'server_error', 'internal_error', null, 'The request failed.').body());

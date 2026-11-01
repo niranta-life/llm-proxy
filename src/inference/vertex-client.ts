@@ -47,10 +47,22 @@ export type VertexGenerateRequest = {
   };
 };
 
+export type VertexEmbedRequest = {
+  model: string;
+  contents: string[];
+  config?: {
+    outputDimensionality?: number;
+    autoTruncate?: boolean;
+    abortSignal?: AbortSignal;
+    httpOptions?: { fetch?: typeof fetch };
+  };
+};
+
 export type VertexGenerateClient = {
   generateContent(request: VertexGenerateRequest): Promise<unknown>;
   generateContentStream(request: VertexGenerateRequest): Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>;
   listModels(signal?: AbortSignal): Promise<void>;
+  embedContent?(request: VertexEmbedRequest): Promise<unknown>;
 };
 
 export type VertexClientFactory = (spec: VertexClientSpec) => Promise<VertexGenerateClient>;
@@ -211,6 +223,13 @@ function wrapClient(ai: GoogleGenAI): VertexGenerateClient {
     async listModels(signal) {
       // The default list is the publisher catalog and omits the project.
       await ai.models.list({ config: { pageSize: 1, queryBase: false, abortSignal: signal } });
+    },
+    embedContent(request) {
+      return ai.models.embedContent({
+        model: request.model,
+        contents: request.contents,
+        config: request.config,
+      });
     },
   };
 }

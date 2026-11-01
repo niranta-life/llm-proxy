@@ -1,4 +1,4 @@
-const SENSITIVE_KEY = /(authorization|password|secret|token|verifier|credential|api[-_]?key|messages|prompt|arguments|tool_calls|tool_call_id)/i;
+const SENSITIVE_KEY = /(authorization|password|secret|token|verifier|credential|api[-_]?key|messages|prompt|arguments|tool_calls|tool_call_id|embeddings?)/i;
 
 function redactString(value: string): string {
   return value

@@ -1,0 +1,36 @@
+{
+  "log": {
+    "containsInput": false,
+    "containsVectorComponent": false,
+    "recordedCompletion": true
+  },
+  "journey": {
+    "status": "succeeded",
+    "promptTokens": 303,
+    "completionTokens": 0,
+    "totalTokens": 303,
+    "durationMs": 5,
+    "cost": "3.03",
+    "costStatus": "estimated",
+    "capabilities": [
+      "embeddings"
+    ],
+    "adapterVersion": 1
+  },
+  "failure": {
+    "status": "failed",
+    "error_code": "upstream_error",
+    "prompt_tokens": null,
+    "dispatched": true
+  },
+  "evidence": {
+    "samples": 0,
+    "features": 0,
+    "decisions": 0,
+    "ranks": 0,
+    "canaries": 0,
+    "selections": 0,
+    "snapshots": 0
+  },
+  "operatorCost": "3.03"
+}

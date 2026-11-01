@@ -18,6 +18,7 @@ import {
   replaceRegistryCredential,
   approvePrivateEndpoint,
   confirmDeploymentLive,
+  registerEmbeddingContract,
   setDeploymentCapabilities,
   setDeploymentConcurrency,
   setDeploymentHealth,
@@ -88,6 +89,7 @@ const CAPABILITIES = new Set([
   'tools',
   'tool_choice',
   'parallel_tool_calls',
+  'embeddings',
 ]);
 
 type Flags = {
@@ -103,6 +105,8 @@ type Flags = {
   enabled?: string;
   alias?: string;
   deployment?: string;
+  dimension?: string;
+  normalization?: string;
   endpoint?: string;
   'workspace-id'?: string;
   provider?: string;
@@ -703,9 +707,11 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     }
     const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls'];
     const toolProviders = new Set(['openai', 'anthropic', 'vertex', 'xai', 'openrouter', 'dgx']);
+    const embeddingProviders = new Set(['openai', 'vertex', 'dgx']);
     if (
       (!toolProviders.has(provider) && capabilities.some((item) => toolCapabilities.includes(item)))
       || (provider === 'vertex' && capabilities.includes('parallel_tool_calls'))
+      || (capabilities.includes('embeddings') && !embeddingProviders.has(provider))
     ) {
       logger.error('deployment arguments are invalid');
       process.exitCode = 1;
@@ -790,7 +796,7 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
-    const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls'];
+    const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls', 'embeddings'];
     try {
       const configVersion = await setDeploymentCapabilities(pool, tenantId, name, capabilities);
       process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, capabilities, configVersion })}\n`);
@@ -805,6 +811,28 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       }
       throw error;
     }
+    return;
+  }
+
+  if (command === 'register-embedding-contract') {
+    const tenantId = requireTenant(values);
+    const name = (values.deployment ?? values.name)?.trim() ?? '';
+    const dimension = Number(values.dimension);
+    const normalization = values.normalization?.trim() ?? '';
+    if (
+      tenantId === undefined
+      || name.length === 0
+      || !Number.isInteger(dimension)
+      || dimension < 1
+      || dimension > 4096
+      || (normalization !== 'none' && normalization !== 'l2')
+    ) {
+      logger.error('tenant-id, deployment, dimension, and normalization are required');
+      process.exitCode = 1;
+      return;
+    }
+    const created = await registerEmbeddingContract(pool, tenantId, name, dimension, normalization);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...created })}\n`);
     return;
   }
 
@@ -1615,6 +1643,8 @@ async function main(): Promise<void> {
         enabled: { type: 'string' },
         alias: { type: 'string' },
         deployment: { type: 'string' },
+        dimension: { type: 'string' },
+        normalization: { type: 'string' },
         endpoint: { type: 'string' },
         'workspace-id': { type: 'string' },
         provider: { type: 'string' },
@@ -1790,6 +1820,8 @@ async function main(): Promise<void> {
     || (values['data-class'] !== undefined && command !== 'set-deployment-data-class')
     || (values['recent-share'] !== undefined && command !== 'set-sample-policy')
     || (values['sample-id'] !== undefined && command !== 'delete-sample')
+    || (values.dimension !== undefined && command !== 'register-embedding-contract')
+    || (values.normalization !== undefined && command !== 'register-embedding-contract')
   );
   if (strayPrivateFlag) {
     logger.error('invalid command arguments');

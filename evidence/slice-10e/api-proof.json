@@ -1,0 +1,76 @@
+{
+  "journey": {
+    "object": "list",
+    "data": [
+      {
+        "object": "embedding",
+        "index": 0,
+        "embedding": [
+          0.424242,
+          0.1,
+          0,
+          0
+        ]
+      },
+      {
+        "object": "embedding",
+        "index": 1,
+        "embedding": [
+          0.424242,
+          0.2,
+          0,
+          0
+        ]
+      },
+      {
+        "object": "embedding",
+        "index": 2,
+        "embedding": [
+          0.424242,
+          0.3,
+          0,
+          0
+        ]
+      }
+    ],
+    "model": "embed-small",
+    "usage": {
+      "prompt_tokens": 303,
+      "total_tokens": 303
+    }
+  },
+  "vertex": {
+    "model": "embed-004",
+    "count": 3,
+    "dimension": 4,
+    "usage": {
+      "prompt_tokens": 12,
+      "total_tokens": 12
+    }
+  },
+  "private": {
+    "model": "embed-private",
+    "count": 3,
+    "dimension": 4
+  },
+  "sdk": {
+    "calls": 2,
+    "count": 3,
+    "dimension": 4,
+    "indexes": [
+      0,
+      1,
+      2
+    ],
+    "usage": {
+      "prompt_tokens": 12,
+      "total_tokens": 12
+    },
+    "base64Decoded": [
+      0.5,
+      0.25,
+      -0.5,
+      0.125
+    ]
+  }
+}

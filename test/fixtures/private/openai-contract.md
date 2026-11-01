@@ -28,6 +28,6 @@ A content chunk uses `object` `chat.completion.chunk`.
 A finished choice sets `finish_reason` to `stop`.
 A complete stream ends with one `data: [DONE]`.
 
-The proxy contacts only `/v1/models` and `/v1/chat/completions` for serving.
+Serving uses `/v1/models`, `/v1/chat/completions`, and `/v1/embeddings`.
 A health URL is a separate stored target.
 The proxy does not follow a redirect.

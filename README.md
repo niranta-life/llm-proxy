@@ -45,8 +45,8 @@ flowchart LR
 
 1. **Authentication:** Checks caller `X-Tenant-ID` and Bearer token against a scrypt verifier, establishing PostgreSQL RLS session context.
 2. **Admission & Limits:** Validates tenant budget, rate limits (RPM/TPM), and concurrency ceilings before allocating a token lease.
-3. **Model Resolution:** Named models route directly to the designated deployment; the `auto` alias evaluates active canary rollouts or governed cost-optimal routing policies.
-4. **Adapter Execution:** Normalizes request payload into upstream provider format and returns standard OpenAI completions or SSE chunks.
+3. **Model Resolution:** Named models route directly to the designated deployment. The `auto` alias evaluates active canary rollouts or governed cost-optimal routing policies. An embedding request uses the named deployment and does not use `auto`.
+4. **Adapter Execution:** Normalizes the request into the upstream provider format. Chat returns an OpenAI completion or SSE chunks. An embedding request returns one float vector per text input.
 5. **Cost & Telemetry Settlement:** Computes token counts and prices, settles budget reservations, and records sanitized telemetry into the database.
 
 ---

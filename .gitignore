@@ -14,3 +14,4 @@ deploy/gcp/tofu/*/generated.auto.tfvars.json
 deploy/gcp/tofu/*/.terraform/
 deploy/gcp/tofu/*/plan.txt
 *.tfplan
+config/e2e-organizations.json

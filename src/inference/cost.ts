@@ -256,8 +256,45 @@ function externalLines(provider: RegistryProviderName, usage: StoredUsage, price
   pushStoredRate(lines, price.cacheWriteRate, readCount(usage.cacheCreationInputTokens), true);
   pushStoredRate(lines, price.cacheReadRate, readCount(usage.cacheReadInputTokens), true);
   pushRate(lines, price.outputRate, readCount(usage.completionTokens), false);
-  pushStoredRate(lines, price.thinkingRate, readCount(usage.thoughtsTokens), false);
+  const thoughts = readCount(usage.thoughtsTokens);
+  if (price.thinkingRate !== null) {
+    pushStoredRate(lines, price.thinkingRate, thoughts, false);
+  } else {
+    pushStoredRate(lines, price.outputRate, thoughts, false);
+  }
   return lines;
+}
+
+export function deriveThoughtsTokens(input: {
+  provider: string;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  cacheCreationInputTokens: number | null;
+  cacheReadInputTokens: number | null;
+  thoughtsTokens: number | null;
+}): number | null {
+  if (input.provider === 'dgx') return input.thoughtsTokens;
+  if (input.thoughtsTokens !== null) return input.thoughtsTokens;
+  const prompt = input.promptTokens;
+  const completion = input.completionTokens;
+  const total = input.totalTokens;
+  if (
+    typeof prompt !== 'number'
+    || typeof completion !== 'number'
+    || typeof total !== 'number'
+    || !Number.isInteger(prompt)
+    || !Number.isInteger(completion)
+    || !Number.isInteger(total)
+    || prompt < 0
+    || completion < 0
+    || total < 0
+  ) {
+    return null;
+  }
+  // Cached tokens already sit inside the prompt count. Do not subtract them.
+  const gap = total - prompt - completion;
+  return gap > 0 ? gap : null;
 }
 
 function allocatedLines(usage: StoredUsage, rate: string): Line[] {

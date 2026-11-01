@@ -37,6 +37,7 @@ import { observeShadowRank } from './shadow-rank-store.js';
 import { pinCanary, recordCanaryAssignment, reconcileCanary } from './canary-rollout.js';
 import { recordCapabilityDenial } from './guardrail-store.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
+import { deriveThoughtsTokens } from './cost.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
   featureInputFromChat,
@@ -317,6 +318,7 @@ export async function executeChat(input: {
           cacheCreationInputTokens: null,
           cacheReadInputTokens: null,
           thoughtsTokens: null,
+          provider: route.provider,
           failureClass: 'total_deadline',
           dispatched: false,
           expenseCertainty: 'none',
@@ -375,6 +377,7 @@ export async function executeChat(input: {
           cacheCreationInputTokens: completion.cacheCreationInputTokens,
           cacheReadInputTokens: completion.cacheReadInputTokens,
           thoughtsTokens: completion.thoughtsTokens ?? null,
+          provider: route.provider,
           servingModel: completion.servingModel ?? null,
           servingProvider: completion.servingProvider ?? null,
           failureClass: null,
@@ -419,6 +422,7 @@ export async function executeChat(input: {
             cacheCreationInputTokens: null,
             cacheReadInputTokens: null,
             thoughtsTokens: null,
+            provider: route.provider,
             failureClass: null,
             dispatched: false,
             expenseCertainty: 'none',
@@ -499,6 +503,7 @@ export async function executeChat(input: {
           cacheCreationInputTokens: attemptFacts.cacheCreationInputTokens,
           cacheReadInputTokens: attemptFacts.cacheReadInputTokens,
           thoughtsTokens: attemptFacts.thoughtsTokens,
+          provider: route.provider,
           failureClass: decision.failureClass,
           dispatched: facts.dispatched,
           expenseCertainty: decision.expenseCertainty,
@@ -655,6 +660,7 @@ async function recordResult(
     cacheCreationInputTokens: number | null;
     cacheReadInputTokens: number | null;
     thoughtsTokens: number | null;
+    provider: string;
     servingModel?: string | null;
     servingProvider?: string | null;
     failureClass?: string | null;
@@ -663,9 +669,18 @@ async function recordResult(
     closeRequest?: boolean;
   },
 ): Promise<void> {
+  const thoughtsTokens = deriveThoughtsTokens({
+    provider: result.provider,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    totalTokens: result.usage.totalTokens,
+    cacheCreationInputTokens: result.cacheCreationInputTokens,
+    cacheReadInputTokens: result.cacheReadInputTokens,
+    thoughtsTokens: result.thoughtsTokens,
+  });
   try {
     await withTenant(input.runtimePool, input.tenantId, async (client) => {
-      await finishAttempt(client, { tenantId: input.tenantId, ...result });
+      await finishAttempt(client, { tenantId: input.tenantId, ...result, thoughtsTokens });
       await recordAttemptCostSafely(client, input.logger, input.tenantId, result.attemptId);
     });
     if (result.closeRequest !== false) {

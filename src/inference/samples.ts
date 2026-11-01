@@ -207,6 +207,13 @@ export async function captureChatSample(input: {
   try {
     if (input.keyManager === null) return;
     if (input.request.stream && input.streamText === undefined) return;
+    const skip = (reason: string): void => {
+      input.logger.info('sample capture skipped', {
+        requestId: input.requestId,
+        deployment: input.route.deploymentName,
+        reason,
+      });
+    };
     const nowMs = input.nowMs ?? Date.now;
     const started = nowMs();
     const draw = input.draw ?? deterministicDraw(input.tenantId, input.requestId);
@@ -214,11 +221,23 @@ export async function captureChatSample(input: {
     const early = await withTenant(input.pool, input.tenantId, (client) =>
       loadGate(client, input.route, now, { sampleBytes: 0, draw, ageMs: 0 }),
     );
-    if (!early.decision.capture || early.loaded === null) return;
-    if (input.request.stream && !early.loaded.policy.streamingCapture) return;
-    if (overBudget(started, nowMs())) return;
+    if (!early.decision.capture || early.loaded === null) {
+      skip(early.decision.reason);
+      return;
+    }
+    if (input.request.stream && !early.loaded.policy.streamingCapture) {
+      skip('streaming_capture');
+      return;
+    }
+    if (overBudget(started, nowMs())) {
+      skip('budget');
+      return;
+    }
     const dataClass = early.facts.dataClass;
-    if (dataClass === null) return;
+    if (dataClass === null) {
+      skip('data_class');
+      return;
+    }
     const response =
       input.streamText === undefined
         ? input.response
@@ -239,7 +258,10 @@ export async function captureChatSample(input: {
       dataClass,
     });
     const sampleBytes = payloadBytes(payload);
-    if (sampleBytes > CAPTURE_BYTE_CEILING || sampleBytes > early.loaded.policy.maxSampleBytes) return;
+    if (sampleBytes > CAPTURE_BYTE_CEILING || sampleBytes > early.loaded.policy.maxSampleBytes) {
+      skip('size');
+      return;
+    }
     const sampleId = randomUUID();
     const envelope = encryptSample(input.keyManager, {
       tenantId: input.tenantId,
@@ -247,18 +269,33 @@ export async function captureChatSample(input: {
       schemaVersion: SAMPLE_SCHEMA_VERSION,
       payload,
     });
-    if (envelope === null || overBudget(started, nowMs())) return;
+    if (envelope === null) {
+      skip('encrypt');
+      return;
+    }
+    if (overBudget(started, nowMs())) {
+      skip('budget');
+      return;
+    }
     if (input.beforeStore) await input.beforeStore();
-    if (overBudget(started, nowMs())) return;
+    if (overBudget(started, nowMs())) {
+      skip('budget');
+      return;
+    }
     const storedAt = new Date(nowMs());
     const output = payload.output.choices.map((choice) => choice.content).join('\n');
-    const fingerprint = contentFingerprint(input.tenantId, visibleSampleText(payload.request.messages, output));
+    const fingerprint = contentFingerprint(
+      input.tenantId,
+      visibleSampleText(payload.request.messages, output, input.route.deploymentName),
+    );
     const stored = await withTenant(input.pool, input.tenantId, async (client) => {
       await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, [
         `sample-cap:${input.tenantId}`,
       ]);
       const again = await loadGate(client, input.route, storedAt, { sampleBytes, draw, ageMs: 0 });
-      if (!again.decision.capture || again.loaded === null || again.facts.dataClass !== dataClass) return false;
+      if (!again.decision.capture || again.loaded === null || again.facts.dataClass !== dataClass) {
+        return { kept: false as const, reason: again.decision.reason };
+      }
       const coverage = await loadCoverage(client, input.requestId, input.request, input.route.deploymentName);
       const held = await loadHeld(client);
       const selected = selectSample({
@@ -271,7 +308,7 @@ export async function captureChatSample(input: {
         createdAtMs: storedAt.getTime(),
         recentShare: again.loaded.recentShare,
       });
-      if (!selected.keep) return false;
+      if (!selected.keep) return { kept: false as const, reason: selected.reason };
       if (input.failInsert?.()) throw new Error('sample store failed');
       for (const evictId of selected.evictIds) {
         await client.query(`SELECT delete_request_sample($1, $2, 'cap')`, [input.tenantId, evictId]);
@@ -298,11 +335,17 @@ export async function captureChatSample(input: {
         sourceLocation: input.route.location,
       });
       if (!inserted) throw new Error('sample capture is no longer authorized');
-      return true;
+      return { kept: true as const, reason: null };
     });
-    if (stored) {
+    if (stored.kept) {
       storedOk = true;
       input.logger.info('sample stored', { requestId: input.requestId, sampleId });
+    } else {
+      input.logger.info('sample capture skipped', {
+        requestId: input.requestId,
+        deployment: input.route.deploymentName,
+        reason: stored.reason,
+      });
     }
   } catch {
     input.logger.error('sample was not stored', { requestId: input.requestId });

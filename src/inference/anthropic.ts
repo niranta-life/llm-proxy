@@ -128,7 +128,10 @@ export function toAnthropicMessageBody(
     stream: false,
   };
   if (system !== undefined) body.system = system;
-  if (typeof temperature === 'number') body.temperature = temperature;
+  // This model rejects temperature. Omit it instead of forwarding a provider 400.
+  if (typeof temperature === 'number' && upstreamModel !== 'claude-sonnet-5-5') {
+    body.temperature = temperature;
+  }
   if (typeof stop === 'string') body.stop_sequences = [stop];
   else if (Array.isArray(stop)) body.stop_sequences = stop;
   return body;

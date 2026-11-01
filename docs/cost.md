@@ -19,7 +19,7 @@ This page covers step 7. See the [request path](architecture.md#request-path).
 
 Anthropic and Vertex bill the split token counts. They do not also bill the summed prompt count. OpenAI bills the prompt count and the completion count when no cache count is stored.
 
-A cache rate is billed only when that count is stored. A thinking rate is billed the same way. An absent count is not zero and is not a missing category. A stored cache count with no cache rate stays provisional. A DGX allocated operating cost stays apart from an external provider charge.
+A cache rate is billed only when that count is stored. A thinking rate is billed the same way. An absent count is not zero and is not a missing category. A stored cache count with no cache rate stays provisional. When `thoughts_tokens` is set and thinking rate is unset, those tokens bill at the output rate. For a provider other than DGX, a positive gap of `total - prompt - completion` is stored as `thoughts_tokens` before the attempt is priced. Cache counts are not subtracted. DGX allocated accounting does not use that gap. A DGX allocated operating cost stays apart from an external provider charge.
 
 A priced success stores cost status `estimated`. A failure after the request was sent, with no usage, is an uncertain expense. The amount stays null. A timeout is not recorded as a zero-cost call.
 
@@ -51,7 +51,7 @@ docker compose run --rm app node dist/cli.js reconcile-attempt-cost \
 
 ## Evaluation schedule
 
-A schedule reserves `0.01` USD for each selected sample before the worker calls the provider. The tenant daily limit and the global daily limit are at most `1`. The tenant monthly limit and the global monthly limit are at most `20`. The per-run maximum cannot exceed the daily limit. The global sums use `evaluation_global_reserved`. Two ticks take the control lock before they insert a reservation.
+A schedule reserves `0.01` USD for each selected sample before the worker calls the provider. The tenant daily limit and the global daily limit are at most `2.92` USD. The tenant monthly limit and the global monthly limit are at most `20` USD. The migration sets the global monthly limit to `2.92` USD. The per-run maximum cannot exceed the daily limit. The global sums use `evaluation_global_reserved`. Two ticks take the control lock before they insert a reservation.
 
 A cancelled run, a duration cancel, and a killed run leave the reservation `reserved`. The amount is not refunded. A second tick on the same UTC day does not reserve again when a run already exists for that day. A manual run can reserve again when budget remains.
 

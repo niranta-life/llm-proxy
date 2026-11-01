@@ -18,8 +18,14 @@ const UPDATE = {
   'revoke-key': ['tenant-id', 'key-id'],
   'set-openai-credential': ['tenant-id', 'api-key'],
   'set-anthropic-credential': ['tenant-id', 'api-key'],
+  'set-xai-credential': ['tenant-id', 'api-key'],
+  'set-openrouter-credential': ['tenant-id', 'api-key'],
+  'set-vertex-credential': ['tenant-id', 'api-key'],
+  'set-dgx-credential': ['tenant-id', 'api-key'],
   'set-connection-enabled': ['tenant-id', 'enabled', 'provider'],
   'set-deployment-enabled': ['tenant-id', 'name', 'enabled'],
+  'set-deployment-model': ['tenant-id', 'deployment', 'upstream-model'],
+  'set-deployment-capabilities': ['tenant-id', 'deployment', 'capabilities'],
   'set-alias': ['tenant-id', 'alias', 'deployment'],
   'set-tenant-streaming': ['tenant-id', 'enabled'],
   'set-deployment-streaming': ['tenant-id', 'deployment', 'enabled', 'connect-timeout-ms', 'idle-timeout-ms', 'total-timeout-ms', 'backpressure-timeout-ms'],
@@ -47,6 +53,7 @@ const UPDATE = {
 
 const VALIDATE = {
   'validate-deployment': ['tenant-id', 'deployment', 'status'],
+  'confirm-live-deployment': ['tenant-id', 'deployment'],
   'validate-vertex-credential': ['tenant-id'],
   'validate-vertex-access': ['tenant-id'],
   'test-vertex-inference': ['tenant-id', 'deployment'],

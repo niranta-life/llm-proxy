@@ -93,6 +93,22 @@ describe('Anthropic request conversion', () => {
     })).toThrow(/system, user, and assistant/i);
   });
 
+  it('omits temperature for claude-sonnet-5-5 without rejecting the request', () => {
+    const request = validateChatRequest({
+      model: 'claude-deploy',
+      messages: [user],
+      temperature: 0.4,
+      max_tokens: 16,
+    });
+    expect(toAnthropicMessageBody(request, 'claude-sonnet-5-5', 64)).toEqual({
+      model: 'claude-sonnet-5-5',
+      max_tokens: 16,
+      stream: false,
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    expect(toAnthropicMessageBody(request, 'claude-sonnet-4-5', 64).temperature).toBe(0.4);
+  });
+
   it('preserves OpenAI caller fields in the OpenAI body', () => {
     const request = validateChatRequest({
       model: 'gpt-deploy',

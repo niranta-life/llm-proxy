@@ -75,7 +75,7 @@ function choose(input: {
   });
   const tenantId = input.tenantId ?? 'tenant-a';
   const requestId = input.requestId ?? 'request-1';
-  const text = visibleSampleText([{ role: 'user', content: input.fingerprintHex ?? requestId }], 'out');
+  const text = visibleSampleText([{ role: 'user', content: input.fingerprintHex ?? requestId }], 'out', 'chat');
   const fingerprintHex = input.fingerprintHex ?? contentFingerprint(tenantId, text).toString('hex');
   const result = selectSample({
     policy: input.authorized === false ? policy({ approvedClassifications: [] }) : active,
@@ -317,12 +317,15 @@ describe('sample selection', () => {
 
   it('stores one fingerprint per tenant and does not use the raw prompt hash', () => {
     const prompt = 'same visible prompt';
-    const text = visibleSampleText([{ role: 'user', content: prompt }], 'same output');
+    const text = visibleSampleText([{ role: 'user', content: prompt }], 'same output', 'openai');
+    const otherDeploy = visibleSampleText([{ role: 'user', content: prompt }], 'same output', 'anthropic');
     const tenantA = contentFingerprint('tenant-a', text);
     const tenantAAgain = contentFingerprint('tenant-a', text);
     const tenantB = contentFingerprint('tenant-b', text);
+    const otherDeployment = contentFingerprint('tenant-a', otherDeploy);
     expect(tenantA.equals(tenantAAgain)).toBe(true);
     expect(tenantA.equals(tenantB)).toBe(false);
+    expect(tenantA.equals(otherDeployment)).toBe(false);
     expect(tenantA.equals(unkeyedPromptHash(prompt))).toBe(false);
     expect(tenantA.equals(unkeyedPromptHash(text))).toBe(false);
     expect(tenantA.equals(createHash('sha256').update(`tenant-a\n${prompt}`).digest())).toBe(false);
@@ -355,7 +358,16 @@ describe('sample selection', () => {
       cap: 5,
     });
     expect(otherTenant.keep).toBe(true);
-    notes.push('fingerprint differs by tenant and differs from the raw prompt hash');
+    const otherProvider = choose({
+      tenantId: 'tenant-a',
+      requestId: 'dup-4',
+      fingerprintHex: otherDeployment.toString('hex'),
+      held,
+      cap: 5,
+      createdAtMs: 3,
+    });
+    expect(otherProvider.keep).toBe(true);
+    notes.push('fingerprint differs by tenant and deployment and differs from the raw prompt hash');
   });
 
   it('does not select an unauthorized request', () => {

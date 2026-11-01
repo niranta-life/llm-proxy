@@ -17,13 +17,13 @@ docker compose run --rm app node dist/cli.js set-deployment-streaming \
 
 `set-deployment-streaming` also takes `--connect-timeout-ms`, `--idle-timeout-ms`, `--total-timeout-ms`, and `--backpressure-timeout-ms`. Each is an integer from 100 through 600000. If you omit a flag, the deployment timeout covers that stage: the connection, a provider that sends no text, the full stream, and a caller that does not read. Each run of the command replaces all four stored values. Each text chunk resets the idle timer. The total timer can still end the stream while text is arriving.
 
-`stream_options` may only be `{"include_usage":true}` or `{"include_usage":false}`. The request shape is in [Chat](chat.md).
+`stream_options` may only be `{"include_usage":true}` or `{"include_usage":false}`. When the caller omits `stream_options`, a completed stream requests usage. When the caller sets `include_usage` false, the proxy keeps it false. The request shape is in [Chat](chat.md).
 
 ## Events
 
 A stream uses `text/event-stream`. Each event is a `chat.completion.chunk`. The completion id and the upstream model stay the same for that response. The first chunk has the assistant role. Later chunks have the text in order, then a chunk with the finish reason.
 
-A usage chunk is sent only when `include_usage` is true and the provider sent at least one integer count. A later Anthropic usage count replaces the earlier count. The proxy does not add the counts together.
+A usage chunk is sent only when `include_usage` is true and the provider sent at least one integer count. A later Anthropic usage count replaces the earlier count. The proxy does not add the counts together. A completed attempt stores those counts. For a provider other than DGX, a positive gap of `total - prompt - completion` is stored as `thoughts_tokens`. Cache counts are not subtracted. Those tokens bill at the thinking rate. When the thinking rate is unset, they bill at the output rate.
 
 A finished stream ends with one `data: [DONE]`, and only after the provider finish and the provider terminal event.
 

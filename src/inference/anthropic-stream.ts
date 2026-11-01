@@ -17,6 +17,7 @@ const ANTHROPIC_VERSION = '2023-06-01';
 const USAGE_KEYS = new Set([
   'input_tokens',
   'output_tokens',
+  'output_tokens_details',
   'cache_creation_input_tokens',
   'cache_read_input_tokens',
   'cache_creation',
@@ -142,6 +143,14 @@ function applyUsage(cursor: AnthropicStreamCursor, value: unknown): void {
     if (!USAGE_KEYS.has(key)) invalidStream();
   }
   if ('cache_creation' in value && value.cache_creation !== null && !isRecord(value.cache_creation)) invalidStream();
+  if (
+    'output_tokens_details' in value
+    && value.output_tokens_details !== null
+    && value.output_tokens_details !== undefined
+    && !isRecord(value.output_tokens_details)
+  ) {
+    invalidStream();
+  }
   if ('service_tier' in value && value.service_tier !== null && typeof value.service_tier !== 'string') invalidStream();
   if ('inference_geo' in value && value.inference_geo !== null && typeof value.inference_geo !== 'string') invalidStream();
   if ('speed' in value && value.speed !== null && typeof value.speed !== 'string') invalidStream();

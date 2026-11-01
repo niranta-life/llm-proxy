@@ -263,4 +263,67 @@ describe('Anthropic stream conversion', () => {
     );
     expect(finishOf(windowed.events)?.finishReason).toBe('length');
   });
+
+  it('accepts output_tokens_details as an object and completes on message_stop', () => {
+    let cursor = initialAnthropicStreamCursor(1_700_000_000);
+    cursor = eventsFromAnthropicEvent(
+      {
+        type: 'message_start',
+        message: {
+          id: 'msg_details',
+          type: 'message',
+          role: 'assistant',
+          model: MODEL,
+          content: [],
+          stop_reason: null,
+          usage: { input_tokens: 4, output_tokens: 0 },
+        },
+      },
+      cursor,
+      MODEL,
+    ).cursor;
+    cursor = eventsFromAnthropicEvent(
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      cursor,
+      MODEL,
+    ).cursor;
+    cursor = eventsFromAnthropicEvent(
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+      cursor,
+      MODEL,
+    ).cursor;
+    cursor = eventsFromAnthropicEvent(
+      { type: 'content_block_stop', index: 0 },
+      cursor,
+      MODEL,
+    ).cursor;
+    const delta = eventsFromAnthropicEvent(
+      {
+        type: 'message_delta',
+        delta: { stop_reason: 'end_turn', stop_sequence: null },
+        usage: {
+          input_tokens: 4,
+          output_tokens: 2,
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      },
+      cursor,
+      MODEL,
+    );
+    expect(delta.done).toBe(false);
+    expect(delta.cursor.completionTokens).toBe(2);
+    const stop = eventsFromAnthropicEvent({ type: 'message_stop' }, delta.cursor, MODEL);
+    expect(stop.done).toBe(true);
+    expect(() =>
+      eventsFromAnthropicEvent(
+        {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn', stop_sequence: null },
+          usage: { output_tokens: 2, output_tokens_details: 'bad' },
+        },
+        cursor,
+        MODEL,
+      ),
+    ).toThrow(ProxyError);
+  });
 });

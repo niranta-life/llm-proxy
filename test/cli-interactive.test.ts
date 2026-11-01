@@ -14,6 +14,10 @@ const COMMANDS = [
   'set-openai-credential',
   'register-anthropic-connection',
   'set-anthropic-credential',
+  'set-xai-credential',
+  'set-openrouter-credential',
+  'set-vertex-credential',
+  'set-dgx-credential',
   'register-vertex-connection',
   'register-xai-connection',
   'register-openrouter-connection',
@@ -21,11 +25,14 @@ const COMMANDS = [
   'set-connection-enabled',
   'register-deployment',
   'set-deployment-enabled',
+  'set-deployment-model',
+  'set-deployment-capabilities',
   'set-alias',
   'set-tenant-streaming',
   'set-deployment-streaming',
   'set-deployment-concurrency',
   'validate-deployment',
+  'confirm-live-deployment',
   'set-deployment-health',
   'validate-vertex-credential',
   'validate-vertex-access',
@@ -471,6 +478,42 @@ const specs: Spec[] = [
   },
   {
     action: 'update',
+    command: 'set-xai-credential',
+    configuration: 'replace xai api key',
+    prepare: async () => ({
+      'tenant-id': await providerConnection('xai'),
+      'api-key': 'xai-rotated-key-0123456789',
+    }),
+  },
+  {
+    action: 'update',
+    command: 'set-openrouter-credential',
+    configuration: 'replace openrouter api key',
+    prepare: async () => ({
+      'tenant-id': await providerConnection('openrouter'),
+      'api-key': 'or-rotated-key-0123456789',
+    }),
+  },
+  {
+    action: 'update',
+    command: 'set-vertex-credential',
+    configuration: 'replace vertex service account',
+    prepare: async () => ({
+      'tenant-id': await vertexTenant('service_account', VERTEX_KEY),
+      'api-key': VERTEX_KEY,
+    }),
+  },
+  {
+    action: 'update',
+    command: 'set-dgx-credential',
+    configuration: 'replace dgx api key',
+    prepare: async () => ({
+      'tenant-id': await providerConnection('dgx', ['--endpoint', DGX_ENDPOINT]),
+      'api-key': 'dgx-rotated-key-0123456789',
+    }),
+  },
+  {
+    action: 'update',
     command: 'set-connection-enabled',
     configuration: 'disable openai connection',
     prepare: async () => ({
@@ -494,6 +537,26 @@ const specs: Spec[] = [
     command: 'set-deployment-enabled',
     configuration: 'disable a deployment',
     prepare: async () => ({ 'tenant-id': (await openaiChat()).tenantId, name: 'chat', enabled: 'false' }),
+  },
+  {
+    action: 'update',
+    command: 'set-deployment-model',
+    configuration: 'change upstream model',
+    prepare: async () => ({
+      'tenant-id': (await openaiChat()).tenantId,
+      deployment: 'chat',
+      'upstream-model': 'gpt-interactive-next',
+    }),
+  },
+  {
+    action: 'update',
+    command: 'set-deployment-capabilities',
+    configuration: 'change deployment capabilities',
+    prepare: async () => ({
+      'tenant-id': (await openaiChat()).tenantId,
+      deployment: 'chat',
+      capabilities: 'max_tokens',
+    }),
   },
   {
     action: 'update',
@@ -726,6 +789,36 @@ const specs: Spec[] = [
       deployment: 'chat',
       status: 'valid',
     }),
+  },
+  {
+    action: 'validate',
+    command: 'confirm-live-deployment',
+    configuration: 'confirm live after a succeeded call',
+    prepare: async () => {
+      const chat = await openaiChat();
+      const found = await admin.query<{ id: string; connection_id: string; config_version: number; connection_version: number }>(
+        `SELECT d.id, d.connection_id, d.config_version, c.credential_version AS connection_version
+         FROM model_deployments d
+         JOIN provider_connections c ON c.tenant_id = d.tenant_id AND c.id = d.connection_id
+         WHERE d.tenant_id = $1 AND d.name = 'chat'`,
+        [chat.tenantId],
+      );
+      const row = found.rows[0];
+      if (row === undefined) throw new Error('deployment is missing');
+      const request = await admin.query<{ id: string }>(
+        `INSERT INTO proxy_requests (
+           tenant_id, deployment_id, deployment_config_version, connection_id, connection_version, requested_model, status
+         ) VALUES ($1, $2, $3, $4, $5, 'gpt-test', 'succeeded') RETURNING id`,
+        [chat.tenantId, row.id, row.config_version, row.connection_id, row.connection_version],
+      );
+      await admin.query(
+        `INSERT INTO model_attempts (
+           tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status, duration_ms
+         ) VALUES ($1, $2, $3, $4, 'gpt-test', 'succeeded', 25)`,
+        [chat.tenantId, request.rows[0]?.id, row.id, row.config_version],
+      );
+      return { 'tenant-id': chat.tenantId, deployment: 'chat' };
+    },
   },
   {
     action: 'validate',

@@ -5,7 +5,10 @@ test/.pg.json
 .DS_Store
 .env.live
 config/docker.env
+config/provider-keys.env
+config/local-tenant.json
 config/.image-stamp
+perf/runs/
 deploy/gcp/settings.env
 deploy/gcp/tofu/*/generated.auto.tfvars.json
 deploy/gcp/tofu/*/.terraform/

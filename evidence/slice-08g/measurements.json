@@ -9,8 +9,8 @@
     "lockContention": "maximum ungranted pg_locks while delayed chats overlapped",
     "predictedSavings": "shadow estimatedSavings stays an estimate"
   },
-  "qualitySnapshot": "d509c0f4-2511-4285-91ce-62ec12cf9ce0",
-  "betaSnapshot": "a974a6be-3088-46b7-b2b0-336750ac5342",
+  "qualitySnapshot": "708d7859-03ea-4152-ab0d-3daf2ad463db",
+  "betaSnapshot": "c1d959e7-638e-4455-ba4a-66922c7971a8",
   "rank": {
     "winner": "h08g-quality",
     "reasons": [
@@ -24,7 +24,7 @@
     "invalidSnapshotMiss": false,
     "invalidWinner": "h08g-tie",
     "restoredWinner": "h08g-quality",
-    "dropped": "b6fcea58-f988-4b37-a009-f5f800ccfe72",
+    "dropped": "70694f87-7218-456f-969f-0a5d8c1a0f20",
     "estimate": null,
     "savingsKind": "estimate"
   },
@@ -56,11 +56,11 @@
       401,
       401
     ],
-    "restartedPid": 94834,
+    "restartedPid": 60247,
     "restartedDeployment": "h08g-quality"
   },
   "performance": {
-    "routingCpuSeconds": 0.6199999999999999,
+    "routingCpuSeconds": 0.6099999999999999,
     "routingCpuLabel": {
       "routingCpu": "whole-process CPU from ps, not routing-only CPU",
       "routingLatency": "nearest-rank percentile of stored computation_ms wall-clock rank time",
@@ -71,35 +71,35 @@
       "predictedSavings": "shadow estimatedSavings stays an estimate"
     },
     "rssKb": [
-      156448,
-      156032,
-      158640
+      134112,
+      148080,
+      158656
     ],
     "computationMs": {
       "p50": 2,
       "p95": 6,
-      "p99": 8,
+      "p99": 7,
       "samples": 34
     },
     "clientChatMs": {
-      "p50": 74.19583300000158,
+      "p50": 75.84212500000285,
       "samples": 12
     },
     "addedInferenceLatencyMs": {
-      "p50": 70.19583300000158,
-      "p95": 76.36962499999936,
+      "p50": 71.84212500000285,
+      "p95": 77.28679099999863,
       "samples": 12
     },
     "evidenceCacheHits": 25,
     "evidenceCacheDecisions": 34,
     "evidenceCacheHitRate": 0.7352941176470589,
-    "policyLookupMs": 68.5590000000011,
+    "policyLookupMs": 89.82208400000309,
     "locksNotGranted": 0,
-    "lockSamples": 47,
-    "maxLocks": 127,
+    "lockSamples": 48,
+    "maxLocks": 69,
     "deadlocksBefore": 0,
     "deadlocksAfter": 0,
-    "throughputPerSecond": 13.300310391671147,
+    "throughputPerSecond": 13.14247417616632,
     "successRate": 1,
     "costByDeployment": {
       "h08g-base": {
@@ -142,19 +142,8 @@
     "databaseOutageHits": 0,
     "databaseOutageRestored": "h08g-beta"
   },
-  "security": {
-    "modelDrift": "baseline_fallback",
-    "configDrift": "fresh_config_version",
-    "aged": "h08g-tie",
-    "agedReason": "evidence_stale",
-    "regressed": "h08g-tie",
-    "refresh": 201,
-    "residency": "baseline_unavailable",
-    "foreignPromotions": 0,
-    "migration": "031_routing_promotions.sql"
-  },
   "recovery": {
-    "propagationMs": 60.103290999999444,
+    "propagationMs": 63.723416000000725,
     "rollbackStatuses": [
       400,
       200,
@@ -162,8 +151,8 @@
     ],
     "restoredDeployment": "h08g-base",
     "forcedDeployment": "h08g-poor",
-    "detectionMs": 11.629000000000815,
-    "rollbackMs": 3.705832999999984,
+    "detectionMs": 12.319125000001804,
+    "rollbackMs": 4.96362500000032,
     "stops": 1,
     "guardAfter": "h08g-base"
   },

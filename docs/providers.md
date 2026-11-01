@@ -37,6 +37,10 @@ Every command that takes `--api-key` also takes `--api-key-stdin`: `register-` a
 
 The examples in this document use `--api-key` for brevity. In scripts, prefer `--api-key-stdin`.
 
+## Local Colima file
+
+On the local Compose project, put each provider key in `config/provider-keys.env`. Run `./llm-proxy-docker.sh keys`. That command uses `--api-key-stdin`. It does not print the key. It does not put the key in the container environment. A DGX call needs addresses in `DGX_ALLOWLIST_ADDRESSES`. Without those addresses, `keys` still stores the DGX key and does not call that host. See [Operations](operations.md#provider-keys).
+
 ## OpenAI
 
 The base URL is `OPENAI_BASE_URL`. If that variable is absent, the proxy uses `https://api.openai.com/v1`. Set it when you point at a mock server. A caller cannot change it on the request.
@@ -259,7 +263,9 @@ docker compose run --rm app node dist/cli.js set-deployment-health \
 
 `list-private-models` reads `/models` from the stored endpoint and prints the model ids. `probe-private-health` calls the stored health endpoint and prints the HTTP status. Both take `--tenant-id` and `--deployment`. `probe-private-health` fails when no health endpoint is stored. `approve-private-endpoint` takes `--tls-verify` (default `true`) and `--health-endpoint` (optional). `--max-concurrency` on `set-deployment-concurrency` is an integer, or `none` to remove the limit.
 
-`validate-deployment` can record `unvalidated`, `valid`, `invalid`, or `validated_mock`. It refuses `validated_live`. Live DGX is not verified. `set-deployment-health` records `unknown`, `healthy`, or `unhealthy` and does not change the validation status. Tests use a local mock and do not call a DGX host.
+`validate-deployment` can record `unvalidated`, `valid`, `invalid`, or `validated_mock`. It refuses `validated_live`. Use `confirm-live-deployment` with `--tenant-id` and `--deployment` to record `validated_live` only after a succeeded call in the last 24 hours. Live DGX is not verified. `set-deployment-health` records `unknown`, `healthy`, or `unhealthy` and does not change the validation status. Tests use a local mock and do not call a DGX host.
+
+`set-deployment-model` changes `upstream_model` for an existing deployment. `set-deployment-capabilities` replaces the capability list. For Anthropic model `claude-sonnet-5-5`, the proxy omits `temperature` on the provider body even when the client sends it. Replace stored xAI, OpenRouter, Vertex, and DGX keys with `set-xai-credential`, `set-openrouter-credential`, `set-vertex-credential`, and `set-dgx-credential`. Each takes `--api-key-stdin` the same way as `set-openai-credential`.
 
 ## Related
 

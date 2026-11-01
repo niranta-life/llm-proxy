@@ -12,7 +12,7 @@
     "status": "stopped",
     "signal": "error_rate",
     "series": {
-      "policyVersionId": "4f212a46-06ea-4dd7-bb8c-cb1e90198cd8",
+      "policyVersionId": "ded9132f-ebe0-4188-be4b-9a5bc04626b7",
       "cohort": "canary",
       "cohortDeployment": "guard-spare",
       "executedDeployment": "guard-spare",
@@ -24,8 +24,8 @@
       "incompleteStreamRate": 0,
       "retryRate": 0,
       "fallbackRate": 0,
-      "latencyP50Ms": 5,
-      "latencyP95Ms": 5,
+      "latencyP50Ms": 4,
+      "latencyP95Ms": 4,
       "costPerRequest": "0.00000000",
       "costPerCompletedRequest": null,
       "schemaValidationFailures": 0,
@@ -77,7 +77,7 @@
     "status": "stopped"
   },
   "latency": {
-    "latencyP95Ms": 6,
+    "latencyP95Ms": 5,
     "status": "stopped"
   },
   "cost": {
@@ -107,7 +107,7 @@
     ],
     "alias": "guard-chat",
     "violations": 1,
-    "winnerKey": "race-b"
+    "winnerKey": "race-a"
   },
   "inflight": {
     "stream": "gpt-guard-spare",
@@ -129,7 +129,7 @@
     "fallbackRate": 1,
     "realRetryRate": 1
   },
-  "propagationMs": 93,
+  "propagationMs": 92,
   "crossTenant": {
     "betaStatus": "active",
     "betaModel": "gpt-guard-beta-spare"

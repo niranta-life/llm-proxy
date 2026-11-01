@@ -13,6 +13,7 @@ import { ProxyError, proxyError, safeErrorCode, safeNativeReason, safeProviderRe
 import type { ResolvedRoute } from './resolve.js';
 import { bindRouteTransport } from './private-serve.js';
 import { admitChatAttempt, isAdmissionCode, settleChatAttempt } from './admission.js';
+import { deriveThoughtsTokens } from './cost.js';
 import { recordAttemptCostSafely } from './cost-store.js';
 import {
   featureInputFromChat,
@@ -814,6 +815,7 @@ async function recordStream(
     runtimePool: Pool;
     logger: Logger;
     tenantId: string;
+    route: ResolvedRoute;
     nowMs?: () => number;
     beforeSettle?: () => Promise<void> | void;
     request: Parameters<typeof featureInputFromChat>[0];
@@ -844,6 +846,15 @@ async function recordStream(
     closeRequest?: boolean;
   },
 ): Promise<void> {
+  const thoughtsTokens = deriveThoughtsTokens({
+    provider: input.route.provider,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    totalTokens: result.usage.totalTokens,
+    cacheCreationInputTokens: result.cacheCreationInputTokens,
+    cacheReadInputTokens: result.cacheReadInputTokens,
+    thoughtsTokens: result.thoughtsTokens,
+  });
   try {
     await withTenant(input.runtimePool, input.tenantId, async (client) => {
       await finishAttempt(client, {
@@ -859,7 +870,7 @@ async function recordStream(
         uncachedInputTokens: result.uncachedInputTokens,
         cacheCreationInputTokens: result.cacheCreationInputTokens,
         cacheReadInputTokens: result.cacheReadInputTokens,
-        thoughtsTokens: result.thoughtsTokens,
+        thoughtsTokens,
         streamStatus: result.streamStatus,
         firstTextDeltaMs: result.firstTextDeltaMs,
         chunkCount: result.chunkCount,

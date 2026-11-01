@@ -646,6 +646,18 @@ describe('streaming samples and replay eligibility', () => {
     expect(row?.attempts).toBe(1);
     expect(await samplesFor(row?.request_id ?? '')).toBe(0);
     expect(await sampleCount()).toBe(before);
+    const requestId = row?.request_id ?? '';
+    const line = ctx.lines.find(
+      (entry) => entry.includes('"sample capture skipped"') && entry.includes(requestId),
+    );
+    expect(line).toBeDefined();
+    const event = JSON.parse(line ?? '{}') as { msg?: string; reason?: string; deployment?: string; requestId?: string };
+    expect(event.msg).toBe('sample capture skipped');
+    expect(event.reason).toBe('streaming_capture');
+    expect(event.deployment).toBe('chat');
+    expect(event.requestId).toBe(requestId);
+    expect(line).not.toContain('scene-openai');
+    expect(line).not.toContain('left');
     streamNotes.push('capture off completed stream stored 0');
   });
 

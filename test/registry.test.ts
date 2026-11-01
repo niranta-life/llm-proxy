@@ -101,6 +101,7 @@ describe('provider registry', () => {
       '029_routing_rollouts.sql',
       '030_routing_guardrails.sql',
       '031_routing_promotions.sql',
+      '032_deployment_ops.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));
@@ -160,6 +161,9 @@ describe('provider registry', () => {
     const routingPromotions = readFileSync(join(projectRoot, 'migrations', '031_routing_promotions.sql'), 'utf8');
     expect(routingPromotions).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
     expect(routingPromotions).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
+    const deploymentOps = readFileSync(join(projectRoot, 'migrations', '032_deployment_ops.sql'), 'utf8');
+    expect(deploymentOps).not.toMatch(/\bDROP\s+(COLUMN|TABLE)\b/i);
+    expect(deploymentOps).not.toMatch(/\bDROP\s+CONSTRAINT\b/i);
     const admin = adminPool(db);
     pools.push(admin);
     const versions = await admin.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version');
@@ -792,5 +796,137 @@ describe('provider registry', () => {
         [beta.tenantId, connectionId],
       ),
     ).rejects.toThrow(/foreign key|violates/);
+  });
+
+  it('updates upstream model, replaces registry credentials, and confirms live after a succeeded call', async () => {
+    const tenant = provisionTenant(db, 'Registry Ops');
+    cliOk(db, [
+      'register-xai-connection',
+      '--tenant-id',
+      tenant.tenantId,
+      '--api-key',
+      'xai-first-key-0123456789',
+    ]);
+    cliOk(db, [
+      'register-deployment',
+      '--tenant-id',
+      tenant.tenantId,
+      '--provider',
+      'xai',
+      '--name',
+      'xai',
+      '--upstream-model',
+      'grok-old',
+      '--timeout-ms',
+      '5000',
+      '--capabilities',
+      'temperature,max_tokens',
+      '--enabled',
+      'true',
+    ]);
+    const model = cliOk(db, [
+      'set-deployment-model',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+      '--upstream-model',
+      'grok-new',
+    ]);
+    expect(model).toMatchObject({ upstreamModel: 'grok-new', configVersion: 2 });
+    const caps = cliOk(db, [
+      'set-deployment-capabilities',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+      '--capabilities',
+      'max_tokens',
+    ]);
+    expect(caps).toMatchObject({ capabilities: ['max_tokens'], configVersion: 3 });
+    const missingCaps = cliRaw(db, [
+      'set-deployment-capabilities',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+    ]);
+    expect(missingCaps.status).not.toBe(0);
+    const badVertex = cliRaw(db, [
+      'set-vertex-credential',
+      '--tenant-id',
+      tenant.tenantId,
+      '--api-key',
+      'not-a-json',
+    ]);
+    expect(badVertex.status).not.toBe(0);
+    expect(badVertex.stderr).toContain('service account identity is not a credential');
+    const replaced = cliOk(db, [
+      'set-xai-credential',
+      '--tenant-id',
+      tenant.tenantId,
+      '--api-key',
+      'xai-second-key-0123456789',
+    ]);
+    expect(replaced).toMatchObject({ provider: 'xai', credentialVersion: 2 });
+    expect(JSON.stringify(replaced)).not.toContain('xai-second-key');
+    const missingLive = cliRaw(db, [
+      'confirm-live-deployment',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+    ]);
+    expect(missingLive.status).not.toBe(0);
+    expect(missingLive.stderr).toContain('live confirmation is not available');
+    const admin = adminPool(db);
+    pools.push(admin);
+    const deployment = await admin.query<{
+      id: string;
+      connection_id: string;
+      config_version: number;
+      connection_version: number;
+    }>(
+      `SELECT d.id, d.connection_id, d.config_version, c.credential_version AS connection_version
+       FROM model_deployments d
+       JOIN provider_connections c ON c.tenant_id = d.tenant_id AND c.id = d.connection_id
+       WHERE d.tenant_id = $1 AND d.name = 'xai'`,
+      [tenant.tenantId],
+    );
+    const row = deployment.rows[0];
+    if (row === undefined) throw new Error('deployment is missing');
+    const request = await admin.query<{ id: string }>(
+      `INSERT INTO proxy_requests (
+         tenant_id, deployment_id, deployment_config_version, connection_id, connection_version,
+         requested_model, status
+       ) VALUES ($1, $2, $3, $4, $5, 'xai', 'succeeded')
+       RETURNING id`,
+      [tenant.tenantId, row.id, row.config_version, row.connection_id, row.connection_version],
+    );
+    await admin.query(
+      `INSERT INTO model_attempts (
+         tenant_id, request_id, deployment_id, deployment_config_version, upstream_model, status, duration_ms
+       ) VALUES ($1, $2, $3, $4, 'grok-new', 'succeeded', 42)`,
+      [tenant.tenantId, request.rows[0]?.id, row.id, row.config_version],
+    );
+    const live = cliOk(db, [
+      'confirm-live-deployment',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+    ]);
+    expect(live).toMatchObject({ validationStatus: 'validated_live', configVersion: 4 });
+    const stillRejected = cliRaw(db, [
+      'validate-deployment',
+      '--tenant-id',
+      tenant.tenantId,
+      '--deployment',
+      'xai',
+      '--status',
+      'validated_live',
+    ]);
+    expect(stillRejected.status).not.toBe(0);
+    expect(stillRejected.stderr).toContain('validation status is not available');
   });
 });

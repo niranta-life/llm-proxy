@@ -15,10 +15,14 @@ import {
   registerRegistryConnection,
   replaceAnthropicCredential,
   replaceOpenAiCredential,
+  replaceRegistryCredential,
   approvePrivateEndpoint,
+  confirmDeploymentLive,
+  setDeploymentCapabilities,
   setDeploymentConcurrency,
   setDeploymentHealth,
   setDeploymentStreaming,
+  setDeploymentUpstreamModel,
   setDeploymentValidation,
   setModelAlias,
   setModelDeploymentEnabled,
@@ -28,7 +32,7 @@ import {
 } from './db/inference-admin.js';
 import { listPrivateModels, probePrivateHealth } from './inference/private-serve.js';
 import { normalizeApproval } from './inference/private.js';
-import { prepareRegistryConnection } from './inference/registry.js';
+import { assertVertexCredential, prepareRegistryConnection } from './inference/registry.js';
 import { defaultVertexClientFactory, type VertexApiVersion, type VertexAuthMode, type VertexClientSpec } from './inference/vertex-client.js';
 import { testVertexInference, validateVertexAccess, validateVertexCredential } from './inference/vertex-probe.js';
 import { createPool } from './db/pools.js';
@@ -610,6 +614,46 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     return;
   }
 
+  if (
+    command === 'set-xai-credential'
+    || command === 'set-openrouter-credential'
+    || command === 'set-dgx-credential'
+  ) {
+    const tenantId = requireTenant(values);
+    const apiKey = values['api-key'] ?? '';
+    const provider = command.slice('set-'.length, command.indexOf('-credential'));
+    if (tenantId === undefined || apiKey.length === 0) {
+      logger.error('tenant-id and api-key are required');
+      process.exitCode = 1;
+      return;
+    }
+    const protectedCredential = credentialStore(config).protect(apiKey, 'api_key');
+    const credentialVersion = await replaceRegistryCredential(pool, tenantId, provider, protectedCredential);
+    process.stdout.write(`${JSON.stringify({ tenantId, provider, credentialVersion })}\n`);
+    return;
+  }
+
+  if (command === 'set-vertex-credential') {
+    const tenantId = requireTenant(values);
+    const apiKey = values['api-key'] ?? '';
+    if (tenantId === undefined || apiKey.length === 0) {
+      logger.error('tenant-id and api-key are required');
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      assertVertexCredential(apiKey);
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : 'vertex credential is invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const protectedCredential = credentialStore(config).protect(apiKey, 'service_account');
+    const credentialVersion = await replaceRegistryCredential(pool, tenantId, 'vertex', protectedCredential);
+    process.stdout.write(`${JSON.stringify({ tenantId, provider: 'vertex', credentialVersion })}\n`);
+    return;
+  }
+
   if (command === 'set-connection-enabled') {
     const tenantId = requireTenant(values);
     const enabled = parseEnabled(values.enabled);
@@ -707,6 +751,47 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     }
     const configVersion = await setModelDeploymentEnabled(pool, tenantId, name, enabled);
     process.stdout.write(`${JSON.stringify({ tenantId, name, enabled, configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-model') {
+    const tenantId = requireTenant(values);
+    const name = (values.deployment ?? values.name)?.trim() ?? '';
+    const upstreamModel = values['upstream-model']?.trim() ?? '';
+    if (tenantId === undefined || name.length === 0 || upstreamModel.length === 0) {
+      logger.error('tenant-id, deployment, and upstream-model are required');
+      process.exitCode = 1;
+      return;
+    }
+    const updated = await setDeploymentUpstreamModel(pool, tenantId, name, upstreamModel);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...updated })}\n`);
+    return;
+  }
+
+  if (command === 'set-deployment-capabilities') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    const capabilities = parseCapabilities(values.capabilities);
+    if (tenantId === undefined || name.length === 0 || values.capabilities === undefined || capabilities === undefined) {
+      logger.error('tenant-id, deployment, and capabilities are required');
+      process.exitCode = 1;
+      return;
+    }
+    const configVersion = await setDeploymentCapabilities(pool, tenantId, name, capabilities);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, capabilities, configVersion })}\n`);
+    return;
+  }
+
+  if (command === 'confirm-live-deployment') {
+    const tenantId = requireTenant(values);
+    const name = values.deployment?.trim() ?? '';
+    if (tenantId === undefined || name.length === 0) {
+      logger.error('tenant-id and deployment are required');
+      process.exitCode = 1;
+      return;
+    }
+    const updated = await confirmDeploymentLive(pool, tenantId, name);
+    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, ...updated })}\n`);
     return;
   }
 

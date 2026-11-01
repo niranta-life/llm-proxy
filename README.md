@@ -128,11 +128,13 @@ Each box maps to code in `src/`. See [Architecture](docs/architecture.md) for th
 
 `./llm-proxy-docker.sh` runs this proxy on the Colima profile you already use. Compose starts PostgreSQL 16 and one app container. The app command is `node dist/index.js`. The base image entrypoint stays `docker-entrypoint.sh`. The image does not start the evaluation worker, the guardrail worker, or the promotion worker. The cleanup worker still starts inside the app process.
 
-`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. That file holds the log level, the OpenAI address, the credential keys, the stream limits, and the migration timeouts. Compose sets the database host, the role names, the role passwords, and the listen address. Leave those values out of the config file.
+`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. That file holds the log level, the OpenAI address, the lock for saved provider keys, the stream limits, and the migration timeouts. Do not put a provider API key in that file. Compose sets the database host, the role names, the role passwords, and the listen address. Leave those values out of the config file.
+
+`setup` also creates `config/provider-keys.env` when that file is missing. That file holds the provider API keys. Its mode is 600. Git does not track it. A Docker build does not copy it. The script does not print a provider key. `keys` turns inference on only when one of those keys is set. It registers an enabled deployment for each provider that has a key. A later `keys` run replaces the OpenAI, Anthropic, xAI, OpenRouter, Vertex, and DGX keys. It updates `upstream_model` when the file model differs. An empty `ANTHROPIC_MAX_OUTPUT_TOKENS` skips Anthropic. Other providers still apply. Selection stays off. Automatic promotion stays off. The script does not mark a deployment validated. A DGX call needs addresses in `DGX_ALLOWLIST_ADDRESSES`. Without those addresses, `keys` still stores the DGX key and does not call that host.
 
 `build` builds the app image and does not start it. `start` rebuilds that image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `watch` rebuilds the image when those files change. `watch` recreates the app when the config file changes. After either change the ready check returns HTTP 200 `{"status":"ready","database":"ready"}`. `stop` keeps the database volume and leaves Colima running. Colima stops only with `stop --vm`.
 
-Git does not track `config/docker.env`. A Docker build does not copy that file. A config the process would reject makes `build` and `start` exit before they start Colima or build an image. `scripts/colima.sh` starts the same Compose project. See [Architecture](docs/architecture.md#local-runtime) and [Operations](docs/operations.md).
+Git does not track `config/docker.env` or `config/provider-keys.env`. A Docker build does not copy those files. A config the process would reject makes `build` and `start` exit before they start Colima or build an image. A provider keys file with a loose mode, a symlink, or a command in a value makes `keys` exit before it starts Colima or builds an image. `scripts/colima.sh` starts the same Compose project. See [Architecture](docs/architecture.md#local-runtime) and [Operations](docs/operations.md).
 
 ### Request characteristics
 
@@ -255,7 +257,7 @@ export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
 ./llm-proxy-docker.sh start
 ```
 
-`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. Edit `config/docker.env` to change the log level, the OpenAI address, the stream limits, or the migration timeouts. Leave `INFERENCE_ENABLED` false until you want a provider call. `build` builds the app image and does not start it. `start` rebuilds the app image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. `start` also builds that image when it is missing. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `./llm-proxy-docker.sh status` shows Colima, the config file, whether inference is off, and whether the image matches the program files. It prints `image: not checked` when the program-file stamp matches and Colima is down. `status` shows the containers and the ready check when Colima is running. `./llm-proxy-docker.sh watch` rebuilds the app image when those program files change. `watch` recreates the app when the config file changes. `./llm-proxy-docker.sh stop` stops the containers and keeps the database volume. Colima itself stops only with `./llm-proxy-docker.sh stop --vm`. The shape of that runtime is in [Local runtime](#local-runtime).
+`setup` creates `config/docker.env` when that file is missing. Inference stays off. A second `setup` leaves `INFERENCE_ENABLED` false. `setup` also creates `config/provider-keys.env` when that file is missing. No provider key is stored there. Edit `config/docker.env` to change the log level, the OpenAI address, the stream limits, or the migration timeouts. Put each provider API key in `config/provider-keys.env`. Leave a key empty to skip that provider. Keep that file at mode 600. `build` builds the app image and does not start it. `start` rebuilds the app image when `Dockerfile`, `package.json`, `package-lock.json`, `tsconfig.json`, `src/`, `migrations/`, or `docker/postgres/` changes. `start` also builds that image when it is missing. A start with those files unchanged does not rebuild the image. `start --build` rebuilds the image. `./llm-proxy-docker.sh status` shows Colima, the config file, the inference value, and whether the image matches the program files. It prints `image: not checked` when the program-file stamp matches and Colima is down. `status` shows the containers and the ready check when Colima is running. `./llm-proxy-docker.sh watch` rebuilds the app image when those program files change. `watch` recreates the app when the config file changes. `./llm-proxy-docker.sh stop` stops the containers and keeps the database volume. Colima itself stops only with `./llm-proxy-docker.sh stop --vm`. The shape of that runtime is in [Local runtime](#local-runtime).
 
 `scripts/colima.sh start` starts the same Compose project. `npm run stack -- start` runs that script. `npm run docker -- start` runs `llm-proxy-docker.sh`. `scripts/colima.sh start --build` rebuilds the image.
 
@@ -268,32 +270,17 @@ curl -s http://127.0.0.1:8080/health/ready
 
 Live returns `{"status":"live"}`. Ready returns `{"status":"ready","database":"ready"}` when Postgres is up and `schema_migrations` has the latest migration for this image. If it is not ready, the route returns HTTP 503 and live stays 200. During shutdown it also returns HTTP 503, with `{"status":"not_ready","reason":"shutting_down"}`.
 
-Chat stays off until inference is on and a deployment is enabled. Create a tenant, turn inference on, and register OpenAI:
+Chat stays off until inference is on and a deployment is enabled. Put a provider key in `config/provider-keys.env`. Then run:
 
 ```bash
-docker compose run --rm app node dist/cli.js provision-tenant --name Acme
-
-export INFERENCE_ENABLED=true
-export PROVIDER_CREDENTIAL_KEY="$(openssl rand -base64 32)"
-export OPENAI_BASE_URL="https://api.openai.com/v1"
-docker compose up -d --force-recreate app
-
-docker compose run --rm app node dist/cli.js register-openai-connection \
-  --tenant-id <tenant-id> --api-key "$OPENAI_API_KEY"
-docker compose run --rm app node dist/cli.js register-deployment \
-  --tenant-id <tenant-id> \
-  --name primary \
-  --upstream-model gpt-4o-mini \
-  --timeout-ms 30000 \
-  --capabilities temperature \
-  --enabled true
-docker compose run --rm app node dist/cli.js set-alias \
-  --tenant-id <tenant-id> --alias auto --deployment primary
+./llm-proxy-docker.sh keys
 ```
 
-The CLI prints the tenant secret once. Save it. The database stores only a verifier.
+`keys` reads that file. It does not print the key. With no key set, it does not change inference and it does not start Colima. With a key set, it turns inference on, starts the stack, and stores the tenant id and the tenant secret in `config/local-tenant.json`. That file is mode 600. Git does not track it. The script prints the tenant id and the file path. It does not print the tenant secret. It registers one enabled deployment for each provider whose key is set. A later `keys` run replaces the OpenAI, Anthropic, xAI, OpenRouter, Vertex, and DGX keys. It updates `upstream_model` when the file model differs. An empty `ANTHROPIC_MAX_OUTPUT_TOKENS` skips Anthropic. Other providers still apply. For `claude-sonnet-5-5`, the Anthropic deployment stores capabilities without `temperature`. A DGX call needs addresses in `DGX_ALLOWLIST_ADDRESSES`. Without those addresses, `keys` still stores the DGX key and does not call that host. Selection stays off. Automatic promotion stays off. The script does not point `auto` at a deployment. The script does not mark a deployment validated. Use `confirm-live-deployment` to record `validated_live` only after a succeeded call in the last 24 hours.
 
-To keep a provider key out of the process arguments, pass it with `--api-key-stdin` instead of `--api-key`. See [docs/providers.md](docs/providers.md).
+The app container drops every Linux capability and sets `no-new-privileges`. Provider API keys are not container environment variables. The master key in `PROVIDER_CREDENTIAL_KEY` stays in the app environment because the process must open a stored provider key.
+
+See [docs/providers.md](docs/providers.md) for a manual registration. Pass a provider key with `--api-key-stdin`. Do not put it in the process arguments.
 
 The same commands can run as prompts. `--interactive` has to be the only argument:
 
@@ -352,25 +339,27 @@ Compose database passwords are for local development. The proxy listens without 
 - **[Circuit breaker](docs/breaker.md).** An optional breaker per deployment. An open breaker returns HTTP 503 and does not call the provider.
 - **[Metrics](docs/metrics.md).** Counts, latency, stream percentiles, attempts, breaker state, and cost for the caller's own tenant.
 - **[Performance](docs/performance.md).** Recorded times, rates, and memory from the evidence runs. The figures use mock providers. They are not a production service level.
+- **[Performance rig](docs/performance-rig.md).** The rig measures load, latency, and cost across the enabled deployments. A blind judge scores the answers and does not see which model wrote them. Each run keeps its records, plots, and analysis under perf/runs/. It does not change how requests pick a model.
 - **[Request characteristics](docs/metrics.md#request-features).** One versioned record per completed chat: the task, the model, the size, and the outcome. The prompt and the answer are not stored.
 - **[Encrypted samples](docs/metrics.md#encrypted-samples).** Optional ciphertext for an approved chat. Off by default. Metadata routes return no prompt and no completion.
 - **[Evaluation](docs/architecture.md#evaluation).** Pinned replay, deterministic checks, a read-only report, an optional judge, and a schedule. Replay stays off until you enable execution for one tenant. The judge and the schedule stay off until you name one tenant. None of them change production routing.
 - **[Cost of a schedule](docs/cost.md#evaluation-schedule).** A tick reserves the estimate before a provider call. Daily and monthly ceilings stay small.
 - **[Operations](docs/operations.md).** Configuration, health, shutdown, migrations, incidents, and tests.
 - **[Comparison](docs/comparison.md).** The LLM gateway market, with sources.
+- **[Live tests](docs/e2e/test-4-full.md).** Local calls on the Compose stack. [Test 1](docs/e2e/test-1.md) is the first full run. [Test 2](docs/e2e/test-2.md) lists the failures from that run. [Test 3](docs/e2e/test-3.md) records the new OpenAI key, the first xAI calls, and one learning path. [Test 4](docs/e2e/test-4-full.md) calls OpenAI, Anthropic, and xAI, then switches alias `auto`. [Test 5](docs/e2e/test-5-learn.md) refreshes one qualification profile at a 0.05 margin. The snapshot stays unqualified. `model=auto` stays on OpenAI. [Test 6](docs/e2e/test-6-cost-switch.md) qualifies OpenAI, Anthropic, and xAI on 73 pairs at a 0.05 margin. With alias `auto` on Anthropic, selection serves OpenAI. The run then stops that rollout and returns alias `auto` to OpenAI.
 
 ## Roadmap
 
 - **Automatic optimizer.** Selection is shipped. It stays off until an operator enables it. An optimizer that promotes a policy by itself stays off. A named model still never switches.
 - **Redis** for hot counters. Evaluation jobs already use PostgreSQL.
 - **External secret manager** support for provider keys.
-- **A verified live call to a private endpoint** (DGX), so it can be `validated_live`.
+- **A verified live call to a private endpoint** (DGX), so an operator can record `validated_live` for that host. `confirm-live-deployment` already records `validated_live` for a public provider after a succeeded call in the last 24 hours.
 
 ## Not included
 
 - Login, OAuth, SSO, user accounts, and saved caller state.
 - Tools, images, audio, embeddings, and MCP.
-- A verified live call to DGX. A DGX deployment is not `validated_live`.
+- A verified live call to DGX. Use `confirm-live-deployment` only after a succeeded call in the last 24 hours.
 - An optimizer that promotes a policy without an operator.
 - An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI. A routing policy, an evidence refresh, a canary rollout, and a guardrail set use internal HTTP routes. Task feedback uses the same tenant authentication as chat. Those routes do not change a provider key.
 - TLS on the proxy listen port.

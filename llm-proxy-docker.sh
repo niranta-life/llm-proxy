@@ -2,7 +2,8 @@
 # Build and run the llm-proxy Compose project on Colima.
 # setup writes config/docker.env. start rebuilds the app image when the source changes.
 # watch rebuilds that image, or recreates the app when the config file changes.
-# The database volume stays. Inference stays off until the config file sets it.
+# The database volume stays. Inference stays off until keys turns it on for a set provider key.
+# Provider API keys stay in config/provider-keys.env. The script does not print them.
 
 set -euo pipefail
 
@@ -11,6 +12,9 @@ PROFILE="${COLIMA_PROFILE:-default}"
 SOCKET="${COLIMA_SOCKET:-${HOME}/.colima/${PROFILE}/docker.sock}"
 ENV_EXAMPLE="${ROOT}/config/docker.env.example"
 ENV_FILE="${LLM_PROXY_ENV_FILE:-${ROOT}/config/docker.env}"
+KEYS_EXAMPLE="${ROOT}/config/provider-keys.env.example"
+KEYS_FILE="${LLM_PROXY_KEYS_FILE:-${ROOT}/config/provider-keys.env}"
+TENANT_FILE="${ROOT}/config/local-tenant.json"
 STAMP="${ROOT}/config/.image-stamp"
 READY_URL="${PROXY_BASE_URL:-http://127.0.0.1:8080}/health/ready"
 WATCH_SECONDS="${LLM_PROXY_WATCH_SECONDS:-2}"
@@ -30,10 +34,11 @@ CONFIG_KEYS=(
 
 usage() {
   cat <<'EOF'
-Usage: llm-proxy-docker.sh <build|setup|start|stop|status|watch> [options]
+Usage: llm-proxy-docker.sh <build|setup|start|stop|status|watch|keys> [options]
 
   build               Build the app image on Colima.
   setup               Create config/docker.env when it is missing. Inference stays off.
+                      Create config/provider-keys.env when it is missing. Store no provider key there.
   start [--build]     Start Colima when it is down, then start Compose.
                       Rebuild the app image when the program files changed or the image is missing.
   stop [--vm]         Stop Compose. Keep the database volume. --vm also stops Colima.
@@ -41,11 +46,17 @@ Usage: llm-proxy-docker.sh <build|setup|start|stop|status|watch> [options]
                       Show the containers and the ready check when Colima is running.
   watch               Rebuild the app image when the program files change.
                       Recreate the app when the config file changes.
+  keys                Read config/provider-keys.env. Do not print a provider key.
+                      Turn inference on only when a provider key is set.
+                      An empty file does not change inference and does not start Colima.
+                      Register an enabled deployment for each provider that has a key.
+                      Leave selection off. Leave automatic promotion off.
 
 The script uses the Colima socket. The script does not change the Docker context.
 Set COLIMA_PROFILE or COLIMA_SOCKET when yours differ.
 Set LLM_PROXY_ENV_FILE only when that file already exists.
 The script creates config/docker.env only when you do not set LLM_PROXY_ENV_FILE.
+Set LLM_PROXY_KEYS_FILE only when that file already exists.
 The image command stays node dist/index.js.
 The image does not start the evaluation worker, the guardrail worker, or the promotion worker.
 EOF
@@ -423,11 +434,950 @@ recreate_app() {
   wait_ready
 }
 
+file_mode() {
+  local mode
+  mode="$(stat -f '%OLp' "$1" 2>/dev/null || true)"
+  if [[ -z "$mode" ]]; then
+    mode="$(stat -c '%a' "$1")"
+  fi
+  printf '%s' "$mode"
+}
+
+file_owner() {
+  local owner
+  owner="$(stat -f '%u' "$1" 2>/dev/null || true)"
+  if [[ -z "$owner" ]]; then
+    owner="$(stat -c '%u' "$1")"
+  fi
+  printf '%s' "$owner"
+}
+
+require_private_file() {
+  local file="$1" label="$2" mode owner
+  if [[ -L "$file" ]]; then
+    die "${label} must not be a symlink: ${file}"
+  fi
+  [[ -f "$file" ]] || die "${label} is missing: ${file}"
+  mode="$(file_mode "$file")"
+  [[ "$mode" == "600" || "$mode" == "400" ]] || die "${label} must be mode 600 or 400: ${file}"
+  owner="$(file_owner "$file")"
+  [[ "$owner" == "$(id -u)" ]] || die "${label} must be owned by you: ${file}"
+}
+
+ensure_keys_file() {
+  local old_umask
+  if [[ "$KEYS_FILE" != "${ROOT}/config/provider-keys.env" ]]; then
+    return 0
+  fi
+  if [[ -e "$KEYS_FILE" || -L "$KEYS_FILE" ]]; then
+    return 0
+  fi
+  [[ -f "$KEYS_EXAMPLE" ]] || die "provider keys example is missing: ${KEYS_EXAMPLE}"
+  mkdir -p "$(dirname "$KEYS_FILE")"
+  old_umask="$(umask)"
+  umask 077
+  cp "$KEYS_EXAMPLE" "$KEYS_FILE"
+  umask "$old_umask"
+  chmod 600 "$KEYS_FILE"
+  echo "Created ${KEYS_FILE}."
+  echo "No provider key is stored in that file."
+}
+
+keys_value() {
+  local key="$1" line
+  [[ -f "$KEYS_FILE" ]] || return 1
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ "$line" == "$key="* ]] || continue
+    strip_quotes "${line#"$key="}"
+    return 0
+  done < "$KEYS_FILE"
+  printf ''
+}
+
+plain_text() {
+  local key="$1" value="$2"
+  # The value stays literal. The script does not source the keys file.
+  # shellcheck disable=SC2016
+  if [[ "$value" == *'$('* || "$value" == *'`'* || "$value" == *'${'* ]]; then
+    die "config value must be plain text: ${key}"
+  fi
+}
+
+require_model() {
+  local key="$1" value="$2"
+  [[ -n "$value" ]] || die "${key} is required"
+  [[ "${#value}" -ge 1 && "${#value}" -le 128 ]] || die "${key} is invalid"
+  [[ ! "$value" =~ [[:space:]] ]] || die "${key} is invalid"
+}
+
+require_api_key() {
+  local key="$1" value="$2"
+  [[ "${#value}" -ge 8 && "${#value}" -le 256 ]] || die "${key} must be 8 to 256 characters"
+  [[ ! "$value" =~ [[:space:]] ]] || die "${key} must not contain whitespace"
+}
+
+validate_capabilities() {
+  local value="$1" part seen=" "
+  local -a parts=()
+  [[ -n "$value" ]] || return 0
+  read -r -a parts <<< "${value//,/ }"
+  [[ ${#parts[@]} -gt 0 ]] || die "DEPLOYMENT_CAPABILITIES is invalid"
+  for part in "${parts[@]}"; do
+    part="${part#"${part%%[![:space:]]*}"}"
+    part="${part%"${part##*[![:space:]]}"}"
+    [[ -n "$part" ]] || die "DEPLOYMENT_CAPABILITIES is invalid"
+    [[ "$seen" != *" ${part} "* ]] || die "DEPLOYMENT_CAPABILITIES is invalid"
+    seen+=" ${part} "
+    case "$part" in
+      temperature|top_p|max_tokens|max_completion_tokens|stop|presence_penalty|frequency_penalty|seed|n|user|response_format_text)
+        ;;
+      *)
+        die "DEPLOYMENT_CAPABILITIES is invalid"
+        ;;
+    esac
+  done
+}
+
+public_provider_host() {
+  local host="$1"
+  host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+  host="${host%.}"
+  case "$host" in
+    openai.com|*.openai.com|anthropic.com|*.anthropic.com|x.ai|*.x.ai|openrouter.ai|*.openrouter.ai|googleapis.com|*.googleapis.com)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+validate_dgx_endpoint() {
+  local value="$1" rest hostport host port path
+  [[ "${#value}" -ge 8 && "${#value}" -le 512 ]] || die "DGX_ENDPOINT is invalid"
+  [[ ! "$value" =~ [[:space:]] ]] || die "DGX_ENDPOINT is invalid"
+  [[ "$value" == https://* ]] || die "DGX_ENDPOINT must be an https URL that ends in /v1"
+  [[ "$value" != *"@"* && "$value" != *"?"* && "$value" != *"#"* ]] || die "DGX_ENDPOINT is invalid"
+  [[ "$value" == */v1 || "$value" == */v1/ ]] || die "DGX_ENDPOINT must end in /v1"
+  rest="${value#https://}"
+  hostport="${rest%%/*}"
+  path="${rest#*/}"
+  path="${path%/}"
+  [[ "$path" == "v1" ]] || die "DGX_ENDPOINT must end in /v1"
+  if [[ "$hostport" == *:* ]]; then
+    host="${hostport%%:*}"
+    port="${hostport##*:}"
+  else
+    host="$hostport"
+    port="443"
+  fi
+  host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+  host="${host%.}"
+  [[ "$host" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "DGX_ENDPOINT is invalid"
+  [[ "$port" =~ ^[0-9]+$ ]] || die "DGX_ENDPOINT is invalid"
+  (( 10#$port >= 1 && 10#$port <= 65535 )) || die "DGX_ENDPOINT is invalid"
+  public_provider_host "$host" && die "DGX_ENDPOINT must not use a public provider host"
+  DGX_HOST="$host"
+  DGX_PORT="$port"
+}
+
+address_ok() {
+  local value="$1" octet
+  local IFS='.'
+  local -a octets=()
+  [[ "$value" != "0.0.0.0" && "$value" != "::" && "$value" != "::1" ]] || return 1
+  [[ "$value" != 169.254.* && "$value" != "169.254.169.254" ]] || return 1
+  if [[ "$value" == *:* ]]; then
+    [[ "$value" =~ ^[0-9A-Fa-f:]{2,45}$ ]] || return 1
+    return 0
+  fi
+  [[ "$value" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
+  read -r -a octets <<< "$value"
+  [[ ${#octets[@]} -eq 4 ]] || return 1
+  for octet in "${octets[@]}"; do
+    (( 10#$octet <= 255 )) || return 1
+  done
+}
+
+validate_allowlist() {
+  local value="$1" part seen=" " count=0
+  local -a parts=()
+  [[ -n "$value" ]] || return 0
+  read -r -a parts <<< "${value//,/ }"
+  for part in "${parts[@]}"; do
+    part="${part#"${part%%[![:space:]]*}"}"
+    part="${part%"${part##*[![:space:]]}"}"
+    [[ -n "$part" ]] || die "DGX_ALLOWLIST_ADDRESSES is invalid"
+    [[ "$seen" != *" ${part} "* ]] || die "DGX_ALLOWLIST_ADDRESSES is invalid"
+    seen+=" ${part} "
+    address_ok "$part" || die "DGX_ALLOWLIST_ADDRESSES is invalid"
+    count=$((count + 1))
+  done
+  (( count >= 1 && count <= 8 )) || die "DGX_ALLOWLIST_ADDRESSES is invalid"
+}
+
+validate_health_endpoint() {
+  local value="$1" rest hostport host port path
+  [[ -n "$value" ]] || return 0
+  [[ "$value" == https://* ]] || die "DGX_HEALTH_ENDPOINT is invalid"
+  [[ "$value" != *"@"* && "$value" != *"?"* && "$value" != *"#"* ]] || die "DGX_HEALTH_ENDPOINT is invalid"
+  rest="${value#https://}"
+  hostport="${rest%%/*}"
+  path="/${rest#*/}"
+  path="${path%/}"
+  if [[ "$hostport" == *:* ]]; then
+    host="${hostport%%:*}"
+    port="${hostport##*:}"
+  else
+    host="$hostport"
+    port="443"
+  fi
+  host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+  [[ "$host" == "$DGX_HOST" && "$port" == "$DGX_PORT" ]] || die "DGX_HEALTH_ENDPOINT is invalid"
+  case "$path" in
+    /health|/health/ready|/ready|/v1/health|/v1/health/ready)
+      ;;
+    *)
+      die "DGX_HEALTH_ENDPOINT is invalid"
+      ;;
+  esac
+}
+
+validate_keys_file() {
+  local line key value seen=" "
+  KEYS_ANY=0
+  DGX_HOST=""
+  DGX_PORT=""
+  require_private_file "$KEYS_FILE" "provider keys file"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" =~ ^[A-Z0-9_]+= ]] || die "config line is not KEY=VALUE"
+    key="${line%%=*}"
+    if [[ "$seen" == *" ${key} "* ]]; then
+      die "config key is repeated: ${key}"
+    fi
+    seen+=" ${key} "
+    value="$(strip_quotes "${line#*=}")"
+    plain_text "$key" "$value"
+    case "$key" in
+      OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY|OPENROUTER_API_KEY|DGX_API_KEY)
+        [[ -z "$value" ]] || require_api_key "$key" "$value"
+        [[ -z "$value" ]] || KEYS_ANY=1
+        ;;
+      VERTEX_SERVICE_ACCOUNT_JSON)
+        if [[ -n "$value" ]]; then
+          [[ "${#value}" -ge 8 && "${#value}" -le 3000 ]] || die "VERTEX_SERVICE_ACCOUNT_JSON must be 8 to 3000 characters"
+          [[ "$value" == *private_key* || "$value" == *private-key* ]] || die "VERTEX_SERVICE_ACCOUNT_JSON must be a service account key"
+          KEYS_ANY=1
+        fi
+        ;;
+      OPENAI_MODEL|ANTHROPIC_MODEL|XAI_MODEL|OPENROUTER_MODEL|VERTEX_MODEL|DGX_MODEL)
+        [[ -z "$value" ]] || require_model "$key" "$value"
+        ;;
+      ANTHROPIC_ENDPOINT)
+        if [[ -n "$value" ]]; then
+          [[ "${#value}" -ge 8 && "${#value}" -le 512 ]] || die "ANTHROPIC_ENDPOINT is invalid"
+          [[ "$value" == http://* || "$value" == https://* ]] || die "ANTHROPIC_ENDPOINT must be an http or https URL"
+          [[ "$value" != *"@"* && ! "$value" =~ [[:space:]] ]] || die "ANTHROPIC_ENDPOINT is invalid"
+        fi
+        ;;
+      ANTHROPIC_WORKSPACE_ID)
+        if [[ -n "$value" ]]; then
+          [[ "${#value}" -le 128 && ! "$value" =~ [[:space:]] ]] || die "ANTHROPIC_WORKSPACE_ID is invalid"
+        fi
+        ;;
+      ANTHROPIC_MAX_OUTPUT_TOKENS)
+        [[ -z "$value" ]] || require_range "$key" "$value" 1 128000
+        ;;
+      VERTEX_PROJECT)
+        [[ -z "$value" || "$value" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] || die "VERTEX_PROJECT is invalid"
+        ;;
+      VERTEX_LOCATION)
+        [[ -z "$value" || "$value" =~ ^(global|[a-z]+(-[a-z0-9]+){1,3})$ ]] || die "VERTEX_LOCATION is invalid"
+        ;;
+      DGX_ENDPOINT)
+        [[ -z "$value" ]] || validate_dgx_endpoint "$value"
+        ;;
+      DGX_ALLOWLIST_ADDRESSES)
+        [[ -z "$value" ]] || validate_allowlist "$value"
+        ;;
+      DGX_HEALTH_ENDPOINT)
+        ;;
+      DEPLOYMENT_TIMEOUT_MS)
+        [[ -z "$value" ]] || require_range "$key" "$value" 100 600000
+        ;;
+      DEPLOYMENT_CAPABILITIES)
+        validate_capabilities "$value"
+        ;;
+      *)
+        die "config key is not allowed: ${key}"
+        ;;
+    esac
+  done < "$KEYS_FILE"
+  validate_key_relations
+}
+
+validate_key_relations() {
+  local openai anthropic xai router vertex dgx endpoint project location addresses health max_out
+  openai="$(keys_value OPENAI_API_KEY || true)"
+  anthropic="$(keys_value ANTHROPIC_API_KEY || true)"
+  xai="$(keys_value XAI_API_KEY || true)"
+  router="$(keys_value OPENROUTER_API_KEY || true)"
+  vertex="$(keys_value VERTEX_SERVICE_ACCOUNT_JSON || true)"
+  dgx="$(keys_value DGX_API_KEY || true)"
+  if [[ -n "$openai" ]]; then
+    require_model OPENAI_MODEL "$(keys_value OPENAI_MODEL || true)"
+  fi
+  if [[ -n "$anthropic" ]]; then
+    endpoint="$(keys_value ANTHROPIC_ENDPOINT || true)"
+    [[ -n "$endpoint" ]] || die "ANTHROPIC_ENDPOINT is required when ANTHROPIC_API_KEY is set"
+    require_model ANTHROPIC_MODEL "$(keys_value ANTHROPIC_MODEL || true)"
+  fi
+  if [[ -n "$xai" ]]; then
+    require_model XAI_MODEL "$(keys_value XAI_MODEL || true)"
+  fi
+  if [[ -n "$router" ]]; then
+    require_model OPENROUTER_MODEL "$(keys_value OPENROUTER_MODEL || true)"
+  fi
+  if [[ -n "$vertex" ]]; then
+    project="$(keys_value VERTEX_PROJECT || true)"
+    location="$(keys_value VERTEX_LOCATION || true)"
+    [[ -n "$project" ]] || die "VERTEX_PROJECT is required when VERTEX_SERVICE_ACCOUNT_JSON is set"
+    [[ -n "$location" ]] || die "VERTEX_LOCATION is required when VERTEX_SERVICE_ACCOUNT_JSON is set"
+    require_model VERTEX_MODEL "$(keys_value VERTEX_MODEL || true)"
+  fi
+  endpoint="$(keys_value DGX_ENDPOINT || true)"
+  addresses="$(keys_value DGX_ALLOWLIST_ADDRESSES || true)"
+  health="$(keys_value DGX_HEALTH_ENDPOINT || true)"
+  if [[ -n "$dgx" && -z "$endpoint" ]]; then
+    die "DGX_ENDPOINT is required when DGX_API_KEY is set"
+  fi
+  if [[ -z "$dgx" && -n "$endpoint" ]]; then
+    die "DGX_API_KEY is required when DGX_ENDPOINT is set"
+  fi
+  if [[ -n "$dgx" ]]; then
+    require_model DGX_MODEL "$(keys_value DGX_MODEL || true)"
+    [[ -n "$addresses" || -z "$health" ]] || die "DGX_ALLOWLIST_ADDRESSES is required when DGX_HEALTH_ENDPOINT is set"
+    validate_health_endpoint "$health"
+  elif [[ -n "$addresses" || -n "$health" ]]; then
+    die "DGX_API_KEY is required when a DGX allowlist is set"
+  fi
+  unset openai anthropic xai router vertex dgx endpoint project location addresses health max_out
+}
+
+output_has_secret() {
+  local file="$1"
+  shift
+  local secret line
+  if grep -E -q 'sk-[A-Za-z0-9_-]+|yck_[A-Za-z0-9_-]+|private[_-]key|BEGIN PRIVATE' "$file"; then
+    return 0
+  fi
+  for secret in "$@"; do
+    [[ -n "$secret" ]] || continue
+    # Compare inside this shell. Do not pass the secret to another process.
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" == *"$secret"* ]]; then
+        return 0
+      fi
+    done < "$file"
+  done
+  return 1
+}
+
+discard_secret_output() {
+  local file
+  for file in "$@"; do
+    [[ -n "$file" ]] || continue
+    rm -f "$file"
+  done
+  die "command output contained a secret and was discarded"
+}
+
+new_private_temp() {
+  local file
+  file="$(mktemp)"
+  chmod 600 "$file"
+  KEY_TEMPS+=("$file")
+  printf '%s' "$file"
+}
+
+run_cli() {
+  local out err code
+  out="$(new_private_temp)"
+  err="$(new_private_temp)"
+  set +e
+  compose run --rm -T --no-deps app node dist/cli.js "$@" >"$out" 2>"$err"
+  code=$?
+  set -e
+  if output_has_secret "$out" || output_has_secret "$err"; then
+    discard_secret_output "$out" "$err"
+  fi
+  if [[ "$code" -ne 0 ]]; then
+    cat "$err" >&2
+    die "provider command failed"
+  fi
+  printf '%s' "$out"
+}
+
+pipe_key() {
+  local key="$1"
+  shift
+  local out err code
+  out="$(new_private_temp)"
+  err="$(new_private_temp)"
+  set +e
+  printf '%s' "$key" | compose run --rm -T --no-deps app node dist/cli.js "$@" >"$out" 2>"$err"
+  code=$?
+  set -e
+  if output_has_secret "$out" "$key" || output_has_secret "$err" "$key"; then
+    discard_secret_output "$out" "$err"
+  fi
+  if [[ "$code" -ne 0 ]]; then
+    cat "$err" >&2
+    die "provider command failed"
+  fi
+}
+
+listing_has() {
+  local kind="$1" name="$2" code
+  set +e
+  node --no-warnings -e '
+    const fs = require("fs");
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    } catch (err) {
+      process.exit(2);
+    }
+    const kind = process.argv[2];
+    const name = process.argv[3];
+    const rows = kind === "deployment" ? data.deployments : data.connections;
+    const field = kind === "deployment" ? "name" : "provider";
+    const found = Array.isArray(rows) && rows.some((row) => row && row[field] === name);
+    process.exit(found ? 0 : 1);
+  ' "$LISTING" "$kind" "$name"
+  code=$?
+  set -e
+  if [[ "$code" -ne 0 && "$code" -ne 1 ]]; then
+    die "inference listing is invalid"
+  fi
+  return "$code"
+}
+
+deployment_field() {
+  local name="$1" field="$2"
+  node --no-warnings -e '
+    const fs = require("fs");
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    } catch (err) {
+      process.exit(2);
+    }
+    const name = process.argv[2];
+    const field = process.argv[3];
+    const rows = Array.isArray(data.deployments) ? data.deployments : [];
+    const row = rows.find((item) => item && item.name === name);
+    if (!row) process.exit(1);
+    const value = row[field];
+    if (value === null || value === undefined) {
+      process.stdout.write("");
+      process.exit(0);
+    }
+    if (Array.isArray(value)) {
+      process.stdout.write(value.join(","));
+      process.exit(0);
+    }
+    process.stdout.write(String(value));
+  ' "$LISTING" "$name" "$field"
+}
+
+refresh_listing() {
+  local out
+  out="$(run_cli list-inference --tenant-id "$TENANT_ID")"
+  LISTING="$out"
+}
+
+deployment_timeout() {
+  local value
+  value="$(keys_value DEPLOYMENT_TIMEOUT_MS || true)"
+  if [[ -z "$value" ]]; then
+    printf '60000'
+  else
+    printf '%s' "$value"
+  fi
+}
+
+deployment_capabilities() {
+  local value
+  value="$(keys_value DEPLOYMENT_CAPABILITIES || true)"
+  if [[ -z "$value" ]]; then
+    printf 'temperature,max_tokens'
+  else
+    printf '%s' "$value"
+  fi
+}
+
+capabilities_for() {
+  local provider="$1" model="$2" caps
+  caps="$(deployment_capabilities)"
+  if [[ "$provider" == "anthropic" && "$model" == "claude-sonnet-5-5" ]]; then
+    node --no-warnings -e '
+      const parts = String(process.argv[1] || "")
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0 && part !== "temperature");
+      process.stdout.write(parts.join(","));
+    ' "$caps"
+  else
+    printf '%s' "$caps"
+  fi
+}
+
+sorted_caps() {
+  node --no-warnings -e '
+    const parts = String(process.argv[1] || "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+      .sort();
+    process.stdout.write(parts.join(","));
+  ' "$1"
+}
+
+ensure_deployment() {
+  local provider="$1" model="$2" caps stored_model stored_caps stored_enabled
+  caps="$(capabilities_for "$provider" "$model")"
+  if listing_has deployment "$provider"; then
+    stored_model="$(deployment_field "$provider" upstreamModel || true)"
+    if [[ "$stored_model" != "$model" ]]; then
+      run_cli set-deployment-model --tenant-id "$TENANT_ID" --deployment "$provider" --upstream-model "$model" >/dev/null
+      echo "${provider}: upstream model updated"
+    fi
+    stored_caps="$(deployment_field "$provider" capabilities || true)"
+    if [[ "$(sorted_caps "$stored_caps")" != "$(sorted_caps "$caps")" ]]; then
+      run_cli set-deployment-capabilities --tenant-id "$TENANT_ID" --deployment "$provider" --capabilities "$caps" >/dev/null
+      echo "${provider}: capabilities updated"
+    fi
+    stored_enabled="$(deployment_field "$provider" enabled || true)"
+    if [[ "$stored_enabled" != "true" ]]; then
+      run_cli set-deployment-enabled --tenant-id "$TENANT_ID" --name "$provider" --enabled true >/dev/null
+      echo "${provider}: deployment enabled"
+    fi
+    ensure_deployment_policy "$provider"
+    return 0
+  fi
+  if [[ "$provider" == "anthropic" ]]; then
+    run_cli register-deployment \
+      --tenant-id "$TENANT_ID" \
+      --provider "$provider" \
+      --name "$provider" \
+      --upstream-model "$model" \
+      --timeout-ms "$(deployment_timeout)" \
+      --capabilities "$caps" \
+      --default-max-output-tokens "$(keys_value ANTHROPIC_MAX_OUTPUT_TOKENS)" \
+      --enabled true >/dev/null
+  else
+    run_cli register-deployment \
+      --tenant-id "$TENANT_ID" \
+      --provider "$provider" \
+      --name "$provider" \
+      --upstream-model "$model" \
+      --timeout-ms "$(deployment_timeout)" \
+      --capabilities "$caps" \
+      --enabled true >/dev/null
+  fi
+  echo "${provider}: deployment registered"
+  refresh_listing
+  ensure_deployment_policy "$provider"
+}
+
+ensure_deployment_policy() {
+  local provider="$1" class collection
+  class="$(deployment_field "$provider" dataClassification || true)"
+  if [[ -z "$class" ]]; then
+    run_cli set-deployment-data-class --tenant-id "$TENANT_ID" --deployment "$provider" --data-class internal >/dev/null
+    echo "${provider}: data class set to internal"
+  fi
+  collection="$(deployment_field "$provider" dataCollection || true)"
+  if [[ -z "$collection" ]]; then
+    run_cli set-deployment-data-collection --tenant-id "$TENANT_ID" --deployment "$provider" --data-collection allow >/dev/null
+    echo "${provider}: data collection set to allow"
+  fi
+  ensure_sample_allowlist "$provider"
+  refresh_listing
+}
+
+ensure_sample_allowlist() {
+  local provider="$1" out_file next code
+  out_file="$(run_cli show-sample-policy --tenant-id "$TENANT_ID")"
+  set +e
+  next="$(node --no-warnings -e '
+    const fs = require("fs");
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    } catch (err) {
+      process.exit(2);
+    }
+    if (!data || data.attached === false || data.mode !== "encrypted_sample") process.exit(0);
+    const provider = process.argv[2];
+    const providers = Array.isArray(data.providers) ? [...data.providers] : [];
+    const deployments = Array.isArray(data.deployments) ? [...data.deployments] : [];
+    const hasProvider = providers.includes(provider);
+    const hasDeployment = deployments.includes(provider);
+    if (hasProvider && hasDeployment) process.exit(0);
+    if (!hasProvider) providers.push(provider);
+    if (!hasDeployment) deployments.push(provider);
+    process.stdout.write(JSON.stringify({
+      mode: String(data.mode),
+      contentCapture: data.contentCapture === true ? "true" : "false",
+      streamingCapture: data.streamingCapture === true ? "true" : "false",
+      replay: data.replay === true ? "true" : "false",
+      judgeDisclosure: data.judgeDisclosure === true ? "true" : "false",
+      sampleRate: String(data.sampleRate),
+      maxSampleBytes: String(data.maxSampleBytes),
+      maxSampleCount: String(data.maxSampleCount),
+      retentionSeconds: String(data.retentionSeconds),
+      recentShare: String(data.recentShare),
+      classifications: (Array.isArray(data.classifications) ? data.classifications : []).join(","),
+      providers: providers.join(","),
+      deployments: deployments.join(","),
+    }));
+  ' "$out_file" "$provider")"
+  code=$?
+  set -e
+  if [[ "$code" -ne 0 ]]; then
+    die "Could not read the sample policy. keys stopped."
+  fi
+  [[ -n "$next" ]] || return 0
+  run_cli set-sample-policy \
+    --tenant-id "$TENANT_ID" \
+    --mode "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).mode)' "$next")" \
+    --content-capture "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).contentCapture)' "$next")" \
+    --streaming-capture "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).streamingCapture)' "$next")" \
+    --replay "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).replay)' "$next")" \
+    --judge-disclosure "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).judgeDisclosure)' "$next")" \
+    --sample-rate "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).sampleRate)' "$next")" \
+    --max-sample-bytes "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).maxSampleBytes)' "$next")" \
+    --max-sample-count "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).maxSampleCount)' "$next")" \
+    --retention-seconds "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).retentionSeconds)' "$next")" \
+    --recent-share "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).recentShare)' "$next")" \
+    --classifications "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).classifications)' "$next")" \
+    --providers "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).providers)' "$next")" \
+    --deployments "$(node --no-warnings -e 'process.stdout.write(JSON.parse(process.argv[1]).deployments)' "$next")" \
+    >/dev/null
+  echo "${provider}: sample policy allow-list updated"
+}
+
+apply_openai() {
+  local key
+  key="$(keys_value OPENAI_API_KEY || true)"
+  [[ -n "$key" ]] || return 0
+  if listing_has connection openai; then
+    pipe_key "$key" set-openai-credential --tenant-id "$TENANT_ID" --api-key-stdin
+    echo "openai: key replaced"
+  else
+    pipe_key "$key" register-openai-connection --tenant-id "$TENANT_ID" --api-key-stdin
+    echo "openai: connection registered"
+  fi
+  ensure_deployment openai "$(keys_value OPENAI_MODEL)"
+  unset key
+}
+
+apply_anthropic() {
+  local key endpoint workspace max_out
+  local -a args=()
+  key="$(keys_value ANTHROPIC_API_KEY || true)"
+  [[ -n "$key" ]] || return 0
+  max_out="$(keys_value ANTHROPIC_MAX_OUTPUT_TOKENS || true)"
+  if [[ -z "$max_out" ]]; then
+    echo "anthropic: skipped because ANTHROPIC_MAX_OUTPUT_TOKENS is empty. The key was not replaced."
+    unset key endpoint workspace max_out
+    return 0
+  fi
+  endpoint="$(keys_value ANTHROPIC_ENDPOINT)"
+  workspace="$(keys_value ANTHROPIC_WORKSPACE_ID || true)"
+  if listing_has connection anthropic; then
+    pipe_key "$key" set-anthropic-credential --tenant-id "$TENANT_ID" --api-key-stdin
+    echo "anthropic: key replaced"
+  else
+    args=(register-anthropic-connection --tenant-id "$TENANT_ID" --endpoint "$endpoint" --api-key-stdin)
+    if [[ -n "$workspace" ]]; then
+      args+=(--workspace-id "$workspace")
+    fi
+    pipe_key "$key" "${args[@]}"
+    echo "anthropic: connection registered"
+  fi
+  ensure_deployment anthropic "$(keys_value ANTHROPIC_MODEL)"
+  unset key endpoint workspace max_out
+}
+
+apply_registry_key() {
+  local provider="$1" key_name="$2" model_name="$3"
+  shift 3
+  local key
+  key="$(keys_value "$key_name" || true)"
+  [[ -n "$key" ]] || return 0
+  if listing_has connection "$provider"; then
+    case "$provider" in
+      xai) pipe_key "$key" set-xai-credential --tenant-id "$TENANT_ID" --api-key-stdin ;;
+      openrouter) pipe_key "$key" set-openrouter-credential --tenant-id "$TENANT_ID" --api-key-stdin ;;
+      vertex) pipe_key "$key" set-vertex-credential --tenant-id "$TENANT_ID" --api-key-stdin ;;
+      dgx) pipe_key "$key" set-dgx-credential --tenant-id "$TENANT_ID" --api-key-stdin ;;
+      *) die "provider is invalid: ${provider}" ;;
+    esac
+    if [[ "$provider" == "vertex" ]]; then
+      echo "vertex: credential replaced"
+    else
+      echo "${provider}: key replaced"
+    fi
+  else
+    pipe_key "$key" "$@"
+    echo "${provider}: connection registered"
+  fi
+  ensure_deployment "$provider" "$(keys_value "$model_name")"
+  unset key
+}
+
+apply_dgx_allowlist() {
+  local addresses health
+  local -a args=()
+  addresses="$(keys_value DGX_ALLOWLIST_ADDRESSES || true)"
+  [[ -n "$addresses" ]] || return 0
+  health="$(keys_value DGX_HEALTH_ENDPOINT || true)"
+  args=(
+    approve-private-endpoint
+    --tenant-id "$TENANT_ID"
+    --host "$DGX_HOST"
+    --port "$DGX_PORT"
+    --addresses "$addresses"
+    --tls-verify true
+  )
+  if [[ -n "$health" ]]; then
+    args+=(--health-endpoint "$health")
+  fi
+  run_cli "${args[@]}" >/dev/null
+  echo "dgx: allowlist stored"
+  unset addresses health
+}
+
+load_tenant() {
+  local out err code capture idfile
+  if [[ -L "$TENANT_FILE" ]]; then
+    die "tenant file must not be a symlink: ${TENANT_FILE}"
+  fi
+  if [[ -f "$TENANT_FILE" ]]; then
+    require_private_file "$TENANT_FILE" "tenant file"
+    if ! TENANT_ID="$(node --no-warnings -e '
+      const fs = require("fs");
+      let data;
+      try {
+        data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      } catch (err) {
+        process.exit(2);
+      }
+      if (!data || typeof data.tenantId !== "string" || data.tenantId.length === 0) process.exit(2);
+      process.stdout.write(data.tenantId);
+    ' "$TENANT_FILE")"; then
+      die "tenant file is invalid: ${TENANT_FILE}"
+    fi
+    [[ "$TENANT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+      || die "tenant file is invalid: ${TENANT_FILE}"
+    echo "Tenant id: ${TENANT_ID}"
+    echo "Tenant secret stays in ${TENANT_FILE}."
+    return 0
+  fi
+  command -v node >/dev/null 2>&1 || die "node is required to store the tenant file"
+  out="$(new_private_temp)"
+  err="$(new_private_temp)"
+  set +e
+  compose run --rm -T --no-deps app node dist/cli.js provision-tenant --name local >"$out" 2>"$err"
+  code=$?
+  set -e
+  if [[ "$code" -ne 0 ]]; then
+    if output_has_secret "$err"; then
+      discard_secret_output "$out" "$err"
+    fi
+    cat "$err" >&2
+    die "tenant was not created"
+  fi
+  capture="$(new_private_temp)"
+  idfile="$(new_private_temp)"
+  if ! node --no-warnings -e '
+    const fs = require("fs");
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    } catch (err) {
+      process.exit(2);
+    }
+    if (!data || typeof data.tenantId !== "string" || data.tenantId.length === 0) process.exit(2);
+    if (typeof data.secret !== "string" || data.secret.length === 0) process.exit(2);
+    if (typeof data.keyId !== "string" || data.keyId.length === 0) process.exit(2);
+    fs.writeFileSync(process.argv[2], JSON.stringify({
+      tenantId: data.tenantId,
+      keyId: data.keyId,
+      secret: data.secret,
+      name: data.name,
+    }) + "\n", { mode: 0o600 });
+    process.stdout.write(data.tenantId);
+  ' "$out" "$capture" >"$idfile"; then
+    wipe_file "$out"
+    wipe_file "$idfile"
+    wipe_file "$capture"
+    die "tenant was not created"
+  fi
+  TENANT_ID="$(cat "$idfile")"
+  chmod 600 "$capture"
+  mv "$capture" "$TENANT_FILE"
+  chmod 600 "$TENANT_FILE"
+  wipe_file "$out"
+  wipe_file "$idfile"
+  [[ "$TENANT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+    || die "tenant was not created"
+  echo "Tenant id: ${TENANT_ID}"
+  echo "Tenant secret stays in ${TENANT_FILE}."
+}
+
+set_inference_on() {
+  local tmp line found=0 old_umask
+  old_umask="$(umask)"
+  umask 077
+  tmp="$(mktemp)"
+  umask "$old_umask"
+  chmod 600 "$tmp"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == INFERENCE_ENABLED=* ]]; then
+      printf 'INFERENCE_ENABLED=true\n'
+      found=1
+    else
+      printf '%s\n' "$line"
+    fi
+  done < "$ENV_FILE" > "$tmp"
+  if [[ "$found" -eq 0 ]]; then
+    printf 'INFERENCE_ENABLED=true\n' >> "$tmp"
+  fi
+  mv "$tmp" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+}
+
+report_provider_keys() {
+  local mode owner value label
+  PROVIDER_LIST=""
+  if [[ ! -e "$KEYS_FILE" && ! -L "$KEYS_FILE" ]]; then
+    echo "provider keys: missing"
+    return 0
+  fi
+  if [[ -L "$KEYS_FILE" ]]; then
+    echo "provider keys: refused"
+    return 0
+  fi
+  mode="$(file_mode "$KEYS_FILE" 2>/dev/null || true)"
+  owner="$(file_owner "$KEYS_FILE" 2>/dev/null || true)"
+  if [[ "$mode" != "600" && "$mode" != "400" ]] || [[ "$owner" != "$(id -u)" ]]; then
+    echo "provider keys: refused"
+    return 0
+  fi
+  append_provider OPENAI_API_KEY openai
+  append_provider ANTHROPIC_API_KEY anthropic
+  append_provider XAI_API_KEY xai
+  append_provider OPENROUTER_API_KEY openrouter
+  append_provider VERTEX_SERVICE_ACCOUNT_JSON vertex
+  append_provider DGX_API_KEY dgx
+  if [[ -z "$PROVIDER_LIST" ]]; then
+    echo "provider keys: none"
+  else
+    echo "provider keys: ${PROVIDER_LIST}"
+  fi
+}
+
+append_provider() {
+  local key="$1" label="$2" value
+  value="$(keys_value "$key" || true)"
+  if [[ -n "$value" ]]; then
+    if [[ -n "$PROVIDER_LIST" ]]; then
+      PROVIDER_LIST="${PROVIDER_LIST}, ${label}"
+    else
+      PROVIDER_LIST="$label"
+    fi
+  fi
+  unset value
+}
+
+wipe_file() {
+  local file="$1"
+  [[ -n "$file" && -f "$file" ]] || return 0
+  dd if=/dev/zero of="$file" bs=1024 count=64 >/dev/null 2>&1 || true
+  rm -f "$file"
+}
+
+cleanup_key_temps() {
+  local file
+  for file in ${KEY_TEMPS+"${KEY_TEMPS[@]}"}; do
+    wipe_file "$file"
+  done
+}
+
+cmd_keys() {
+  KEY_TEMPS=()
+  trap cleanup_key_temps EXIT
+  if [[ ! -e "$KEYS_FILE" && ! -L "$KEYS_FILE" ]]; then
+    die "provider keys file is missing: ${KEYS_FILE}. Run ./llm-proxy-docker.sh setup."
+  fi
+  validate_keys_file
+  if [[ "$KEYS_ANY" -eq 0 ]]; then
+    echo "No provider keys are set. Inference is unchanged."
+    return 0
+  fi
+  command -v node >/dev/null 2>&1 || die "node is required to apply provider keys"
+  ensure_config
+  validate_env_file
+  if [[ -z "$(config_value PROVIDER_CREDENTIAL_KEY || true)" ]]; then
+    die "PROVIDER_CREDENTIAL_KEY is required before provider keys are applied"
+  fi
+  set_inference_on
+  load_env_file
+  ensure_colima
+  if [[ "$(source_hash)" != "$(stamp_value)" ]] || ! image_exists; then
+    build_image
+  fi
+  echo "starting the llm-proxy Compose project"
+  recreate_app
+  load_tenant
+  refresh_listing
+  apply_openai
+  apply_anthropic
+  apply_registry_key xai XAI_API_KEY XAI_MODEL register-xai-connection --tenant-id "$TENANT_ID" --api-key-stdin
+  apply_registry_key openrouter OPENROUTER_API_KEY OPENROUTER_MODEL register-openrouter-connection --tenant-id "$TENANT_ID" --api-key-stdin
+  apply_registry_key vertex VERTEX_SERVICE_ACCOUNT_JSON VERTEX_MODEL \
+    register-vertex-connection --tenant-id "$TENANT_ID" \
+    --project "$(keys_value VERTEX_PROJECT)" \
+    --location "$(keys_value VERTEX_LOCATION)" \
+    --api-key-stdin
+  apply_registry_key dgx DGX_API_KEY DGX_MODEL \
+    register-dgx-connection --tenant-id "$TENANT_ID" \
+    --endpoint "$(keys_value DGX_ENDPOINT)" \
+    --api-key-stdin
+  if [[ -n "$(keys_value DGX_API_KEY || true)" ]]; then
+    if [[ -n "$(keys_value DGX_ALLOWLIST_ADDRESSES || true)" ]]; then
+      apply_dgx_allowlist
+    else
+      echo "dgx: chat needs DGX_ALLOWLIST_ADDRESSES before the proxy can call that host."
+    fi
+  fi
+  echo "Inference is on."
+  echo "Selection stays off."
+  echo "Automatic promotion stays off."
+  echo "The script did not mark a deployment validated."
+}
+
 cmd_build() {
   build_image
 }
 
 cmd_setup() {
+  ensure_keys_file
   if [[ -f "$ENV_FILE" ]]; then
     validate_env_file
     echo "Config file already exists: ${ENV_FILE}"
@@ -491,6 +1441,7 @@ cmd_status() {
     echo "config: missing"
     echo "Run ./llm-proxy-docker.sh setup"
   fi
+  report_provider_keys
   echo "image: $(image_state)"
   if colima_running && [[ -S "$SOCKET" ]]; then
     export DOCKER_HOST="unix://${SOCKET}"
@@ -578,6 +1529,10 @@ main() {
     watch)
       [[ "$has_build" -eq 0 && "$has_vm" -eq 0 ]] || die "watch does not take options"
       cmd_watch
+      ;;
+    keys)
+      [[ "$has_build" -eq 0 && "$has_vm" -eq 0 ]] || die "keys does not take options"
+      cmd_keys
       ;;
     -h|--help)
       usage

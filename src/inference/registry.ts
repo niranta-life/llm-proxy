@@ -51,7 +51,7 @@ function approvedDgxEndpoint(value: string): string | undefined {
   return trimmed;
 }
 
-function assertVertexCredential(credential: string): void {
+export function assertVertexCredential(credential: string): void {
   const trimmed = credential.trim();
   if (!/private[_-]key/i.test(trimmed)) {
     throw new Error('service account identity is not a credential');

@@ -23,6 +23,14 @@ describe('request validation', () => {
     const parsed = validateChatRequest({ ...textRequest, stream: true, stream_options: { include_usage: true } });
     expect(parsed.stream).toBe(true);
     expect(parsed.includeUsage).toBe(true);
+    const defaultUsage = validateChatRequest({ ...textRequest, stream: true });
+    expect(defaultUsage.includeUsage).toBe(true);
+    const omitted = validateChatRequest({
+      ...textRequest,
+      stream: true,
+      stream_options: { include_usage: false },
+    });
+    expect(omitted.includeUsage).toBe(false);
     expect(() => assertStreamAllowed(parsed, { provider: 'openai', streamingEnabled: false }, false)).toThrow(
       /streaming is not supported/i,
     );

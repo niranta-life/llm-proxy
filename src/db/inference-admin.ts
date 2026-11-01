@@ -34,6 +34,8 @@ export type InferenceListing = {
     streamBackpressureTimeoutMs: number | null;
     validationStatus: string;
     healthStatus: string;
+    dataCollection: string | null;
+    dataClassification: string | null;
     createdAt: string;
   }>;
   aliases: Array<{
@@ -344,6 +346,65 @@ export async function setDeploymentValidation(
     validationStatus: row.validation_status,
     healthStatus: row.health_status,
   };
+}
+
+export async function setDeploymentUpstreamModel(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+  upstreamModel: string,
+): Promise<{ configVersion: number; upstreamModel: string }> {
+  const result = await pool.query<{ config_version: number; upstream_model: string }>(
+    'SELECT config_version, upstream_model FROM set_deployment_upstream_model($1::uuid, $2, $3)',
+    [tenantId, name, upstreamModel],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not updated');
+  return { configVersion: row.config_version, upstreamModel: row.upstream_model };
+}
+
+export async function setDeploymentCapabilities(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+  capabilities: string[],
+): Promise<number> {
+  const result = await pool.query<{ set_deployment_capabilities: number }>(
+    'SELECT set_deployment_capabilities($1::uuid, $2, $3::text[]) AS set_deployment_capabilities',
+    [tenantId, name, capabilities],
+  );
+  const version = result.rows[0]?.set_deployment_capabilities;
+  if (version === undefined) throw new Error('deployment capabilities were not updated');
+  return version;
+}
+
+export async function confirmDeploymentLive(
+  pool: Pool,
+  tenantId: string,
+  name: string,
+): Promise<{ configVersion: number; validationStatus: string }> {
+  const result = await pool.query<{ config_version: number; validation_status: string }>(
+    'SELECT config_version, validation_status FROM confirm_deployment_live($1::uuid, $2)',
+    [tenantId, name],
+  );
+  const row = result.rows[0];
+  if (row === undefined) throw new Error('deployment was not confirmed');
+  return { configVersion: row.config_version, validationStatus: row.validation_status };
+}
+
+export async function replaceRegistryCredential(
+  pool: Pool,
+  tenantId: string,
+  provider: string,
+  protectedCredential: string,
+): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    'SELECT replace_registry_credential($1::uuid, $2, $3) AS version',
+    [tenantId, provider, protectedCredential],
+  );
+  const version = result.rows[0]?.version;
+  if (version === undefined) throw new Error('credential was not replaced');
+  return version;
 }
 
 export async function approvePrivateEndpoint(

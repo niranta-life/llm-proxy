@@ -867,7 +867,7 @@ export function buildApp(deps: AppDeps): ProxyApp {
         accepted: result.accepted,
         itemCount: result.itemCount,
         mode: plan.mode,
-        modelExecution: 'off' as const,
+        modelExecution: plan.mode === 'replay' ? ('pinned' as const) : ('off' as const),
         sampleCategory: plan.sampleCategory,
         challengerDeployment: plan.challengerDeployment,
         judgeDeployment: plan.judgeDeployment,

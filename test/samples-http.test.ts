@@ -119,6 +119,25 @@ describe('encrypted samples over HTTP', () => {
     });
   }
 
+  function expectSkip(requestId: string, reason: string): void {
+    const line = ctx.lines.find(
+      (entry) => entry.includes('"sample capture skipped"') && entry.includes(requestId),
+    );
+    expect(line, reason).toBeDefined();
+    const event = JSON.parse(line ?? '{}') as {
+      msg?: string;
+      reason?: string;
+      deployment?: string;
+      requestId?: string;
+    };
+    expect(event.msg).toBe('sample capture skipped');
+    expect(event.reason).toBe(reason);
+    expect(event.deployment).toBe('chat');
+    expect(event.requestId).toBe(requestId);
+    expect(line).not.toContain(PROMPT);
+    expect(line).not.toContain(COMPLETION);
+  }
+
   async function sampleCount(tenantId: string): Promise<number> {
     const result = await admin.query<{ count: number }>(
       'SELECT count(*)::int AS count FROM request_samples WHERE tenant_id = $1',
@@ -415,6 +434,7 @@ describe('encrypted samples over HTTP', () => {
     expect(missing.statusCode).toBe(200);
     expect(missing.headers['x-attempt-count']).toBe('1');
     expect(await sampleCount(a.tenantId)).toBe(0);
+    expectSkip(String(missing.headers['x-request-id']), 'missing_permission');
 
     runCli(
       db,
@@ -442,6 +462,7 @@ describe('encrypted samples over HTTP', () => {
     const rejected = await post(ctx, a);
     expect(rejected.statusCode).toBe(200);
     expect(await sampleCount(a.tenantId)).toBe(0);
+    expectSkip(String(rejected.headers['x-request-id']), 'data_class');
 
     runCli(
       db,
@@ -470,6 +491,7 @@ describe('encrypted samples over HTTP', () => {
     expect(oversized.statusCode).toBe(200);
     expect(oversized.headers['x-attempt-count']).toBe('1');
     expect(await sampleCount(a.tenantId)).toBe(0);
+    expectSkip(String(oversized.headers['x-request-id']), 'size');
 
     setPolicy(a.tenantId, 'encrypted_sample', [
       '--content-capture',

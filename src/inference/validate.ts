@@ -109,7 +109,7 @@ export function validateChatRequest(body: unknown): ChatRequest {
 }
 
 function parseStreamOptions(body: Record<string, unknown>, stream: boolean): boolean {
-  if (!('stream_options' in body)) return false;
+  if (!('stream_options' in body)) return true;
   if (!stream) {
     throw invalidRequest('stream_options', 'unsupported_parameter', 'stream_options is not supported.');
   }
@@ -121,7 +121,7 @@ function parseStreamOptions(body: Record<string, unknown>, stream: boolean): boo
   if (keys.some((key) => key !== 'include_usage')) {
     throw invalidRequest('stream_options', 'unsupported_parameter', 'stream_options is not supported.');
   }
-  if (value.include_usage === undefined) return false;
+  if (value.include_usage === undefined) return true;
   if (typeof value.include_usage !== 'boolean') {
     throw invalidRequest('stream_options.include_usage', 'invalid_parameter', 'include_usage must be a boolean.');
   }

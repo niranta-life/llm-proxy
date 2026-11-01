@@ -257,6 +257,21 @@ describe('durable evaluation orchestration', () => {
     }
   });
 
+  it('reports modelExecution pinned for replay preflight and off for dry_run', async () => {
+    const { tenant, sampleId } = await prepare('Eval Preflight Mode');
+    const dry = await postPlan(tenant, plan([sampleId]), undefined, '/internal/v1/evaluations/preflight');
+    expect(dry.statusCode).toBe(200);
+    expect(dry.json()).toMatchObject({ accepted: true, mode: 'dry_run', modelExecution: 'off' });
+    const replay = await postPlan(
+      tenant,
+      plan([sampleId], { mode: 'replay' }),
+      undefined,
+      '/internal/v1/evaluations/preflight',
+    );
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toMatchObject({ accepted: true, mode: 'replay', modelExecution: 'pinned' });
+  });
+
   it('creates a dry run, pages it, and hides it from another tenant', async () => {
     const { tenant, sampleId } = await prepare('Eval Create');
     const other = provisionTenant(db, 'Eval Create Other');

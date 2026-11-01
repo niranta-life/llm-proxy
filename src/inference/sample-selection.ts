@@ -67,8 +67,9 @@ export function deterministicDraw(tenantId: string, requestId: string): number {
 export function visibleSampleText(
   messages: readonly { role: string; content: string }[],
   output: string,
+  deployment: string,
 ): string {
-  const lines = [FINGERPRINT_DOMAIN];
+  const lines = [FINGERPRINT_DOMAIN, 'deployment', deployment];
   for (const message of messages) {
     lines.push(message.role, message.content);
   }

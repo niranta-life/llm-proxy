@@ -3,6 +3,7 @@ import {
   addDecimal,
   calculateCost,
   costToStore,
+  deriveThoughtsTokens,
   multiplyDecimal,
   selectPrice,
   type CalculatedCost,
@@ -522,5 +523,132 @@ describe('model cost calculation', () => {
     expect(absent.costStatus).toBe('unknown');
     expect(absent.amount).toBeNull();
     prove('request-fee', present);
+  });
+
+  it('derives a positive token gap as thoughts and leaves a zero gap null', () => {
+    expect(
+      deriveThoughtsTokens({
+        provider: 'xai',
+        promptTokens: 1250,
+        completionTokens: 12,
+        totalTokens: 1516,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+      }),
+    ).toBe(254);
+    expect(
+      deriveThoughtsTokens({
+        provider: 'openai',
+        promptTokens: 15,
+        completionTokens: 5,
+        totalTokens: 20,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+      }),
+    ).toBeNull();
+    expect(
+      deriveThoughtsTokens({
+        provider: 'dgx',
+        promptTokens: 10,
+        completionTokens: 2,
+        totalTokens: 40,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps the full token gap when cache counts are present', () => {
+    expect(
+      deriveThoughtsTokens({
+        provider: 'xai',
+        promptTokens: 100,
+        completionTokens: 10,
+        totalTokens: 130,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: 20,
+        thoughtsTokens: null,
+      }),
+    ).toBe(20);
+    expect(
+      deriveThoughtsTokens({
+        provider: 'openai',
+        promptTokens: 100,
+        completionTokens: 10,
+        totalTokens: 140,
+        cacheCreationInputTokens: 15,
+        cacheReadInputTokens: 20,
+        thoughtsTokens: null,
+      }),
+    ).toBe(30);
+    expect(
+      deriveThoughtsTokens({
+        provider: 'anthropic',
+        promptTokens: 50,
+        completionTokens: 5,
+        totalTokens: 60,
+        cacheCreationInputTokens: 1.5,
+        cacheReadInputTokens: null,
+        thoughtsTokens: null,
+      }),
+    ).toBe(5);
+  });
+
+  it('bills stored thoughts at the thinking rate or the output rate when thinking is unset', () => {
+    const withThinking = calculateCost({
+      provider: 'xai',
+      usage: usage({ promptTokens: 1250, completionTokens: 12, totalTokens: 1516, thoughtsTokens: 254 }),
+      price: price({
+        id: 'xai-think',
+        provider: 'xai',
+        model: 'grok-cost',
+        inputRate: '0.000002',
+        outputRate: '0.000006',
+        thinkingRate: '0.000003',
+      }),
+    });
+    expect(withThinking.costStatus).toBe('estimated');
+    expect(withThinking.amount).toBe('0.003334');
+    const fallback = calculateCost({
+      provider: 'xai',
+      usage: usage({ promptTokens: 1250, completionTokens: 12, totalTokens: 1516, thoughtsTokens: 254 }),
+      price: price({
+        id: 'xai-output',
+        provider: 'xai',
+        model: 'grok-cost',
+        inputRate: '0.000002',
+        outputRate: '0.000006',
+      }),
+    });
+    expect(fallback.costStatus).toBe('estimated');
+    expect(fallback.amount).toBe('0.004096');
+    const dgxUsage = {
+      promptTokens: 10,
+      completionTokens: 2,
+      totalTokens: 40,
+      cacheCreationInputTokens: null,
+      cacheReadInputTokens: null,
+      thoughtsTokens: null,
+    };
+    expect(deriveThoughtsTokens({ provider: 'dgx', ...dgxUsage })).toBeNull();
+    const dgx = calculateCost({
+      provider: 'dgx',
+      usage: usage(dgxUsage),
+      price: price({
+        id: 'dgx-gap',
+        provider: 'dgx',
+        model: 'private-cost',
+        inputRate: '0.01',
+        outputRate: '0.02',
+        allocatedRate: '0.05',
+      }),
+    });
+    expect(dgx.costStatus).toBe('estimated');
+    expect(dgx.amount).toBe('0.14');
+    expect(dgx.allocatedAmount).toBe('0.6');
+    prove('thoughts-gap', withThinking);
   });
 });

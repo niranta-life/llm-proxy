@@ -5,8 +5,10 @@ import { isTaskCategory, type TaskCategory } from './task-categories.js';
 
 const SCALE = 1_000_000_000_000n;
 export const SAMPLE_ESTIMATE = '0.01';
-export const SCHEDULE_DAILY_CEILING = '1';
+export const SCHEDULE_DAILY_CEILING = '2.92';
 export const SCHEDULE_MONTHLY_CEILING = '20';
+export const SCHEDULE_SAMPLE_CEILING = 73;
+export const SCHEDULE_CHALLENGER_CALL_CEILING = 292;
 export const SCHEDULE_CANDIDATE_CAP = 200;
 export const JUDGE_CALLS_PER_SAMPLE = 2;
 
@@ -208,11 +210,11 @@ export function parseScheduleWrite(body: unknown): ScheduleWrite {
   if (perRun <= 0n || perRun > daily) {
     throw invalidRequest('per_run_max_expense', 'invalid_parameter', 'perRunMaxExpense is invalid.');
   }
-  const maxChallengerCalls = integerIn(body.maxChallengerCalls, 1, 100);
+  const maxChallengerCalls = integerIn(body.maxChallengerCalls, 1, SCHEDULE_CHALLENGER_CALL_CEILING);
   const maxJudgeCalls = integerIn(body.maxJudgeCalls, 0, 40);
   const maxConcurrentJobs = integerIn(body.maxConcurrentJobs, 1, 10);
   const maxDurationMs = integerIn(body.maxDurationMs, 1000, 600_000);
-  const maxSamples = integerIn(body.maxSamples, 1, 20);
+  const maxSamples = integerIn(body.maxSamples, 1, SCHEDULE_SAMPLE_CEILING);
   if (
     maxChallengerCalls === null ||
     maxJudgeCalls === null ||

@@ -9,6 +9,10 @@ export const API_KEY_COMMANDS: ReadonlySet<string> = new Set([
   'register-xai-connection',
   'register-openrouter-connection',
   'register-dgx-connection',
+  'set-xai-credential',
+  'set-openrouter-credential',
+  'set-vertex-credential',
+  'set-dgx-credential',
 ]);
 
 export const MAX_API_KEY_STDIN_BYTES = 64 * 1024;

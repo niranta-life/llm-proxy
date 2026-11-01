@@ -1,0 +1,7 @@
+run 2
+HTTP 200 ok
+postgres allow
+redis allow
+comparisons 1
+agreements 1
+duration_ms 1

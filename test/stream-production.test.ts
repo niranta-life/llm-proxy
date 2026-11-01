@@ -830,7 +830,8 @@ describe('streaming production controls', () => {
       const port = await freePort();
       const admin = adminPool(db);
       await ctx.app.listen({ host: '127.0.0.1', port });
-      const started = new Date();
+      const marked = await admin.query<{ now: Date }>(`SELECT clock_timestamp() AS now`);
+      const started = marked.rows[0]?.now ?? new Date();
       const finish = openPost(port, tenant.tenantId, tenant.secret, chatPayload('drain-chat', 'finish-in-drain', { stream: true }));
       const hold = openPost(port, tenant.tenantId, tenant.secret, chatPayload('drain-chat', 'hold-open', { stream: true }));
       try {

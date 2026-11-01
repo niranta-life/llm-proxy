@@ -1,0 +1,17 @@
+Node.js v24.22.1
+vitest run test/redis-foundation.test.ts
+13 passed, 0 failed
+Duration 25.79s
+
+REDIS_CASE {"case":"no-redis","run":1,"ready":{"status":"ready","database":"ready"},"redis":"disabled"}
+REDIS_CASE {"case":"no-redis","run":2,"ready":{"status":"ready","database":"ready"},"redis":"disabled"}
+REDIS_CASE {"case":"connected","code":"tenant_rate_limited","redis":"connected"}
+REDIS_CASE {"case":"redis-down","budget":"budget_exceeded","lease":"concurrency_limited","ready":"ready"}
+REDIS_CASE {"case":"isolation","alpha":"tenant_rate_limited","beta":200}
+REDIS_CASE {"case":"auth","redis":"unavailable","lastError":"auth","chat":200}
+REDIS_CASE {"case":"tls","redis":"unavailable","lastError":"tls","chat":200}
+REDIS_CASE {"case":"startup-down","ready":"ready","redis":"unavailable","chat":200}
+REDIS_CASE {"case":"restart","reconnects":1,"code":"tenant_rate_limited"}
+REDIS_CASE {"case":"cleanup","proxyClients":0}
+REDIS_CASE {"case":"shadow-launch","run":1,"code":"200 allowed"}
+REDIS_CASE {"case":"shadow-launch","run":2,"code":"200 allowed"}

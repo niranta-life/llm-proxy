@@ -1,0 +1,6 @@
+callers 5
+requests 20
+capacity 10
+allows 10
+denies 10
+duplicates 0

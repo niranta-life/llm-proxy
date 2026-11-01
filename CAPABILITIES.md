@@ -351,3 +351,125 @@ Logs do not contain the raw input or the vectors.
 An embedding call does not store a chat sample.
 
 An embedding call does not write chat quality evidence or routing evidence.
+
+## Redis
+
+Hot rate counters can be checked in Redis shadow while PostgreSQL still admits the request.
+
+`RATE_LIMIT_STORE` accepts `postgres`, `redis_shadow`, or `redis_active`.
+
+The default is `postgres`.
+
+`redis_active` is off by default.
+
+`postgres` does not open a Redis connection.
+
+`redis_shadow` opens one Redis connection.
+
+`REDIS_SHADOW_CHECKS` accepts `true` or `false`.
+
+The default is `false`.
+
+`true` checks a Redis token bucket for the tenant request rate, the API-key request rate, the tenant token rate, and the API-key token rate.
+
+The bucket uses Redis server time.
+
+Each counter key has a TTL.
+
+The key version is a hash of the tenant rate policy.
+
+API-key counters for that tenant stay in the same key.
+
+The key is scoped to the authenticated tenant id.
+
+The key uses a hash tag, so the counters for one tenant share one Redis Cluster slot.
+
+The same attempt id does not consume the bucket twice.
+
+Connection limits stay in PostgreSQL.
+
+Deployment limits stay in PostgreSQL.
+
+Those limits are concurrency leases.
+
+A budget stays in PostgreSQL.
+
+A concurrency lease stays in PostgreSQL.
+
+Evaluation state stays in PostgreSQL.
+
+An evaluation queue is not stored in Redis.
+
+The shadow check does not admit a request.
+
+`redis_active` admits a hard request rate or a hard token rate only when an operator has approved that policy.
+
+`activate-redis-rate` records the approval.
+
+A policy with no approval stays on PostgreSQL.
+
+`deactivate-redis-rate` removes the approval.
+
+Observe mode stays advisory when Redis is healthy.
+
+A hard request rate is a strict limit.
+
+A hard token rate is a strict limit.
+
+An observe-mode request rate is advisory.
+
+An observe-mode token rate is advisory.
+
+Redis spends only a quota slice that PostgreSQL already charged.
+
+The slice is versioned and bound to a rate-backend epoch.
+
+A Redis failure, a restart, or a lost key does not grant that slice again.
+
+An uncertain result denies that admission.
+
+The fast path opens a circuit breaker and stops using Redis until recovery.
+
+Recovery closes the open epochs and does not refund them.
+
+`RATE_LIMIT_STORE=postgres` is the immediate rollback.
+
+An approval has no effect in `postgres` or `redis_shadow`.
+
+Use shadow mode first, then one test tenant, then a limited active set.
+
+A Redis timeout, a missing script that cannot reload, or an invalid Redis reply does not change a PostgreSQL decision in `postgres` or `redis_shadow`.
+
+Redis does not store a secret, a prompt, or a response.
+
+`GET /health/redis` reports the mode, the link state, connect failures, reconnects, pings, the last error class, and the PostgreSQL decision beside the Redis decision.
+
+In `redis_active` it also reports the circuit, active allows, active denies, fallback denies, epoch closes, and the last recovery time.
+
+A Redis failure does not change `GET /health/ready`.
+
+The connect timeout is an integer from 100 to 10000 milliseconds.
+
+The reconnect timeout is an integer from 100 to 10000 milliseconds.
+
+The default for each timeout is 1000 milliseconds.
+
+The breaker cooldown is an integer from 100 to 10000 milliseconds.
+
+The default cooldown is 1000 milliseconds.
+
+The URL uses `redis:` or `rediss:`.
+
+The URL does not contain a password.
+
+The ACL user is not `default`.
+
+The local Compose profile `redis` starts Redis 7.
+
+That profile is off by default.
+
+The local ACL disables the default user.
+
+The local proxy user can ping, authenticate, quit, and run the rate script.
+
+The local proxy user can write only a key that starts with `rl:`.

@@ -317,6 +317,7 @@ describe('Anthropic integration', () => {
       '036_embeddings.sql',
       '037_mcp_catalog.sql',
       '038_mcp_execution.sql',
+      '039_rate_backend_epochs.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

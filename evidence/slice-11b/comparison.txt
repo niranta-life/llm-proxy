@@ -1,0 +1,9 @@
+http 200 ok
+postgres allow
+redis deny
+disagreements 1
+duration_ms 1
+counters tenant_requests:2
+leases connection:released,connection:released,deployment:released,deployment:released,tenant_request:released,tenant_request:released
+budgets settled,settled
+redis fields m:tr,r:tr,s:122393e4-685e-4c1f-8d10-089318071ef5,s:9c8626d3-dbfc-473f-8caf-e999684fa773,t:tr

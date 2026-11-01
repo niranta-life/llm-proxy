@@ -33,6 +33,18 @@ CONFIG_KEYS=(
   HTTP_KEEP_ALIVE_TIMEOUT_MS
   MIGRATION_LOCK_TIMEOUT_MS
   MIGRATION_STATEMENT_TIMEOUT_MS
+  RATE_LIMIT_STORE
+  REDIS_SHADOW_CHECKS
+  REDIS_URL
+  REDIS_USERNAME
+  REDIS_PASSWORD
+  REDIS_TLS
+  REDIS_TLS_CA_FILE
+  REDIS_TLS_CERT_FILE
+  REDIS_TLS_KEY_FILE
+  REDIS_CONNECT_TIMEOUT_MS
+  REDIS_RECONNECT_TIMEOUT_MS
+  REDIS_BREAKER_COOLDOWN_MS
 )
 
 usage() {
@@ -337,6 +349,36 @@ validate_env_file() {
         ;;
       HTTP_KEEP_ALIVE_TIMEOUT_MS|MIGRATION_LOCK_TIMEOUT_MS|MIGRATION_STATEMENT_TIMEOUT_MS)
         require_range "$key" "$value" 1000 3600000
+        ;;
+      RATE_LIMIT_STORE)
+        [[ "$value" == "postgres" || "$value" == "redis_shadow" || "$value" == "redis_active" ]] || die "RATE_LIMIT_STORE must be postgres, redis_shadow, or redis_active"
+        ;;
+      REDIS_SHADOW_CHECKS)
+        [[ -z "$value" || "$value" == "true" || "$value" == "false" ]] || die "REDIS_SHADOW_CHECKS must be true or false"
+        ;;
+      REDIS_URL)
+        if [[ -n "$value" ]]; then
+          [[ "$value" == redis://* || "$value" == rediss://* ]] || die "REDIS_URL must be a redis or rediss URL"
+          [[ "$value" != *"@"* ]] || die "REDIS_URL must not include credentials"
+        fi
+        ;;
+      REDIS_USERNAME)
+        if [[ -n "$value" ]]; then
+          [[ "$value" != "default" && "$value" =~ ^[A-Za-z][A-Za-z0-9._-]{0,63}$ ]] || die "REDIS_USERNAME must be an ACL user"
+        fi
+        ;;
+      REDIS_PASSWORD)
+        if [[ -n "$value" ]]; then
+          [[ ${#value} -ge 8 && ${#value} -le 256 && "$value" != *[[:space:]]* ]] || die "REDIS_PASSWORD must be 8 to 256 characters"
+        fi
+        ;;
+      REDIS_TLS)
+        [[ -z "$value" || "$value" == "true" || "$value" == "false" ]] || die "REDIS_TLS must be true or false"
+        ;;
+      REDIS_TLS_CA_FILE|REDIS_TLS_CERT_FILE|REDIS_TLS_KEY_FILE)
+        ;;
+      REDIS_CONNECT_TIMEOUT_MS|REDIS_RECONNECT_TIMEOUT_MS|REDIS_BREAKER_COOLDOWN_MS)
+        [[ -z "$value" ]] || require_range "$key" "$value" 100 10000
         ;;
       DATABASE_HOST|DATABASE_PORT|DATABASE_NAME|MIGRATOR_USER|MIGRATOR_PASSWORD|AUTH_USER|AUTH_PASSWORD|RUNTIME_USER|RUNTIME_PASSWORD|HOST|PORT)
         die "Compose sets ${key}. Remove it from ${ENV_FILE}"

@@ -184,6 +184,11 @@ describe('controlled retries', () => {
     return { response, elapsedMs: Date.now() - started };
   }
 
+  async function mark(): Promise<Date> {
+    const marked = await admin.query<{ now: Date }>(`SELECT clock_timestamp() AS now`);
+    return marked.rows[0]?.now ?? new Date();
+  }
+
   async function rowsSince(tenantId: string, since: Date): Promise<AttemptRow[]> {
     const result = await admin.query<AttemptRow>(
       `SELECT a.attempt_ordinal, a.status, a.failure_class, a.dispatched, a.expense_certainty,
@@ -224,7 +229,7 @@ describe('controlled retries', () => {
 
   it('sends one attempt when retry is off', async () => {
     mode = { type: 'status', status: 429 };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(plain, 'plain-429');
     const stored = await rowsSince(plain.tenantId, since);
     report('retry-off', response.statusCode, mock.hits, stored, elapsedMs);
@@ -237,7 +242,7 @@ describe('controlled retries', () => {
   it('retries a rate limit once for model=auto and then succeeds', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'then-ok', status: 429 };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(opted, 'auto-429-ok');
     const stored = await rowsSince(opted.tenantId, since);
     report('429-then-ok', response.statusCode, mock.hits, stored, elapsedMs);
@@ -283,7 +288,7 @@ describe('controlled retries', () => {
   it('stops at two attempts when the rate limit continues', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'status', status: 429 };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(opted, 'always-429');
     const stored = await rowsSince(opted.tenantId, since);
     report('429-cap', response.statusCode, mock.hits, stored, elapsedMs);
@@ -296,7 +301,7 @@ describe('controlled retries', () => {
   it('retries HTTP 503 and keeps the public status', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'status', status: 503 };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(opted, 'always-503');
     const stored = await rowsSince(opted.tenantId, since);
     report('503', response.statusCode, mock.hits, stored, elapsedMs);
@@ -308,7 +313,7 @@ describe('controlled retries', () => {
   it('waits for a valid Retry-After and ignores an invalid one', async () => {
     setPolicy({ retries: true, total: 10_000, initial: 0, max: 0 });
     mode = { type: 'then-ok', status: 429, retryAfter: '1' };
-    const since = new Date();
+    const since = await mark();
     const first = await chat(opted, 'retry-after-1');
     const stored = await rowsSince(opted.tenantId, since);
     const gap = (times[1] ?? 0) - (times[0] ?? 0);
@@ -324,7 +329,7 @@ describe('controlled retries', () => {
     times.length = 0;
     mock.hits.length = 0;
     seen.clear();
-    const secondSince = new Date();
+    const secondSince = await mark();
     const second = await chat(opted, 'retry-after-soon');
     const secondRows = await rowsSince(opted.tenantId, secondSince);
     const small = (times[1] ?? 0) - (times[0] ?? 0);
@@ -338,7 +343,7 @@ describe('controlled retries', () => {
   it('does not retry when a valid Retry-After exceeds the deadline', async () => {
     setPolicy({ retries: true, connection: 5_000, attempt: 5_000, total: 2_000, initial: 0, max: 0 });
     mode = { type: 'then-ok', status: 429, retryAfter: '10' };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(opted, 'retry-after-too-long');
     const stored = await rowsSince(opted.tenantId, since);
     report('retry-after-exceeds', response.statusCode, mock.hits, stored, elapsedMs);
@@ -351,7 +356,7 @@ describe('controlled retries', () => {
   it('does not retry HTTP 400 or HTTP 401', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'status', status: 400 };
-    const since = new Date();
+    const since = await mark();
     const denied = await chat(opted, 'http-400');
     const deniedRows = await rowsSince(opted.tenantId, since);
     report('http-400', denied.response.statusCode, mock.hits, deniedRows, denied.elapsedMs);
@@ -383,7 +388,7 @@ describe('controlled retries', () => {
     pools.push(closed.authPool, closed.runtimePool);
     try {
       setPolicy({ retries: true, initial: 0, max: 0 });
-      const since = new Date();
+      const since = await mark();
       const started = Date.now();
       const response = await closed.app.inject({
         method: 'POST',
@@ -399,7 +404,7 @@ describe('controlled retries', () => {
       expect(stored.every((row) => row.amount === null)).toBe(true);
       expect(stored.some((row) => row.amount === '0')).toBe(false);
 
-      const offSince = new Date();
+      const offSince = await mark();
       const plainResponse = await closed.app.inject({
         method: 'POST',
         url: '/v1/chat/completions',
@@ -418,7 +423,7 @@ describe('controlled retries', () => {
   it('stops on a timeout before dispatch, after dispatch, and on the total deadline', async () => {
     mode = { type: 'hang' };
     setPolicy({ retries: true, connection: 200, attempt: 5_000, total: 5_000, initial: 0, max: 0 });
-    const beforeSince = new Date();
+    const beforeSince = await mark();
     const before = await chat(opted, 'timeout-before');
     const beforeRows = await rowsSince(opted.tenantId, beforeSince);
     report('timeout-before', before.response.statusCode, mock.hits, beforeRows, before.elapsedMs);
@@ -431,7 +436,7 @@ describe('controlled retries', () => {
 
     mock.hits.length = 0;
     setPolicy({ retries: true, connection: 5_000, attempt: 200, total: 5_000, initial: 0, max: 0 });
-    const afterSince = new Date();
+    const afterSince = await mark();
     const after = await chat(opted, 'timeout-after');
     const afterRows = await rowsSince(opted.tenantId, afterSince);
     report('timeout-after', after.response.statusCode, mock.hits, afterRows, after.elapsedMs);
@@ -445,7 +450,7 @@ describe('controlled retries', () => {
 
     mock.hits.length = 0;
     setPolicy({ retries: true, connection: 5_000, attempt: 5_000, total: 200, initial: 0, max: 0 });
-    const totalSince = new Date();
+    const totalSince = await mark();
     const total = await chat(opted, 'timeout-total');
     const totalRows = await rowsSince(opted.tenantId, totalSince);
     report('total-deadline', total.response.statusCode, mock.hits, totalRows, total.elapsedMs);
@@ -468,7 +473,7 @@ describe('controlled retries', () => {
     await live.app.listen({ host: '127.0.0.1', port: 0 });
     const address = live.app.server.address();
     if (address === null || typeof address === 'string') throw new Error('listen port is missing');
-    const since = new Date();
+    const since = await mark();
     const controller = new AbortController();
     const pending = fetch(`http://127.0.0.1:${address.port}/v1/chat/completions`, {
       method: 'POST',
@@ -503,7 +508,7 @@ describe('controlled retries', () => {
   it('does not retry a stream after output has started', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'partial' };
-    const since = new Date();
+    const since = await mark();
     const { response, elapsedMs } = await chat(opted, 'stream-partial', { stream: true });
     const stored = await rowsSince(opted.tenantId, since);
     report('stream-partial', response.statusCode, mock.hits, stored, elapsedMs);
@@ -516,7 +521,7 @@ describe('controlled retries', () => {
   it('keeps concurrent retries on separate attempts', async () => {
     setPolicy({ retries: true, initial: 0, max: 0 });
     mode = { type: 'then-ok', status: 429 };
-    const since = new Date();
+    const since = await mark();
     const responses = await Promise.all([chat(opted, 'concurrent-a'), chat(opted, 'concurrent-b')]);
     const stored = await rowsSince(opted.tenantId, since);
     report('concurrent', responses[0]?.response.statusCode ?? 0, mock.hits, stored, responses[0]?.elapsedMs ?? 0);
@@ -542,7 +547,7 @@ describe('controlled retries', () => {
     mode = { type: 'status', status: 429 };
     mock.hits.length = 0;
     seen.clear();
-    const since = new Date();
+    const since = await mark();
     const after = await chat(opted, 'rollback-off');
     const stored = await rowsSince(opted.tenantId, since);
     report('rollback-off', after.response.statusCode, mock.hits, stored, after.elapsedMs);

@@ -160,7 +160,7 @@ describe('routing hardening', () => {
   let childA: Child | undefined;
   let childB: Child | undefined;
   let measuredFrom = new Date(0);
-  const admitFunction = 'admit_attempt(uuid, uuid, uuid, uuid, uuid, boolean, timestamptz, timestamptz, date, bigint, numeric, text, uuid)';
+  const admitFunction = 'admit_attempt(uuid, uuid, uuid, uuid, uuid, boolean, timestamptz, timestamptz, date, bigint, numeric, text, uuid, boolean, boolean, boolean, boolean)';
   let childC: Child | undefined;
   let portA = 0;
   let portB = 0;
@@ -1937,7 +1937,7 @@ describe('routing hardening', () => {
     const applied = await admin.query<{ version: string }>(`SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1`);
     const latest = await latestMigrationVersion();
     expect(applied.rows[0]?.version).toBe(latest);
-    expect(latest).toBe('038_mcp_execution.sql');
+    expect(latest).toBe('039_rate_backend_epochs.sql');
     const docker = readFileSync(join(projectRoot, 'Dockerfile'), 'utf8');
     const entry = readFileSync(join(projectRoot, 'src', 'index.ts'), 'utf8');
     expect(docker).toContain('CMD ["node", "dist/index.js"]');

@@ -1,0 +1,10 @@
+replicas 3
+ports 58703,58704,58705
+http_allows 2
+http_denies 4
+redis_allows 3
+redis_denies 4
+other_tenant 200 ok
+replica 1 allow 2 deny 1 postgres deny redis deny
+replica 2 allow 0 deny 2 postgres deny redis deny
+replica 3 allow 1 deny 1 postgres deny redis deny

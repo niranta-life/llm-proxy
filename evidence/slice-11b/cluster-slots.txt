@@ -1,0 +1,10 @@
+tenant f571ff22-d6f6-47e4-8040-5ffbc9a14ffd
+key rl:{f571ff22-d6f6-47e4-8040-5ffbc9a14ffd}:v36faceb5e7628f92
+slot 11108
+other revision key rl:{f571ff22-d6f6-47e4-8040-5ffbc9a14ffd}:v7a5116ebe02b50bf
+other revision slot 11108
+same slot true
+other tenant key rl:{dcb0b671-fb6a-4a76-9f55-9179f66403fd}:v36faceb5e7628f92
+other tenant slot 15097
+hash CRC-16/XMODEM of the hash tag, modulo 16384
+script keys: KEYS[1] only

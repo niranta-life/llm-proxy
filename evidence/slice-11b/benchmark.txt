@@ -1,0 +1,6 @@
+operation checkHotCounters
+samples 100
+min_ms 0.4
+p50_ms 0.812
+p99_ms 2.047
+max_ms 2.122

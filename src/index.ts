@@ -2,8 +2,11 @@ import { ConfigError, loadConfig, type Config } from './config.js';
 import { createPool } from './db/pools.js';
 import { latestMigrationVersion, migrate } from './db/migrate.js';
 import { buildApp } from './http/app.js';
+import { bindActiveDecide, bindRateShadow } from './inference/admission.js';
+import { createActiveDecide } from './inference/active-decide.js';
 import { startSampleCleanupWorker } from './inference/sample-jobs.js';
 import { createLogger, type Logger } from './logger.js';
+import { createRedisShadow, type RedisShadow } from './redis/shadow.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown';
@@ -15,6 +18,7 @@ async function shutdownProcess(
   drainMs: number,
   drain: () => Promise<{ aborted: number; activeAfter: number }>,
   closeServer: () => Promise<void>,
+  closeRedis: () => Promise<void>,
   closePools: () => Promise<void>,
 ): Promise<void> {
   const timer = setTimeout(() => {
@@ -33,6 +37,11 @@ async function shutdownProcess(
     await closeServer();
   } catch (error) {
     logger.error('server close failed', { message: errorMessage(error) });
+  }
+  try {
+    await closeRedis();
+  } catch {
+    logger.error('redis close failed', { message: 'unavailable' });
   }
   try {
     await closePools();
@@ -72,6 +81,14 @@ async function main(): Promise<void> {
 
   const authPool = createPool(config, 'auth', logger);
   const runtimePool = createPool(config, 'runtime', logger);
+  const redis: RedisShadow = createRedisShadow(config, logger);
+  if (config.redisShadowChecks) bindRateShadow((input) => redis.observeRates(input));
+  if (config.rateLimitMode === 'redis_active') bindActiveDecide(createActiveDecide(redis.active()));
+  try {
+    await redis.start();
+  } catch {
+    logger.error('redis shadow start failed', { error: 'unavailable' });
+  }
   const readyVersion = await latestMigrationVersion();
   const app = buildApp({
     logger,
@@ -87,6 +104,7 @@ async function main(): Promise<void> {
     keepAliveTimeoutMs: config.httpKeepAliveTimeoutMs,
     evaluationScheduleTenantIds: config.evaluationScheduleTenantIds,
     evaluationGlobalKill: config.evaluationGlobalKill,
+    redisHealth: () => redis.health(),
   });
 
   const stopSampleCleanup = startSampleCleanupWorker(runtimePool, logger);
@@ -101,6 +119,7 @@ async function main(): Promise<void> {
       config.streamShutdownDrainMs,
       () => app.drainStreams(config.streamShutdownDrainMs),
       () => app.close(),
+      () => redis.stop(),
       async () => {
         await authPool.end();
         await runtimePool.end();
@@ -115,6 +134,7 @@ async function main(): Promise<void> {
     logger.info('listening', { host: config.host, port: config.port });
   } catch (error) {
     logger.error('listen failed', { message: errorMessage(error) });
+    await redis.stop().catch(() => undefined);
     await authPool.end().catch(() => undefined);
     await runtimePool.end().catch(() => undefined);
     process.exit(1);

@@ -45,6 +45,7 @@ import {
   setTenantBudget,
   setTenantLimits,
 } from './db/admission.js';
+import { activateRateBackend, deactivateRateBackend, isRateScope } from './db/rate-epochs.js';
 import { resetDeploymentBreaker, setDeploymentBreaker } from './db/breaker.js';
 import { setDeploymentExecutionPolicy } from './db/execution-policy.js';
 import {
@@ -160,6 +161,7 @@ type Flags = {
   'concurrent-streams'?: string;
   'token-rate'?: string;
   'lease-ms'?: string;
+  scope?: string;
   'share-group'?: string;
   'monthly-amount'?: string;
   deployments?: string;
@@ -1572,6 +1574,24 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
     return;
   }
 
+  if (command === 'activate-redis-rate' || command === 'deactivate-redis-rate') {
+    const tenantId = requireTenant(values);
+    const scope = values.scope ?? '';
+    const keyId = values['key-id'] ?? '';
+    const apiKeyScope = scope === 'api_key_requests' || scope === 'api_key_tokens';
+    const scopeId = apiKeyScope ? keyId : tenantId ?? '';
+    if (tenantId === undefined || !isRateScope(scope) || (apiKeyScope && !UUID.test(keyId))) {
+      logger.error('rate arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
+    const generation = command === 'activate-redis-rate'
+      ? await activateRateBackend(pool, tenantId, scope, scopeId, new Date())
+      : await deactivateRateBackend(pool, tenantId, scope, scopeId, new Date());
+    process.stdout.write(`${JSON.stringify({ tenantId, scope, scopeId, generation })}\n`);
+    return;
+  }
+
   logger.error('unknown command');
   process.exitCode = 1;
 }
@@ -1698,6 +1718,7 @@ async function main(): Promise<void> {
         'concurrent-streams': { type: 'string' },
         'token-rate': { type: 'string' },
         'lease-ms': { type: 'string' },
+        scope: { type: 'string' },
         'share-group': { type: 'string' },
         'monthly-amount': { type: 'string' },
         deployments: { type: 'string' },
@@ -1772,6 +1793,11 @@ async function main(): Promise<void> {
       && command !== 'set-api-key-limits'
     )
     || (values['lease-ms'] !== undefined && command !== 'set-tenant-limits')
+    || (
+      values.scope !== undefined
+      && command !== 'activate-redis-rate'
+      && command !== 'deactivate-redis-rate'
+    )
     || (values['share-group'] !== undefined && command !== 'set-connection-limit')
     || (values['monthly-amount'] !== undefined && command !== 'set-tenant-budget')
     || (values['effective-at'] !== undefined && command !== 'register-price')

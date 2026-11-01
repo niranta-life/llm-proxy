@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import type { LogLevel } from './logger.js';
 
 export const OFFICIAL_OPENAI_BASE_URL = 'https://api.openai.com/v1';
@@ -34,6 +35,21 @@ export class ConfigError extends Error {
 
 export type DatabaseRole = 'migrator' | 'auth' | 'runtime';
 
+export type RateLimitMode = 'postgres' | 'redis_shadow' | 'redis_active';
+
+export type RedisSettings = {
+  url: string;
+  username: string;
+  password: string;
+  tls: boolean;
+  caFile: string | null;
+  certFile: string | null;
+  keyFile: string | null;
+  connectTimeoutMs: number;
+  reconnectTimeoutMs: number;
+  breakerCooldownMs: number;
+};
+
 export type Config = {
   host: string;
   port: number;
@@ -53,6 +69,9 @@ export type Config = {
   migrationLockTimeoutMs: number;
   migrationStatementTimeoutMs: number;
   httpKeepAliveTimeoutMs: number;
+  rateLimitMode: RateLimitMode;
+  redisShadowChecks: boolean;
+  redis: RedisSettings | null;
   database: {
     host: string;
     port: number;
@@ -261,6 +280,130 @@ function readMillisecondWindow(env: NodeJS.ProcessEnv, name: string, fallback: s
   return parsed;
 }
 
+function readRateLimitMode(env: NodeJS.ProcessEnv, errors: string[]): RateLimitMode {
+  const value = readRequired(env, 'RATE_LIMIT_STORE') ?? 'postgres';
+  if (value === 'postgres' || value === 'redis_shadow' || value === 'redis_active') return value;
+  errors.push('RATE_LIMIT_STORE must be postgres, redis_shadow, or redis_active');
+  return 'postgres';
+}
+
+function readShadowChecks(env: NodeJS.ProcessEnv, mode: RateLimitMode, errors: string[]): boolean {
+  if (mode !== 'redis_shadow') return false;
+  const value = env.REDIS_SHADOW_CHECKS;
+  if (value === undefined || value.trim() === '' || value.trim() === 'false') return false;
+  if (value.trim() === 'true') return true;
+  errors.push('REDIS_SHADOW_CHECKS must be true or false');
+  return false;
+}
+
+function readRedisTimeout(env: NodeJS.ProcessEnv, key: string, errors: string[]): number {
+  const text = readRequired(env, key) ?? '1000';
+  const label = `${key} must be an integer from 100 to 10000`;
+  if (!/^\d+$/.test(text)) {
+    errors.push(label);
+    return 1000;
+  }
+  const value = Number(text);
+  if (value < 100 || value > 10_000) {
+    errors.push(label);
+    return 1000;
+  }
+  return value;
+}
+
+function readOptionalBoolean(env: NodeJS.ProcessEnv, key: string, errors: string[]): boolean | undefined {
+  const value = env[key];
+  if (value === undefined || value.trim() === '') return undefined;
+  if (value.trim() === 'true') return true;
+  if (value.trim() === 'false') return false;
+  errors.push(`${key} must be true or false`);
+  return undefined;
+}
+
+function readTlsFile(env: NodeJS.ProcessEnv, key: string, errors: string[], required: boolean): string | null {
+  const value = readRequired(env, key);
+  if (value === undefined) {
+    if (required) errors.push(`missing ${key}`);
+    return null;
+  }
+  try {
+    if (!statSync(value).isFile()) errors.push(`${key} must be a file`);
+  } catch {
+    errors.push(`${key} must be a file`);
+  }
+  return value;
+}
+
+function readRedisSettings(env: NodeJS.ProcessEnv, errors: string[]): RedisSettings | null {
+  const urlText = readRequired(env, 'REDIS_URL');
+  if (urlText === undefined) {
+    errors.push('missing REDIS_URL');
+    return null;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(urlText);
+  } catch {
+    errors.push('REDIS_URL must be a redis or rediss URL');
+    return null;
+  }
+  if ((parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:') || parsed.hostname === '') {
+    errors.push('REDIS_URL must be a redis or rediss URL');
+    return null;
+  }
+  if (parsed.username !== '' || parsed.password !== '') {
+    errors.push('REDIS_URL must not include credentials');
+  }
+  if (parsed.search !== '') {
+    errors.push('REDIS_URL must not include a query');
+  }
+  if (parsed.pathname !== '' && parsed.pathname !== '/' && parsed.pathname !== '/0') {
+    errors.push('REDIS_URL must use database 0');
+  }
+
+  const tls = parsed.protocol === 'rediss:';
+  const tlsFlag = readOptionalBoolean(env, 'REDIS_TLS', errors);
+  if (tlsFlag !== undefined && tlsFlag !== tls) {
+    errors.push('REDIS_TLS must match REDIS_URL');
+  }
+
+  const username = readRequired(env, 'REDIS_USERNAME');
+  if (username === undefined || username === 'default' || !/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(username)) {
+    errors.push('REDIS_USERNAME must be an ACL user');
+  }
+  const password = readRequired(env, 'REDIS_PASSWORD');
+  if (password === undefined || password.length < 8 || password.length > 256 || /\s/.test(password)) {
+    errors.push('REDIS_PASSWORD must be 8 to 256 characters');
+  }
+
+  const caFile = tls ? readTlsFile(env, 'REDIS_TLS_CA_FILE', errors, true) : readTlsFile(env, 'REDIS_TLS_CA_FILE', errors, false);
+  const certFile = readTlsFile(env, 'REDIS_TLS_CERT_FILE', errors, false);
+  const keyFile = readTlsFile(env, 'REDIS_TLS_KEY_FILE', errors, false);
+  if (!tls && (caFile !== null || certFile !== null || keyFile !== null)) {
+    errors.push('REDIS_TLS files require a rediss URL');
+  }
+  if ((certFile === null) !== (keyFile === null)) {
+    errors.push('REDIS_TLS_CERT_FILE and REDIS_TLS_KEY_FILE must both be set');
+  }
+
+  const connectTimeoutMs = readRedisTimeout(env, 'REDIS_CONNECT_TIMEOUT_MS', errors);
+  const reconnectTimeoutMs = readRedisTimeout(env, 'REDIS_RECONNECT_TIMEOUT_MS', errors);
+  const breakerCooldownMs = readRedisTimeout(env, 'REDIS_BREAKER_COOLDOWN_MS', errors);
+  if (username === undefined || password === undefined) return null;
+  return {
+    url: urlText,
+    username,
+    password,
+    tls,
+    caFile,
+    certFile,
+    keyFile,
+    connectTimeoutMs,
+    reconnectTimeoutMs,
+    breakerCooldownMs,
+  };
+}
+
 function readPort(value: string, label: string, errors: string[]): number | undefined {
   if (!/^\d+$/.test(value)) {
     errors.push(`${label} must be an integer from 1 to 65535`);
@@ -313,6 +456,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const migrationLockTimeoutMs = readMillisecondWindow(env, 'MIGRATION_LOCK_TIMEOUT_MS', '60000', errors);
   const migrationStatementTimeoutMs = readMillisecondWindow(env, 'MIGRATION_STATEMENT_TIMEOUT_MS', '600000', errors);
   const httpKeepAliveTimeoutMs = readMillisecondWindow(env, 'HTTP_KEEP_ALIVE_TIMEOUT_MS', '620000', errors);
+  const rateLimitMode = readRateLimitMode(env, errors);
+  const redisShadowChecks = readShadowChecks(env, rateLimitMode, errors);
+  const redis = rateLimitMode === 'postgres' ? null : readRedisSettings(env, errors);
 
   if (errors.length > 0 || port === undefined || databasePort === undefined) {
     throw new ConfigError(errors);
@@ -352,6 +498,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     migrationLockTimeoutMs,
     migrationStatementTimeoutMs,
     httpKeepAliveTimeoutMs,
+    rateLimitMode,
+    redisShadowChecks,
+    redis,
     database: {
       host: databaseHost,
       port: databasePort,

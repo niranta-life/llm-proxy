@@ -1,0 +1,5 @@
+run 1
+GET /health/ready {"status":"ready","database":"ready"}
+GET /health/redis {"mode":"redis_shadow","redis":"connected","connectFailures":0,"reconnects":0,"pings":0,"lastError":null,"shadowChecks":"off","comparisons":0,"agreements":0,"disagreements":0,"unknownResults":0,"redisAllows":0,"redisDenies":0,"lastPostgres":null,"lastRedis":null,"lastDurationMs":null,"scriptLoads":0,"scriptMisses":0,"circuit":"off","activeAllows":0,"activeDenies":0,"fallbackDenies":0,"epochCloses":0,"lastRecoveryMs":null}
+chat 200 allowed
+postgres 200 allowed

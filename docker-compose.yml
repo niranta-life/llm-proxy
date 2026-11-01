@@ -47,6 +47,18 @@ services:
       HTTP_KEEP_ALIVE_TIMEOUT_MS: ${HTTP_KEEP_ALIVE_TIMEOUT_MS:-620000}
       MIGRATION_LOCK_TIMEOUT_MS: ${MIGRATION_LOCK_TIMEOUT_MS:-60000}
       MIGRATION_STATEMENT_TIMEOUT_MS: ${MIGRATION_STATEMENT_TIMEOUT_MS:-600000}
+      RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-postgres}
+      REDIS_SHADOW_CHECKS: ${REDIS_SHADOW_CHECKS:-}
+      REDIS_URL: ${REDIS_URL:-}
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TLS: ${REDIS_TLS:-}
+      REDIS_TLS_CA_FILE: ${REDIS_TLS_CA_FILE:-}
+      REDIS_TLS_CERT_FILE: ${REDIS_TLS_CERT_FILE:-}
+      REDIS_TLS_KEY_FILE: ${REDIS_TLS_KEY_FILE:-}
+      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-}
+      REDIS_RECONNECT_TIMEOUT_MS: ${REDIS_RECONNECT_TIMEOUT_MS:-}
+      REDIS_BREAKER_COOLDOWN_MS: ${REDIS_BREAKER_COOLDOWN_MS:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -69,6 +81,31 @@ services:
       timeout: 5s
       retries: 30
       start_period: 15s
+    networks:
+      - private
+
+  redis:
+    image: redis:7
+    profiles: ["redis"]
+    command:
+      [
+        "redis-server",
+        "--aclfile",
+        "/opt/users.acl",
+        "--port",
+        "6379",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+      ]
+    volumes:
+      - ./docker/redis/users.acl:/opt/users.acl:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "--user", "proxy", "--pass", "local_redis_shadow_pw", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     networks:
       - private
 

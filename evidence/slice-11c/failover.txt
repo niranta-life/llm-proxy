@@ -1,0 +1,4 @@
+healthy_allows 4
+failover_allows 0
+charged 4
+allocated 4

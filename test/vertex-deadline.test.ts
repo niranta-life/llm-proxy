@@ -257,6 +257,11 @@ describe('vertex deadlines on the shipped client', () => {
     return { status: response.statusCode, body: response.body, elapsedMs: Date.now() - started };
   }
 
+  async function mark(): Promise<Date> {
+    const marked = await admin.query<{ now: Date }>(`SELECT clock_timestamp() AS now`);
+    return marked.rows[0]?.now ?? new Date();
+  }
+
   async function rowsSince(since: Date): Promise<AttemptRow[]> {
     const result = await admin.query<AttemptRow>(
       `SELECT a.attempt_ordinal, a.status, a.failure_class, a.dispatched, a.expense_certainty,
@@ -274,7 +279,7 @@ describe('vertex deadlines on the shipped client', () => {
   it('accepts a body that finishes inside the attempt deadline after headers', async () => {
     setPolicy({ retries: false, connection: 800, attempt: 4000, total: 6000 });
     useReplies([{ status: 200, headerDelayMs: 30, bodyDelayMs: 1100, body: okBody() }]);
-    const since = new Date();
+    const since = await mark();
     const result = await chat('headers-then-body');
     const stored = await rowsSince(since);
     const hit = hits[0];
@@ -325,7 +330,7 @@ describe('vertex deadlines on the shipped client', () => {
   it('records a connection deadline before headers as not dispatched', async () => {
     setPolicy({ retries: false, connection: 300, attempt: 4000, total: 6000 });
     useReplies([{ status: 200, headerDelayMs: 1500, bodyDelayMs: 0, body: okBody() }]);
-    const since = new Date();
+    const since = await mark();
     const result = await chat('headers-after-connection');
     const stored = await rowsSince(since);
     const hit = hits[0];
@@ -366,7 +371,7 @@ describe('vertex deadlines on the shipped client', () => {
       { status: 429, retryAfter: '1', headerDelayMs: 0, bodyDelayMs: 0, body: errorBody(429) },
       { status: 200, headerDelayMs: 0, bodyDelayMs: 0, body: okBody() },
     ]);
-    const since = new Date();
+    const since = await mark();
     const result = await chat('vertex-429');
     const stored = await rowsSince(since);
     const gapMs = hits.length >= 2 ? hits[1]!.at - hits[0]!.at : null;
@@ -421,7 +426,7 @@ describe('vertex deadlines on the shipped client', () => {
       { status: 503, retryAfter: '1', headerDelayMs: 0, bodyDelayMs: 0, body: errorBody(503) },
       { status: 200, headerDelayMs: 0, bodyDelayMs: 0, body: okBody() },
     ]);
-    const since = new Date();
+    const since = await mark();
     const result = await chat('vertex-503');
     const stored = await rowsSince(since);
     const gapMs = hits.length >= 2 ? hits[1]!.at - hits[0]!.at : null;
@@ -458,7 +463,7 @@ describe('vertex deadlines on the shipped client', () => {
       { status: 429, retryAfter: '10', headerDelayMs: 0, bodyDelayMs: 0, body: errorBody(429) },
       { status: 200, headerDelayMs: 0, bodyDelayMs: 0, body: okBody() },
     ]);
-    const since = new Date();
+    const since = await mark();
     const result = await chat('vertex-retry-after-too-long');
     const stored = await rowsSince(since);
     console.log(

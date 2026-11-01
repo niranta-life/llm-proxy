@@ -225,11 +225,15 @@ export async function admitAttempt(
     estimate: string | null;
     estimateKind: 'bounded' | 'unbounded' | 'unknown';
     priceVersionId: string | null;
+    skipApiKeyRequests?: boolean;
+    skipTenantRequests?: boolean;
+    skipApiKeyTokens?: boolean;
+    skipTenantTokens?: boolean;
   },
 ): Promise<AdmitDecision> {
   const result = await client.query<{ decision: string; reason: string }>(
     `SELECT decision, reason
-     FROM admit_attempt($1, $2, $3, $4, $5, $6, $7, $8, $9::date, $10, $11::numeric, $12, $13)`,
+     FROM admit_attempt($1, $2, $3, $4, $5, $6, $7, $8, $9::date, $10, $11::numeric, $12, $13, $14, $15, $16, $17)`,
     [
       input.tenantId,
       input.apiKeyId,
@@ -244,6 +248,10 @@ export async function admitAttempt(
       input.estimate,
       input.estimateKind,
       input.priceVersionId,
+      input.skipApiKeyRequests === true,
+      input.skipTenantRequests === true,
+      input.skipApiKeyTokens === true,
+      input.skipTenantTokens === true,
     ],
   );
   const row = result.rows[0];

@@ -112,6 +112,7 @@ import { createRequestAdmission } from './request-admission.js';
 import { createStreamGate, drainStreams, type DrainResult, type StreamGate } from '../inference/stream.js';
 import { parseMetricsWindow } from '../inference/window.js';
 import type { Logger } from '../logger.js';
+import { disabledRedisHealth, type RedisHealth } from '../redis/shadow.js';
 
 export type AppDeps = {
   logger: Logger;
@@ -139,6 +140,7 @@ export type AppDeps = {
   keepAliveTimeoutMs?: number;
   evaluationScheduleTenantIds?: readonly string[];
   evaluationGlobalKill?: boolean;
+  redisHealth?: () => RedisHealth;
   scheduleNow?: () => Date;
   rankDeadlineMs?: number;
   abortAfterDispatch?: () => boolean;
@@ -271,6 +273,8 @@ export function buildApp(deps: AppDeps): ProxyApp {
   }
 
   app.get('/health/live', async () => ({ status: 'live' }));
+
+  app.get('/health/redis', async () => deps.redisHealth?.() ?? disabledRedisHealth());
 
   app.get('/health/ready', async (_request, reply) => {
     try {

@@ -196,7 +196,8 @@ describe('provider load, failure, and shutdown', () => {
       idleTimeoutMs: 15_000,
       totalTimeoutMs: 15_000,
     });
-    const started = new Date();
+    const marked = await admin.query<{ now: Date }>(`SELECT clock_timestamp() AS now`);
+    const started = marked.rows[0]?.now ?? new Date();
     const finish = openPost(
       port,
       shutdownTenant.tenantId,

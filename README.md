@@ -4,7 +4,7 @@
 
 `llm-proxy` sits between your client applications and upstream foundation models. It centralizes API keys, enforces tenant isolation directly in PostgreSQL, tracks exact spend with immutable ledgers, and guarantees that requests never switch models behind your back.
 
-Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
+Runs as a single lightweight Node.js container. PostgreSQL 16 is required. Redis 7 is optional and stays off until you enable it.
 
 ---
 
@@ -26,7 +26,7 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 - **MCP catalog:** A tenant registers an approved MCP server and discovers its tools. The credential is a protected reference. The catalog page shows the tools, the permission, the connection health, and execution history. Discovery does not call a tool. A separate route calls one approved tool. A write waits for approval. See [MCP catalog](docs/mcp.md).
 - **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. A stream returns each tool-call delta with its index, id, and function name. The application executes the function. The proxy does not execute the function. The proxy does not execute a partial argument fragment. A live DGX host does not receive function tools. A loopback DGX mock can stream the same tool call. See [Function tools](docs/function-tools.md), [Cross-provider tool calls](docs/cross-provider-tools.md), and [Tool call results](docs/tool-calls.md).
 - **Multi-Provider Adapters:** Native adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and private self-hosted endpoints (e.g., NVIDIA DGX).
-- **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets.
+- **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets. Optional Redis can compare those rates, or admit one approved hard rate. See [Optional Redis](docs/redis.md).
 - **Resilience Controls:** Configurable request deadlines, circuit breakers, and retry policies before any stream output begins.
 - **Continuous Learning & Cost Optimization:** Offline evaluation replays, deterministic checks, evidence qualification, shadow ranking, canary rollouts, and cost-based selection for the `auto` alias.
 
@@ -37,6 +37,7 @@ flowchart LR
     A["Apps / Agents<br/>(OpenAI SDK)"] -->|"HTTPS 443"| N["Nginx"]
     N -->|"HTTP private"| B["llm-proxy<br/>(Node.js + RLS)"]
     B --> C[("PostgreSQL 16<br/>(Ledger, Limits, Keys)")]
+    B -->|"optional"| R[("Redis 7<br/>(Rate counters)")]
     B --> D["OpenAI"]
     B --> E["Anthropic"]
     B --> F["xAI / Grok"]
@@ -45,7 +46,7 @@ flowchart LR
 ```
 
 1. **Authentication:** Checks caller `X-Tenant-ID` and Bearer token against a scrypt verifier, establishing PostgreSQL RLS session context.
-2. **Admission & Limits:** Validates tenant budget, rate limits (RPM/TPM), and concurrency ceilings before allocating a token lease.
+2. **Admission & Limits:** Validates tenant budget, rate limits (RPM/TPM), and concurrency ceilings before allocating a token lease. PostgreSQL records the budget and the leases. Optional Redis can compare a rate, or admit one approved hard rate. See [Optional Redis](docs/redis.md).
 3. **Model Resolution:** Named models route directly to the designated deployment. The `auto` alias evaluates active canary rollouts or governed cost-optimal routing policies. An embedding request uses the named deployment and does not use `auto`.
 4. **Adapter Execution:** Normalizes the request into the upstream provider format. Chat returns an OpenAI completion or SSE chunks. An embedding request returns one float vector per text input.
 5. **Cost & Telemetry Settlement:** Computes token counts and prices, settles budget reservations, and records sanitized telemetry into the database.
@@ -109,6 +110,7 @@ Explore technical documentation organized by intent:
 - **[Provider Adapters](docs/providers.md)** – Supported providers (OpenAI, Anthropic, xAI, Vertex, DGX), capability maps, and manual registration via `--api-key-stdin`.
 - **[Streaming](docs/streaming.md)** – Server-Sent Events architecture, tool-call deltas, streaming leases, and concurrency caps.
 - **[Limits and Budgets](docs/limits.md)** – Rate limits (RPM/TPM), concurrency ceilings, and monthly spend controls.
+- **[Optional Redis](docs/redis.md)** – Enable a Redis 7 rate counter, approve one hard rate, and roll back to PostgreSQL.
 - **[Cost Tracking](docs/cost.md)** – Transparent price registration, provisional states, and immutable accounting ledgers.
 - **[Circuit Breaker](docs/breaker.md)** – Per-deployment failure tracking and automated 503 fast rejection.
 - **[Retry Policies](docs/retry.md)** – Bounded retry attempts with deadlines before response delivery.
@@ -136,7 +138,6 @@ Explore technical documentation organized by intent:
 ## Roadmap
 
 - **Automatic Optimizer:** Governed selection is shipped; fully automated unattended promotion stays off by default.
-- **Redis Cache Layer:** In-memory caching for hot rate counters (PostgreSQL currently handles evaluation & state).
 - **External Secret Managers:** Native integrations with AWS Secrets Manager, GCP Secret Manager, and HashiCorp Vault.
 - **Hardware-Validated Private DGX Endpoints:** Official verification suite for on-premise NVIDIA DGX clusters.
 

@@ -1,5 +1,8 @@
 import type { Pool, PoolClient } from 'pg';
 import { admitAttempt, closeAttemptAdmission, loadAdmissionPrices, loadDeploymentServiceTier } from '../db/admission.js';
+import type { RateLimitSnapshot, RateShadowInput } from '../redis/hot-counters.js';
+import type { ActiveDecision } from './active-decide.js';
+import { createRateLimitStore } from './rate-limit-store.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { Logger } from '../logger.js';
 import { addDecimal, canonicalDecimal, maxDecimal, multiplyDecimal, selectPrice, type PriceCandidate } from './cost.js';
@@ -21,6 +24,7 @@ const ADMISSION_MESSAGES: Record<string, string> = {
   budget_exceeded: 'The budget limit was reached.',
   budget_unbounded: 'The cost is unbounded.',
   budget_unknown: 'The cost is unknown.',
+  rate_backend_uncertain: 'The rate backend is uncertain.',
 };
 
 export function isAdmissionCode(code: string | null): boolean {
@@ -31,6 +35,9 @@ export function admissionError(reason: string): ProxyError {
   const message = ADMISSION_MESSAGES[reason];
   if (message === undefined) {
     return proxyError(503, 'server_error', 'admission_unavailable', null, 'Admission is unavailable.');
+  }
+  if (reason === 'rate_backend_uncertain') {
+    return proxyError(503, 'server_error', reason, null, message);
   }
   return proxyError(429, 'rate_limit_error', reason, null, message);
 }
@@ -126,6 +133,38 @@ async function quoteAttempt(
   return estimateCharge(selected, inputBound(input.request), outputBound(input.request, input.route));
 }
 
+const rateLimitStore = createRateLimitStore();
+let rateShadow: ((input: RateShadowInput) => Promise<void>) | null = null;
+let activeDecide: ((
+  pool: Pool,
+  input: {
+    tenantId: string;
+    apiKeyId: string;
+    attemptId: string;
+    tokenCost: number | null;
+    now: Date;
+  },
+) => Promise<ActiveDecision>) | null = null;
+
+export function bindRateShadow(observer: ((input: RateShadowInput) => Promise<void>) | null): void {
+  rateShadow = observer;
+}
+
+export function bindActiveDecide(
+  decide: ((
+    pool: Pool,
+    input: {
+      tenantId: string;
+      apiKeyId: string;
+      attemptId: string;
+      tokenCost: number | null;
+      now: Date;
+    },
+  ) => Promise<ActiveDecision>) | null,
+): void {
+  activeDecide = decide;
+}
+
 export async function admitChatAttempt(
   pool: Pool,
   input: {
@@ -138,10 +177,32 @@ export async function admitChatAttempt(
     now: Date;
   },
 ): Promise<void> {
+  const observer = rateShadow;
+  const decide = activeDecide;
+  let shadowInput: RateShadowInput | null = null;
   try {
+    const bound = tokenBound(input.request, input.route);
+    let skips = {
+      apiKeyRequests: false,
+      tenantRequests: false,
+      apiKeyTokens: false,
+      tenantTokens: false,
+    };
+    if (decide !== null) {
+      const active = await decide(pool, {
+        tenantId: input.tenantId,
+        apiKeyId: input.apiKeyId,
+        attemptId: input.attemptId,
+        tokenCost: bound,
+        now: input.now,
+      });
+      if (active.kind === 'deny') throw admissionError(active.reason);
+      if (active.kind === 'redis') skips = active.skips;
+    }
     await withTenant(pool, input.tenantId, async (client) => {
       const quote = await quoteAttempt(client, input);
-      const decision = await admitAttempt(client, {
+      const limits = observer === null ? null : await loadOperationalRateLimits(client, input.tenantId, input.apiKeyId);
+      const decision = await rateLimitStore.admit(client, {
         tenantId: input.tenantId,
         apiKeyId: input.apiKeyId,
         connectionId: input.route.connectionId,
@@ -151,17 +212,81 @@ export async function admitChatAttempt(
         now: input.now,
         windowStart: windowStart(input.now.getTime()),
         periodStart: periodStart(input.now.getTime()),
-        tokenBound: tokenBound(input.request, input.route),
+        tokenBound: bound,
         estimate: quote.amount,
         estimateKind: quote.kind,
         priceVersionId: quote.priceVersionId,
+        skipApiKeyRequests: skips.apiKeyRequests,
+        skipTenantRequests: skips.tenantRequests,
+        skipApiKeyTokens: skips.apiKeyTokens,
+        skipTenantTokens: skips.tenantTokens,
       });
+      if (observer !== null && limits !== null) {
+        shadowInput = {
+          tenantId: input.tenantId,
+          apiKeyId: input.apiKeyId,
+          attemptId: input.attemptId,
+          tokenCost: bound,
+          postgresDecision: decision.decision === 'allow' ? 'allow' : 'deny',
+          limits,
+        };
+      }
       if (decision.decision !== 'allow') throw admissionError(decision.reason);
     });
   } catch (error) {
+    if (shadowInput !== null && observer !== null) {
+      await observer(shadowInput).catch(() => undefined);
+    }
     if (error instanceof ProxyError) throw error;
     throw admissionError('admission_unavailable');
   }
+  if (shadowInput !== null && observer !== null) {
+    await observer(shadowInput).catch(() => undefined);
+  }
+}
+
+function limitNumber(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value);
+  if (!/^\d+$/.test(text)) return null;
+  const parsed = Number(text);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return null;
+  return parsed;
+}
+
+async function loadOperationalRateLimits(
+  client: PoolClient,
+  tenantId: string,
+  apiKeyId: string,
+): Promise<RateLimitSnapshot> {
+  const tenant = await client.query<{
+    mode: string;
+    requests_per_minute: number | null;
+    token_rate_per_minute: string | null;
+  }>(
+    `SELECT mode, requests_per_minute, token_rate_per_minute::text AS token_rate_per_minute
+     FROM tenant_limit_policies WHERE tenant_id = $1`,
+    [tenantId],
+  );
+  const key = await client.query<{
+    mode: string | null;
+    requests_per_minute: number | null;
+    token_rate_per_minute: string | null;
+  }>(
+    `SELECT mode, requests_per_minute, token_rate_per_minute::text AS token_rate_per_minute
+     FROM api_key_limit_policies WHERE tenant_id = $1 AND api_key_id = $2`,
+    [tenantId, apiKeyId],
+  );
+  const tenantRow = tenant.rows[0];
+  const keyRow = key.rows[0];
+  return {
+    tenantMode: tenantRow?.mode ?? null,
+    tenantRequestsPerMinute: limitNumber(tenantRow?.requests_per_minute),
+    tenantTokensPerMinute: limitNumber(tenantRow?.token_rate_per_minute),
+    apiKeyMode: keyRow?.mode ?? null,
+    apiKeyRequestsPerMinute: limitNumber(keyRow?.requests_per_minute),
+    apiKeyTokensPerMinute: limitNumber(keyRow?.token_rate_per_minute),
+  };
 }
 
 export async function admitEmbeddingAttempt(

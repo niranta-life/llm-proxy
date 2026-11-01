@@ -1,0 +1,47 @@
+default config services:
+postgres
+app
+ingress
+
+redis profile services:
+postgres
+app
+ingress
+redis
+
+redis service:
+  redis:
+    profiles:
+      - redis
+    command:
+      - redis-server
+      - --aclfile
+      - /opt/users.acl
+      - --port
+      - "6379"
+      - --save
+      - ""
+      - --appendonly
+      - 'no'
+    image: redis:7
+    networks:
+      private: null
+    volumes:
+      - type: bind
+        source: /Users/nitin/.t3/worktrees/llm-proxy/feat-slice-11a-redis-shadow/docker/redis/users.acl
+        target: /opt/users.acl
+        read_only: true
+        bind: {}
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - --user
+        - proxy
+        - --pass
+        - local_redis_shadow_pw
+        - ping
+      timeout: 5s
+      interval: 2s
+      retries: 30
+networks:

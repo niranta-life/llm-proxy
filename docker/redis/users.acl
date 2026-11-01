@@ -1,0 +1,2 @@
+user default off
+user proxy on resetpass >local_redis_shadow_pw resetkeys ~rl:* resetchannels -@all +ping +auth +quit +eval +evalsha +script|load +time +hget +hset +hsetnx +hdel +hgetall +hlen +expire

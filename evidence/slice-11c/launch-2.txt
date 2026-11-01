@@ -1,0 +1,8 @@
+boot 2
+http 200
+code ok
+mode redis_active
+circuit closed
+redis connected
+active_allows 1
+reservations 2

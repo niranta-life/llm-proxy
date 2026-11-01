@@ -1,0 +1,15 @@
+The default Compose config does not start Redis.
+
+The profile redis starts one Redis 7 service on the private network.
+
+The service became healthy.
+
+redis-cli ping as user proxy returned PONG.
+
+redis-cli set as user proxy returned NOPERM.
+
+redis-cli acl whoami as user proxy returned NOPERM.
+
+The service was then stopped and removed.
+
+The app service and the postgres service were not recreated.

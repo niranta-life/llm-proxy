@@ -1,0 +1,8 @@
+{
+  "launched": true,
+  "pending": "page/write_noteallowedpendingawaiting_approval",
+  "approved": "page/write_noteallowedgrantedsucceeded0",
+  "history": "page/write_noteallowedgrantedsucceeded0",
+  "latencyPresent": true,
+  "secretInTable": false
+}

@@ -21,6 +21,7 @@ export type McpServerRow = {
   cacheScope: 'public' | 'private' | null;
   catalogVersion: number;
   cacheAgeMs: number | null;
+  credentialState: 'active' | 'revoked';
 };
 
 export type McpToolRow = {
@@ -39,6 +40,7 @@ export type McpToolRow = {
   cacheAgeMs: number | null;
   ttlMs: number | null;
   cacheScope: 'public' | 'private' | null;
+  effect: 'read' | 'write' | null;
 };
 
 type ServerSql = {
@@ -57,12 +59,13 @@ type ServerSql = {
   ttl_ms: number | null;
   cache_scope: 'public' | 'private' | null;
   catalog_version: number;
+  credential_state: 'active' | 'revoked';
 };
 
 const SERVER_COLUMNS = `
   id, server_key, display_name, endpoint, protocol_mode, protocol_version,
   connection_status, enabled, last_checked_at, last_error, catalog_fingerprint,
-  catalog_cached_at, ttl_ms, cache_scope, catalog_version
+  catalog_cached_at, ttl_ms, cache_scope, catalog_version, credential_state
 `;
 
 function cacheAge(cachedAt: Date | null, now: number): number | null {
@@ -88,6 +91,7 @@ function toServer(row: ServerSql, now: number): McpServerRow {
     cacheScope: row.cache_scope,
     catalogVersion: row.catalog_version,
     cacheAgeMs: cacheAge(row.catalog_cached_at, now),
+    credentialState: row.credential_state,
   };
 }
 
@@ -288,6 +292,7 @@ type ToolSql = {
   ttl_ms: number | null;
   cache_scope: 'public' | 'private' | null;
   enabled: boolean;
+  effect: 'read' | 'write' | null;
 };
 
 function toTool(row: ToolSql, now: number): McpToolRow {
@@ -307,6 +312,7 @@ function toTool(row: ToolSql, now: number): McpToolRow {
     cacheAgeMs: cacheAge(row.catalog_cached_at, now),
     ttlMs: row.ttl_ms,
     cacheScope: row.cache_scope,
+    effect: row.effect,
   };
 }
 
@@ -315,7 +321,7 @@ const TOOL_SQL = `
          definition.namespaced_name, definition.description, definition.input_schema,
          definition.output_schema, definition.catalog_version, permission.allowed,
          server.protocol_version, server.catalog_fingerprint, server.catalog_cached_at,
-         server.ttl_ms, server.cache_scope, server.enabled
+         server.ttl_ms, server.cache_scope, server.enabled, permission.effect
   FROM mcp_tool_definitions AS definition
   JOIN mcp_servers AS server
     ON server.tenant_id = definition.tenant_id

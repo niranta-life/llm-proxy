@@ -2,6 +2,9 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Pool, PoolClient } from 'pg';
 import type { ProviderCredentialStore } from '../credentials.js';
+import type { SampleKeyManager } from '../inference/sample-crypto.js';
+import { classifyMcpTool } from './execution-store.js';
+import { registerExecutionRoutes } from './execution-http.js';
 import { withTenant } from '../db/tenant-context.js';
 import { ProxyError, proxyError } from '../inference/errors.js';
 import { redact } from '../redact.js';
@@ -36,15 +39,19 @@ export type McpRouteDeps = {
   logger: Logger;
   runtimePool: Pool;
   credentialStore: ProviderCredentialStore | null;
+  sampleKeyManager: SampleKeyManager | null;
   now?: () => number;
   fetchImpl?: typeof fetch;
+  abortAfterDispatch?: () => boolean;
   authenticate: (headers: IncomingHttpHeaders) => Promise<Auth | null>;
 };
 
 function statusFor(kind: McpFailureKind): number {
   if (kind === 'redirect') return 502;
   if (kind === 'unavailable') return 503;
-  if (kind === 'mismatch') return 409;
+  if (kind === 'mismatch' || kind === 'conflict') return 409;
+  if (kind === 'limit') return 429;
+  if (kind === 'not_found') return 404;
   return 400;
 }
 
@@ -248,9 +255,17 @@ export function registerMcpRoutes(app: FastifyInstance, deps: McpRouteDeps): voi
       const serverId = parseServerId(request.body.serverId);
       const remoteName = assertRemoteName(requireString(request.body, 'remoteName'));
       const allowed = request.body.allowed;
-      await withTenant(deps.runtimePool, auth.tenantId, (client) =>
-        setMcpToolPermission(client, auth.tenantId, serverId, remoteName, allowed),
-      );
+      const effect = request.body.effect;
+      if (effect !== undefined) {
+        if (effect !== 'read' && effect !== 'write') throw new McpFailure('invalid', 'The request is invalid.');
+        await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          classifyMcpTool(client, auth.tenantId, serverId, remoteName, allowed, effect),
+        );
+      } else {
+        await withTenant(deps.runtimePool, auth.tenantId, (client) =>
+          setMcpToolPermission(client, auth.tenantId, serverId, remoteName, allowed),
+        );
+      }
       const tools = await withTenant(deps.runtimePool, auth.tenantId, (client) => listServerTools(client, serverId, clock(deps)));
       return { tools };
     } catch (error) {
@@ -335,6 +350,8 @@ export function registerMcpRoutes(app: FastifyInstance, deps: McpRouteDeps): voi
       return sendFailure(reply, error, deps.logger);
     }
   });
+
+  registerExecutionRoutes(app, deps);
 }
 
 function healthBody(server: McpServerRow): Record<string, unknown> {

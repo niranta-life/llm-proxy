@@ -26,7 +26,7 @@ export function mcpAdminPage(): string {
 <body>
 <main>
   <h1>MCP catalog</h1>
-  <p>Register an approved server, test the connection, and discover tools. This page does not call a tool.</p>
+  <p>Register an approved server, test the connection, and discover tools. This page does not call a tool. An approved execution calls one approved tool.</p>
   <p id="status" role="status"></p>
   <form id="session-form">
     <label for="tenant-id">Tenant id</label>
@@ -69,19 +69,46 @@ export function mcpAdminPage(): string {
   </section>
   <section>
     <h2>Tools</h2>
+    <label for="tool-effect">Effect</label>
+    <select id="tool-effect" name="toolEffect">
+      <option value="">Unspecified</option>
+      <option value="read">Read</option>
+      <option value="write">Write</option>
+    </select>
     <div class="row">
       <button type="button" id="allow-tool">Allow tool</button>
       <button type="button" id="deny-tool" class="secondary">Deny tool</button>
       <button type="button" id="refresh-catalog" class="secondary">Refresh catalog</button>
     </div>
     <table>
-      <thead><tr><th></th><th>Namespaced name</th><th>Allowed</th><th>Version</th></tr></thead>
+      <thead><tr><th></th><th>Namespaced name</th><th>Allowed</th><th>Effect</th><th>Version</th></tr></thead>
       <tbody id="tool-rows"></tbody>
     </table>
     <h2>Exposed catalog</h2>
     <table>
       <thead><tr><th>Namespaced name</th><th>Protocol</th><th>Fingerprint</th><th>Cache age</th></tr></thead>
       <tbody id="catalog-rows"></tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Executions</h2>
+    <p>A read runs after the checks. A write waits for approval. Denial and cancellation do not call the tool.</p>
+    <label for="execution-request">Request id</label>
+    <input id="execution-request" name="requestId" autocomplete="off">
+    <label for="execution-call">Tool call id</label>
+    <input id="execution-call" name="toolCallId" autocomplete="off">
+    <label for="execution-arguments">Arguments</label>
+    <input id="execution-arguments" name="arguments" autocomplete="off" value="{&quot;note&quot;:&quot;alpha&quot;}">
+    <div class="row">
+      <button type="button" id="run-tool">Run tool</button>
+      <button type="button" id="approve-execution">Approve</button>
+      <button type="button" id="deny-execution" class="secondary">Deny</button>
+      <button type="button" id="cancel-execution" class="secondary">Cancel</button>
+      <button type="button" id="refresh-executions" class="secondary">Refresh executions</button>
+    </div>
+    <table>
+      <thead><tr><th></th><th>Tool</th><th>Permission</th><th>Approval</th><th>Status</th><th>Latency</th><th>Failure</th></tr></thead>
+      <tbody id="execution-rows"></tbody>
     </table>
   </section>
 </main>
@@ -91,6 +118,9 @@ export function mcpAdminPage(): string {
   let apiKey = '';
   let selectedServer = '';
   let selectedTool = '';
+  let selectedExecution = '';
+  let executionIdentity = '';
+  let knownTools = [];
 
   function say(text) {
     status.textContent = text;
@@ -139,6 +169,7 @@ export function mcpAdminPage(): string {
   }
 
   function fillTools(tools) {
+    knownTools = tools;
     const body = document.querySelector('#tool-rows');
     body.replaceChildren();
     for (const tool of tools) {
@@ -149,9 +180,34 @@ export function mcpAdminPage(): string {
       input.name = 'tool';
       input.value = tool.remoteName;
       input.addEventListener('change', () => { selectedTool = tool.remoteName; });
+      if (tool.remoteName === selectedTool) input.checked = true;
       pick.append(input);
       row.append(pick);
-      for (const value of [tool.namespacedName, String(tool.allowed), String(tool.catalogVersion)]) {
+      for (const value of [tool.namespacedName, String(tool.allowed), tool.effect || '', String(tool.catalogVersion)]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      body.append(row);
+    }
+  }
+
+  function fillExecutions(executions) {
+    const body = document.querySelector('#execution-rows');
+    body.replaceChildren();
+    for (const execution of executions) {
+      const row = document.createElement('tr');
+      const pick = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'execution';
+      input.value = execution.id;
+      input.addEventListener('change', () => { selectedExecution = execution.id; });
+      if (execution.id === selectedExecution) input.checked = true;
+      pick.append(input);
+      row.append(pick);
+      const latency = execution.latencyMs === null || execution.latencyMs === undefined ? '' : String(execution.latencyMs);
+      for (const value of [execution.namespacedName, execution.permission, execution.approval, execution.status, latency, execution.errorMessage || '']) {
         const cell = document.createElement('td');
         cell.textContent = value;
         row.append(cell);
@@ -183,6 +239,8 @@ export function mcpAdminPage(): string {
       const tools = await call('GET', '/internal/v1/mcp/servers/' + selectedServer + '/tools');
       fillTools(tools.tools);
     }
+    const executions = await call('GET', '/internal/v1/mcp/executions');
+    fillExecutions(executions.executions);
   }
 
   document.querySelector('#session-form').addEventListener('submit', (event) => {
@@ -264,7 +322,10 @@ export function mcpAdminPage(): string {
   document.querySelector('#allow-tool').addEventListener('click', async () => {
     try {
       const remoteName = selectedRadio('tool') || selectedTool;
-      await call('POST', '/internal/v1/mcp/permissions', { serverId: selectedRadio('server') || selectedServer, remoteName, allowed: true });
+      const effect = document.querySelector('#tool-effect').value;
+      const body = { serverId: selectedRadio('server') || selectedServer, remoteName, allowed: true };
+      if (effect === 'read' || effect === 'write') body.effect = effect;
+      await call('POST', '/internal/v1/mcp/permissions', body);
       await refreshAll();
       say('The tool is allowed.');
     } catch (error) { say(error.message); }
@@ -281,6 +342,54 @@ export function mcpAdminPage(): string {
 
   document.querySelector('#refresh-catalog').addEventListener('click', async () => {
     try { await refreshAll(); say('The catalog is current.'); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#run-tool').addEventListener('click', async () => {
+    try {
+      const remoteName = selectedRadio('tool') || selectedTool;
+      const tool = knownTools.find((item) => item.remoteName === remoteName);
+      if (!tool) { say('Select a tool.'); return; }
+      let args = null;
+      try { args = JSON.parse(document.querySelector('#execution-arguments').value); } catch { say('The arguments are invalid.'); return; }
+      const payload = await call('POST', '/internal/v1/mcp/executions', {
+        serverId: selectedRadio('server') || selectedServer,
+        remoteName,
+        schemaVersion: tool.catalogVersion,
+        requestId: document.querySelector('#execution-request').value.trim(),
+        toolCallId: document.querySelector('#execution-call').value.trim(),
+        arguments: args
+      });
+      if (payload.executionIdentity) executionIdentity = payload.executionIdentity;
+      selectedExecution = payload.execution.id;
+      await refreshAll();
+      say('Execution ' + payload.execution.status + '.');
+    } catch (error) { say(error.message); }
+  });
+
+  async function decide(decision) {
+    selectedExecution = selectedRadio('execution') || selectedExecution;
+    if (!selectedExecution) { say('Select an execution.'); return; }
+    if (!executionIdentity) { say('The execution identity is invalid.'); return; }
+    const payload = await call('POST', '/internal/v1/mcp/executions/' + selectedExecution + '/approval', { decision, executionIdentity });
+    selectedExecution = payload.execution.id;
+    await refreshAll();
+    say('Execution ' + payload.execution.status + '.');
+  }
+
+  document.querySelector('#approve-execution').addEventListener('click', async () => {
+    try { await decide('grant'); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#deny-execution').addEventListener('click', async () => {
+    try { await decide('deny'); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#cancel-execution').addEventListener('click', async () => {
+    try { await decide('cancel'); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#refresh-executions').addEventListener('click', async () => {
+    try { await refreshAll(); say('The execution list is current.'); } catch (error) { say(error.message); }
   });
 </script>
 </body>

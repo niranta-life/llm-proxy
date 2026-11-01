@@ -126,6 +126,50 @@ A protocol mismatch does not switch to SSE, stdio, or an older handshake.
 
 The proxy does not call a discovered tool.
 
+## MCP execution
+
+A separate route executes one approved tool on a registered server.
+
+The caller is an authenticated tenant.
+
+The tool and the schema version must be approved.
+
+The arguments must be a complete JSON object.
+
+A read tool runs after those checks.
+
+A write tool waits for explicit approval.
+
+Denial and cancellation do not call the tool.
+
+A non-idempotent call is dispatched once.
+
+A timeout or a worker stop after dispatch records an uncertain outcome.
+
+The proxy does not retry that call.
+
+The result returns to the caller.
+
+The caller can submit that result when the run mode is continue and the policy allows one follow-up.
+
+That submit records one model request.
+
+It does not call a provider.
+
+The proxy does not send another model request unless that run mode is on.
+
+Retained arguments and results are encrypted.
+
+The runtime role does not read that ciphertext.
+
+The proxy does not execute an arbitrary function.
+
+The proxy does not execute a chat function tool.
+
+Discovery still does not call a tool.
+
+The catalog page shows the call, the permission, the approval, the failure, the latency, and the history.
+
 The proxy does not launch a local executable.
 
 A redirect is refused.

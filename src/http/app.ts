@@ -141,6 +141,7 @@ export type AppDeps = {
   evaluationGlobalKill?: boolean;
   scheduleNow?: () => Date;
   rankDeadlineMs?: number;
+  abortAfterDispatch?: () => boolean;
 };
 
 export type ProxyApp = FastifyInstance & {
@@ -1630,8 +1631,10 @@ export function buildApp(deps: AppDeps): ProxyApp {
     logger: deps.logger,
     runtimePool: deps.runtimePool,
     credentialStore,
+    sampleKeyManager,
     now: deps.now,
     fetchImpl: deps.compatibleFetch,
+    abortAfterDispatch: deps.abortAfterDispatch,
     authenticate: (headers) => authenticate(deps.authPool, headers),
   });
 

@@ -2,9 +2,9 @@
 
 Back to [README](../README.md)
 
-A tenant registers an approved MCP server, discovers its tools, and reads an authorized catalog. The proxy does not call a discovered tool. This catalog is separate from [function tools](function-tools.md) on a chat.
+A tenant registers an approved MCP server, discovers its tools, and reads an authorized catalog. Discovery does not call a tool. A separate execution route calls one approved tool. This catalog is separate from [function tools](function-tools.md) on a chat. The proxy does not execute a chat function.
 
-The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool.
+The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool. An approved execution calls one approved tool. The page shows the call, the permission, the approval, the failure, the latency, and the history.
 
 ## Where it fits
 
@@ -80,11 +80,35 @@ A later discovery writes a new version only when the fingerprint changes. An unc
 
 `GET /internal/v1/mcp/servers` lists the caller's servers. The list has no credential.
 
+## Governed execution
+
+`POST /internal/v1/mcp/executions` calls one approved tool. The body names `serverId`, `remoteName`, `schemaVersion`, `requestId`, `toolCallId`, and `arguments`.
+
+The server must be enabled, modern, protocol `2026-07-28`, and connected. The credential must be active. The tool must be allowed. `schemaVersion` must be the stored catalog version. The arguments must match the stored object schema.
+
+`POST /internal/v1/mcp/permissions` can set `effect` to `read` or `write`. A read runs after the checks. A write returns HTTP 202 and waits for approval. Write approval stays required.
+
+`POST /internal/v1/mcp/executions/{id}/approval` accepts `grant`, `deny`, or `cancel` with the execution identity. Denial and cancellation do not call the tool. A grant calls the tool once. A second grant does not call it again.
+
+A duplicate request with the same `requestId` and `toolCallId` returns the stored row. It does not call the tool again. A different argument or tool on that pair is rejected.
+
+`GET /internal/v1/mcp/policy` reads the limits. `POST /internal/v1/mcp/policy` stores concurrency, timeout, cost, loop depth, identity lifetime, and whether a follow-up is allowed. The follow-up stays off until that policy is on.
+
+A timeout or a stop after dispatch stores an uncertain outcome. `POST /internal/v1/mcp/executions/recover` marks a stale dispatch uncertain. The proxy does not retry that call.
+
+`POST /internal/v1/mcp/executions/{id}/submit` accepts the result for the caller. `runMode` must be `continue` and the policy must allow one follow-up. The route records one model request. It does not call a provider. Without that mode, no model request is recorded.
+
+`POST /internal/v1/mcp/servers/{id}/revoke` revokes the server credential. A later call is refused. The response does not contain the credential.
+
+Retained arguments and results are encrypted. The history does not return the credential, the execution identity, or the ciphertext. The runtime role does not read the ciphertext.
+
+A tool description is stored text. It does not add a call. The dispatched name is the approved remote name.
+
 ## What discovery does not do
 
 Discovery does not send `tools/call`. A connection test does not send `tools/call`.
 
-The proxy does not execute a discovered tool. The proxy does not put a discovered tool on a chat request.
+The proxy does not execute a discovered tool that is not approved. The proxy does not put a discovered tool on a chat request. The proxy does not execute an arbitrary function.
 
 ## Related
 

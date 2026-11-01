@@ -1,0 +1,44 @@
+{
+  "unapprovedRead": {
+    "statusCode": 400,
+    "toolCalls": 0
+  },
+  "promptInjection": {
+    "descriptionStored": true,
+    "extraWriteCalls": 0,
+    "dispatchedName": "read_note"
+  },
+  "schema": {
+    "statusCode": 400
+  },
+  "schemaVersion": {
+    "statusCode": 409
+  },
+  "unknownTool": {
+    "statusCode": 404,
+    "toolCalls": 0
+  },
+  "replayedIdentity": {
+    "statusCode": 409,
+    "dispatchCount": 1,
+    "secondCall": false
+  },
+  "writeDenied": {
+    "statusCode": 200,
+    "laterGrantCalls": 0
+  },
+  "unauthorizedTenant": {
+    "statusCode": 404,
+    "toolCalls": 0
+  },
+  "limits": {
+    "loop": 429,
+    "cost": 429,
+    "concurrency": 429
+  },
+  "revokedCredential": {
+    "grantStatus": 400,
+    "freshStatus": 400,
+    "toolCalls": 0
+  }
+}

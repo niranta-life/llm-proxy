@@ -1,0 +1,20 @@
+{
+  "read": {
+    "status": "succeeded",
+    "namespacedName": "lab/read_note",
+    "schemaVersion": 1,
+    "latencyMs": 0,
+    "dispatchCount": 1,
+    "modelRequests": 0,
+    "resultText": "synthetic result",
+    "isError": false
+  },
+  "awaitingExecutionId": "3224a102-fdfe-42c8-b05f-6ea9da0a646b",
+  "grantedResult": "synthetic write",
+  "serverError": {
+    "code": -32000,
+    "message": "The synthetic tool failed.",
+    "dispatchCount": 1,
+    "retried": false
+  }
+}

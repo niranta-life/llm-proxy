@@ -1,0 +1,13 @@
+{
+  "timeout": {
+    "status": "uncertain",
+    "dispatchCount": 1,
+    "retried": false
+  },
+  "crash": {
+    "httpStatus": 500,
+    "recoveredStatus": "uncertain",
+    "retried": false,
+    "recovered": 1
+  }
+}

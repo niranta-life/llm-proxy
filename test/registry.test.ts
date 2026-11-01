@@ -107,6 +107,7 @@ describe('provider registry', () => {
       '035_cross_provider_tools.sql',
       '036_embeddings.sql',
       '037_mcp_catalog.sql',
+      '038_mcp_execution.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));

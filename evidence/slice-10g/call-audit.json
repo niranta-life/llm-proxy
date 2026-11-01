@@ -1,0 +1,16 @@
+{
+  "discoveryToolCalls": 0,
+  "schemaVersion": 1,
+  "approvedReadCalls": 1,
+  "duplicate": {
+    "replayed": true,
+    "secondDispatch": false,
+    "mismatchStatus": 409
+  },
+  "writeCalls": 1,
+  "grantedWrites": 1,
+  "modelRequests": 1,
+  "providerCall": false,
+  "evidencePlaintext": false,
+  "runtimeEvidenceDenied": true
+}

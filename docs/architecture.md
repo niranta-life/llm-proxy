@@ -24,7 +24,7 @@ This page maps the [high-level architecture](../README.md#how-does-it-work) to t
 | Evaluation | Stores a bounded run of approved samples against one challenger. A dry run changes item state and does not call a model. A replay calls that pinned deployment through the adapter. An approved profile runs deterministic checks. An optional judge runs only when one tenant is named. A schedule selects samples and records why a run starts or why it skips. An offline refresh writes an immutable evidence snapshot from completed runs. The scheduler is off until one tenant is named. The inference process does not start the worker. A shadow ranker can read snapshot metadata when a shadow policy is enabled. The router does not execute a recommendation from that snapshot. | `src/inference/evaluations.ts`, `src/inference/evaluation-profiles.ts`, `src/inference/evaluation-schedule.ts`, `src/inference/evaluation-schedule-store.ts`, `src/inference/qualification.ts`, `src/inference/qualification-store.ts`, `src/inference/validators.ts`, `src/inference/judge.ts`, `src/inference/judge-rubrics.ts`, `src/inference/evaluation-worker.ts`, `src/inference/replay-execution.ts`, `src/evaluation-worker.ts` |
 | Logging | Removes secrets, prompts, chat messages, raw tool arguments, and embedding vectors from logs. | `src/logger.ts`, `src/redact.ts` |
 | Admin | CLI changes for tenants, keys, deployments, aliases, prices, limits, fallback, and embedding contracts. A routing policy, a qualification profile, an evidence refresh, a canary rollout, a guardrail set, and a promotion use internal HTTP routes and a static grant on the tenant secret. Task feedback uses the same tenant authentication as chat. | `src/cli.ts`, `src/db/inference-admin.ts`, `src/db/provision.ts`, `src/http/app.ts` |
-| MCP catalog | Registers an approved MCP server, discovers its tools, and stores a versioned catalog for one tenant. The page does not call a tool. | `src/mcp/http.ts`, `src/mcp/discover.ts`, `src/mcp/store.ts` |
+| MCP catalog | Registers an approved MCP server, discovers its tools, and stores a versioned catalog for one tenant. Discovery does not call a tool. A separate route calls one approved tool. A write waits for approval. | `src/mcp/http.ts`, `src/mcp/discover.ts`, `src/mcp/execute.ts`, `src/mcp/store.ts` |
 
 ## Request path
 
@@ -51,8 +51,9 @@ An embedding request names one deployment. It does not resolve alias `auto`. It 
 | `GET /v1/tenant` | The caller's own tenant. |
 | `POST /v1/chat/completions` | Chat completion, JSON or SSE. A function-tool stream returns tool-call deltas. See [Function tools](function-tools.md) and [Tool call results](tool-calls.md). |
 | `POST /v1/embeddings` | One embedding vector per text input. The deployment name selects the pin. See [Embeddings](embeddings.md). |
-| `GET /internal/v1/mcp` | Tenant page for MCP registration, discovery, the tool catalog, permissions, enablement, and health. See [MCP catalog](mcp.md). |
-| `POST /internal/v1/mcp/servers`, `POST /internal/v1/mcp/servers/{id}/discover` | Register one approved server and read its tool list. The credential is a protected reference. The route does not call a tool. |
+| `GET /internal/v1/mcp` | Tenant page for MCP registration, discovery, the tool catalog, permissions, approvals, and execution history. See [MCP catalog](mcp.md). |
+| `POST /internal/v1/mcp/servers`, `POST /internal/v1/mcp/servers/{id}/discover` | Register one approved server and read its tool list. The credential is a protected reference. Discovery does not call a tool. |
+| `POST /internal/v1/mcp/executions`, `POST /internal/v1/mcp/executions/{id}/approval` | Call one approved tool, or approve, deny, or cancel a write. A write waits for approval. The result returns to the caller. |
 | `GET /internal/v1/mcp/catalog` | Enabled servers and allowed tools for the caller. |
 | `POST /v1/feedback` | One task result for one chat request. The body has no prompt and no model output. |
 | `GET /v1/models` | Enabled deployments and aliases for the tenant. |
@@ -114,7 +115,7 @@ All state is in PostgreSQL 16. Migrations are in `migrations/`. Every tenant tab
 | Limits and budgets | `tenant_limit_policies`, `api_key_limit_policies`, `connection_limit_policies`, `deployment_limit_policies`, `connection_share_groups`, `limit_counters`, `concurrency_leases`, `attempt_admissions`, `tenant_budgets`, `budget_reservations`, `cost_ledger` |
 | Cost | `price_versions`, `attempt_costs` |
 | Embeddings | `embedding_contracts` |
-| MCP catalog | `mcp_servers`, `mcp_tool_definitions`, `mcp_tool_permissions` |
+| MCP catalog | `mcp_servers`, `mcp_tool_definitions`, `mcp_tool_permissions`, `mcp_execution_policy`, `mcp_tool_executions` |
 
 A policy change stores a new version. The proxy does not edit a stored policy in place. A qualification profile version and an evidence snapshot are insert-only. A later refresh stores a new snapshot. A canary rollout is off until an operator activates it. A guardrail set is off until an operator attaches it. The assignment row stores the cohort and the executed deployment as separate fields. It stores a digest of the routing key. It does not store the raw key. Feedback rows store a metric and a result. They do not store a prompt or a model output.
 

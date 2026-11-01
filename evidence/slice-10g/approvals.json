@@ -1,0 +1,24 @@
+{
+  "awaiting": {
+    "status": "awaiting_approval",
+    "approval": "pending",
+    "dispatchCount": 0,
+    "identityReturned": true
+  },
+  "granted": {
+    "status": "succeeded",
+    "approval": "granted",
+    "dispatchCount": 1,
+    "latencyMs": 0,
+    "schemaVersion": 1
+  },
+  "denied": {
+    "status": "denied",
+    "dispatchCount": 0,
+    "toolCalls": 0
+  },
+  "cancelled": {
+    "status": "cancelled",
+    "dispatchCount": 0
+  }
+}

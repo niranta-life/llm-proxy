@@ -117,6 +117,7 @@ export async function createTestApp(
     evaluationGlobalKill?: boolean;
     scheduleNow?: () => Date;
     rankDeadlineMs?: number;
+    abortAfterDispatch?: () => boolean;
   } = {},
 ) {
   const config = configFor(db);
@@ -151,6 +152,7 @@ export async function createTestApp(
     evaluationGlobalKill: options.evaluationGlobalKill,
     scheduleNow: options.scheduleNow,
     rankDeadlineMs: options.rankDeadlineMs,
+    abortAfterDispatch: options.abortAfterDispatch,
   });
   return { app, ...captured, authPool, runtimePool, config };
 }

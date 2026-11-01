@@ -5,7 +5,10 @@ export type McpFailureKind =
   | 'schema'
   | 'large'
   | 'invalid'
-  | 'rejected';
+  | 'rejected'
+  | 'conflict'
+  | 'limit'
+  | 'not_found';
 
 export class McpFailure extends Error {
   constructor(

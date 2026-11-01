@@ -17,7 +17,7 @@ import {
   type FailedAttemptFacts,
 } from './errors.js';
 import type { TokenUsage, UpstreamCompletion } from './adapter.js';
-import type { ChatRequest } from './validate.js';
+import { messageText, type ChatRequest } from './validate.js';
 
 const ANTHROPIC_FIELDS = new Set(['temperature', 'stop', 'max_tokens', 'max_completion_tokens']);
 
@@ -86,7 +86,7 @@ export function toAnthropicMessageBody(
     throw invalidRequest('messages', 'unsupported_message', 'A system message is only supported as the first message.');
   }
   if (dialog[0]?.role === 'system') {
-    system = dialog[0].content;
+    system = messageText(dialog[0]);
     dialog.shift();
   }
   if (dialog.length === 0 || dialog[0]?.role !== 'user') {
@@ -123,7 +123,7 @@ export function toAnthropicMessageBody(
     max_tokens: limit,
     messages: dialog.map((message) => ({
       role: message.role as 'user' | 'assistant',
-      content: message.content,
+      content: messageText(message),
     })),
     stream: false,
   };

@@ -61,8 +61,25 @@ describe('request validation', () => {
     );
   });
 
-  it('rejects tools, images, audio, and unknown parameters', () => {
-    expect(() => validateChatRequest({ ...textRequest, tools: [] })).toThrow(/tools is not supported/i);
+  it('rejects empty tools, images, audio, and unknown parameters', () => {
+    expect(() => validateChatRequest({ ...textRequest, tools: [] })).toThrow(/tools must contain/i);
+    expect(() => validateChatRequest({ ...textRequest, functions: [] })).toThrow(/functions is not supported/i);
+    expect(() => validateChatRequest({ ...textRequest, function_call: 'auto' })).toThrow(/function_call is not supported/i);
+    const accepted = validateChatRequest({
+      ...textRequest,
+      tools: [{ type: 'function', function: { name: 'get_order_status', parameters: { type: 'object', properties: {} } } }],
+      tool_choice: 'auto',
+      parallel_tool_calls: false,
+    });
+    expect(accepted.optional.tool_choice).toBe('auto');
+    expect(accepted.optional.parallel_tool_calls).toBe(false);
+    expect(() =>
+      validateChatRequest({
+        ...textRequest,
+        stream: true,
+        tools: [{ type: 'function', function: { name: 'get_order_status' } }],
+      }),
+    ).toThrow(/tools is not supported/i);
     expect(() =>
       validateChatRequest({
         model: 'auto',

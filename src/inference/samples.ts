@@ -33,7 +33,7 @@ import {
   type HeldSample,
   type SampleSlot,
 } from './sample-selection.js';
-import type { ChatRequest } from './validate.js';
+import { argumentChars, messageText, requestUsesTools, type ChatRequest } from './validate.js';
 
 export const SAMPLE_PAGE_CAP = 50;
 export const ADAPTER_VERSION = 1;
@@ -145,14 +145,14 @@ export function buildSamplePayload(input: {
     schemaVersion: SAMPLE_SCHEMA_VERSION,
     request: {
       model: input.request.model,
-      messages: input.request.messages.map((message) => ({ role: message.role, content: message.content })),
+      messages: input.request.messages.map((message) => ({ role: message.role, content: message.content ?? '' })),
       task: input.request.taskHint,
-      parameters: { ...input.request.optional },
+      parameters: sampleParameters(input.request.optional),
     },
     output: {
       choices: input.response.choices.map((choice) => ({
         index: choice.index,
-        content: choice.message.content,
+        content: choice.message.content ?? '',
         finishReason: choice.finish_reason,
       })),
     },
@@ -170,6 +170,14 @@ export function buildSamplePayload(input: {
       adapterVersion: ADAPTER_VERSION,
     },
   };
+}
+
+function sampleParameters(optional: Record<string, unknown>): Record<string, unknown> {
+  const parameters = { ...optional };
+  delete parameters.tools;
+  delete parameters.tool_choice;
+  delete parameters.parallel_tool_calls;
+  return parameters;
 }
 
 export function payloadBytes(payload: SamplePayload): number {
@@ -206,6 +214,14 @@ export async function captureChatSample(input: {
   let storedOk = false;
   try {
     if (input.keyManager === null) return;
+    if (requestUsesTools(input.request)) {
+      input.logger.info('sample capture skipped', {
+        requestId: input.requestId,
+        deployment: input.route.deploymentName,
+        reason: 'tool_round',
+      });
+      return;
+    }
     if (input.request.stream && input.streamText === undefined) return;
     const skip = (reason: string): void => {
       input.logger.info('sample capture skipped', {
@@ -639,7 +655,9 @@ async function loadCoverage(
     [requestId],
   );
   const row = result.rows[0];
-  const inputSize = row?.input_size ?? request.messages.reduce((sum, message) => sum + message.content.length, 0);
+  const inputSize =
+    row?.input_size ??
+    request.messages.reduce((sum, message) => sum + messageText(message).length + argumentChars(message), 0);
   const taskCategory = row !== undefined && isTaskCategory(row.task_category)
     ? row.task_category
     : request.taskHint !== null && isTaskCategory(request.taskHint)

@@ -103,6 +103,7 @@ describe('provider registry', () => {
       '031_routing_promotions.sql',
       '032_deployment_ops.sql',
       '033_evaluation_budget_ceilings.sql',
+      '034_openai_function_tools.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));

@@ -12,7 +12,7 @@ import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import { streamOpenAiChat, type UpstreamStreamItem } from './openai-stream.js';
 import type { StreamTimeouts } from './stream.js';
-import type { ChatMessage } from './validate.js';
+import { type ChatMessage, type FunctionToolCall } from './validate.js';
 
 export type TokenUsage = {
   promptTokens: number | null;
@@ -28,7 +28,7 @@ export type UpstreamCompletion = {
     model: string;
     choices: Array<{
       index: number;
-      message: { role: 'assistant'; content: string };
+      message: { role: 'assistant'; content: string | null; tool_calls?: FunctionToolCall[] };
       finish_reason: string | null;
     }>;
     usage?: Record<string, number>;
@@ -75,14 +75,19 @@ export function validateCompletion(value: unknown): UpstreamCompletion {
 
   const choices = value.choices.map((choice) => {
     if (!isRecord(choice) || typeof choice.index !== 'number' || !Number.isInteger(choice.index)) throw invalidUpstream();
-    if (!isRecord(choice.message) || choice.message.role !== 'assistant' || typeof choice.message.content !== 'string') {
-      throw invalidUpstream();
-    }
+    if (!isRecord(choice.message) || choice.message.role !== 'assistant') throw invalidUpstream();
+    const toolCalls = readToolCalls(choice.message);
+    const content = readAssistantContent(choice.message, toolCalls !== undefined);
     if (choice.finish_reason !== null && typeof choice.finish_reason !== 'string') throw invalidUpstream();
+    const finishReason = toolCalls !== undefined ? 'tool_calls' : ((choice.finish_reason as string | null) ?? null);
     return {
       index: choice.index,
-      message: { role: 'assistant' as const, content: choice.message.content },
-      finish_reason: (choice.finish_reason as string | null) ?? null,
+      message: {
+        role: 'assistant' as const,
+        content,
+        ...(toolCalls !== undefined ? { tool_calls: toolCalls } : {}),
+      },
+      finish_reason: finishReason,
     };
   });
 
@@ -110,6 +115,49 @@ export function validateCompletion(value: unknown): UpstreamCompletion {
     cacheCreationInputTokens: null,
     cacheReadInputTokens: null,
   };
+}
+
+const TOOL_CALL_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const TOOL_FUNCTION_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+function readAssistantContent(message: Record<string, unknown>, hasToolCalls: boolean): string | null {
+  if (!('content' in message) || message.content === null) {
+    if (hasToolCalls) return null;
+    throw invalidUpstream();
+  }
+  if (typeof message.content !== 'string') throw invalidUpstream();
+  return message.content;
+}
+
+function readToolCalls(message: Record<string, unknown>): FunctionToolCall[] | undefined {
+  if (!('tool_calls' in message) || message.tool_calls === undefined || message.tool_calls === null) return undefined;
+  if (!Array.isArray(message.tool_calls) || message.tool_calls.length === 0 || message.tool_calls.length > 16) {
+    throw invalidUpstream();
+  }
+  const seen = new Set<string>();
+  return message.tool_calls.map((item) => {
+    if (!isRecord(item) || item.type !== 'function') throw invalidUpstream();
+    if (typeof item.id !== 'string' || !TOOL_CALL_ID.test(item.id) || seen.has(item.id)) throw invalidUpstream();
+    seen.add(item.id);
+    if (!isRecord(item.function)) throw invalidUpstream();
+    if (typeof item.function.name !== 'string' || !TOOL_FUNCTION_NAME.test(item.function.name)) throw invalidUpstream();
+    if (typeof item.function.arguments !== 'string' || !upstreamArguments(item.function.arguments)) throw invalidUpstream();
+    return {
+      id: item.id,
+      type: 'function' as const,
+      function: { name: item.function.name, arguments: item.function.arguments },
+    };
+  });
+}
+
+function upstreamArguments(value: string): boolean {
+  if (value.length === 0 || value.length > 8192) return false;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
 }
 
 function invalidUpstream(): never {

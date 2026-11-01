@@ -1,0 +1,35 @@
+(node:31034) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31057) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:31117) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/function-calling.test.ts > function tool validation > accepts a function tool and rejects unsupported schemas 2ms
+ ✓ test/function-calling.test.ts > function tool validation > accepts every tools array inside the published schema limits 1ms
+ ✓ test/function-calling.test.ts > function tool validation > counts argument length and omits argument text from features, samples, and logs 1ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > returns one tool call and then a final answer 149ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > returns multiple tool calls and keeps both ids 97ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > forwards a forced tool_choice and can return no tool 85ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > rejects a missing function, bad arguments, and a bad tool result id before upstream 76ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > rejects an invalid upstream tool call without a second provider call 45ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > rejects parallel_tool_calls and tools when the deployment does not list them 66ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > records tool-call token usage and cost 53ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > keeps tenants apart 49ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > leaves a text request and a text stream unchanged 93ms
+ ✓ test/function-calling.test.ts > OpenAI function calling > runs the official SDK tool loop for two rounds 176ms
+ ✓ test/function-calling.test.ts > function calling failures > does not retry a provider error and does not execute a function 543ms
+ ✓ test/function-calling.test.ts > function calling failures > cancels the provider call and does not execute a function 605ms
+ ✓ test/function-calling.test.ts > function calling failures > does not send a failed OpenAI tool call to another provider 1434ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  01:44:26
+   Duration  9.42s (transform 244ms, setup 1ms, collect 459ms, tests 5.12s, environment 0ms, prepare 30ms)
+
+(node:31167) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

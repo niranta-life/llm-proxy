@@ -9,7 +9,7 @@ import {
   type FailedAttemptFacts,
 } from './errors.js';
 import type { CanonicalEvent } from './stream.js';
-import type { ChatRequest } from './validate.js';
+import { messageText, type ChatRequest } from './validate.js';
 
 const VERTEX_FIELDS = new Set(['temperature', 'stop', 'max_tokens', 'max_completion_tokens']);
 const SAFETY_REASONS = new Set(['SAFETY', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'RECITATION']);
@@ -158,7 +158,7 @@ export function toVertexRequest(request: ChatRequest, upstreamModel: string): Ve
     throw invalidRequest('messages', 'unsupported_message', 'A system message is only supported as the first message.');
   }
   if (dialog[0]?.role === 'system') {
-    system = dialog[0].content;
+    system = messageText(dialog[0]);
     dialog.shift();
   }
   if (dialog.length === 0) {
@@ -181,7 +181,7 @@ export function toVertexRequest(request: ChatRequest, upstreamModel: string): Ve
     model: upstreamModel,
     contents: dialog.map((message) => ({
       role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
+      parts: [{ text: messageText(message) }],
     })),
     config: { automaticContinuation: false },
   };

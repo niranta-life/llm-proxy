@@ -1,0 +1,90 @@
+[
+  {
+    "name": "single-function-call",
+    "status": 200,
+    "finishReason": "tool_calls",
+    "toolCallId": "call_order_1001",
+    "final": "The order is shipped.",
+    "localExecutions": 1
+  },
+  {
+    "name": "multiple-function-calls",
+    "ids": [
+      "call_order_1001",
+      "call_ship_2002"
+    ],
+    "final": "The order is shipped."
+  },
+  {
+    "name": "tool-choice",
+    "forced": "tool_calls",
+    "none": "hello"
+  },
+  {
+    "name": "missing-function",
+    "status": 400,
+    "code": "invalid_parameter"
+  },
+  {
+    "name": "invalid-arguments",
+    "status": 400,
+    "code": "invalid_parameter"
+  },
+  {
+    "name": "invalid-tool-result-id",
+    "status": 400,
+    "code": "invalid_parameter"
+  },
+  {
+    "name": "unanswered-tool-call",
+    "status": 400,
+    "code": "invalid_parameter"
+  },
+  {
+    "name": "invalid-upstream-arguments",
+    "status": 502,
+    "code": "invalid_upstream_response"
+  },
+  {
+    "name": "permissions",
+    "parallel": "parallel_tool_calls",
+    "plain": "tools",
+    "stream": 400
+  },
+  {
+    "name": "usage",
+    "tokens": {
+      "prompt_tokens": 11,
+      "completion_tokens": 7,
+      "total_tokens": 18,
+      "amount": "0.25",
+      "cost_status": "estimated"
+    },
+    "amount": "0.25"
+  },
+  {
+    "name": "tenant-isolation",
+    "ownModels": [
+      "auto",
+      "plain-chat",
+      "tool-chat",
+      "tools-only"
+    ],
+    "otherModels": [
+      "auto",
+      "other-chat"
+    ]
+  },
+  {
+    "name": "text-regression",
+    "content": "ok",
+    "stream": 200
+  },
+  {
+    "name": "sdk-loop",
+    "firstId": "call_order_1001",
+    "secondId": "call_order_1002",
+    "final": "The order is still shipped.",
+    "localExecutions": 2
+  }
+]

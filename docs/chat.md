@@ -35,8 +35,67 @@ Any other field is sent only when the deployment lists that capability:
 - `n`, only with the value `1`
 - `user`
 - `response_format`, only `{"type":"text"}`. The deployment capability name is `response_format_text`.
+- `tools`, function tools only. The deployment capability name is `tools`.
+- `tool_choice`. The deployment capability name is `tool_choice`.
+- `parallel_tool_calls`. The deployment capability name is `parallel_tool_calls`.
 
-The proxy does not accept tools, images, or audio. It does not remove a field it cannot accept. It refuses the request instead.
+The proxy does not accept images or audio. It does not remove a field it cannot accept. It refuses the request instead.
+
+## Function tools
+
+An OpenAI deployment can accept function tools when it lists `tools`.
+
+A request can send from 1 to 32 function tools.
+
+A function name uses letters, digits, `_`, or `-`.
+
+A function name has at most 64 characters.
+
+`parameters` is an object schema.
+
+The schema can use `type`, `properties`, `required`, `additionalProperties`, `items`, `description`, `enum`, and numeric or length bounds.
+
+The proxy rejects `$ref`, combinators, `pattern`, `format`, and `strict: true`.
+
+One schema is at most 8192 bytes.
+
+Schema depth is at most 8.
+
+Schema node count is at most 64.
+
+A property name starts with a letter or `_`.
+
+`tool_choice` can be `none`, `auto`, `required`, or one named function that is in `tools`.
+
+`parallel_tool_calls` is a boolean.
+
+The deployment must list `parallel_tool_calls` before a request can send that flag.
+
+A stream cannot send tools.
+
+`functions` and `function_call` stay refused.
+
+Anthropic, Vertex, xAI, OpenRouter, DGX, and a private endpoint stay text only.
+
+The proxy returns `choices[0].message.tool_calls` with the provider id.
+
+`finish_reason` is `tool_calls`.
+
+The application executes the function.
+
+The proxy does not call the function.
+
+The proxy does not run tool code.
+
+The application sends the result as a `tool` message with the same `tool_call_id`.
+
+Every tool call in a round needs a result before the next user message.
+
+A later round can call a tool again.
+
+Provider `usage` stays on the response and on the attempt.
+
+Logs and samples do not store raw tool arguments.
 
 ```bash
 curl -s --cacert config/ingress/live/ca.crt https://127.0.0.1/v1/chat/completions \

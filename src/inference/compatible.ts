@@ -70,6 +70,11 @@ export function compatibleRequestFields(
   delete fields.provider;
   delete fields.models;
   delete fields.route;
+  if (provider !== 'openai') {
+    delete fields.tools;
+    delete fields.tool_choice;
+    delete fields.parallel_tool_calls;
+  }
   if (provider !== 'openrouter') return fields;
   const routing = openRouterRoutingBody(policy);
   if (routing === undefined) return fields;

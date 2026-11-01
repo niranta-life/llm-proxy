@@ -436,7 +436,7 @@ async function storeCompletion(
         model: completion.response.model,
         choices: completion.response.choices.map((choice) => ({
           index: choice.index,
-          content: choice.message.content,
+          content: choice.message.content ?? '',
           finishReason: choice.finish_reason,
         })),
       },

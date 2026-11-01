@@ -49,7 +49,7 @@ import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, loadCatalog } from './store.js';
 import type { StreamGate } from './stream.js';
-import { assertCapabilities, assertStreamAllowed, validateChatRequest } from './validate.js';
+import { assertCapabilities, assertStreamAllowed, assertToolProvider, validateChatRequest } from './validate.js';
 
 function adapterFor(provider: string): ProviderAdapter {
   if (provider === 'anthropic') return anthropicAdapter;
@@ -214,6 +214,7 @@ export async function executeChat(input: {
     }
     throw error;
   }
+  assertToolProvider(request, route.provider);
   let adapter = adapterFor(route.provider);
   adapter.prepare(request, route);
   if (request.stream) {
@@ -523,6 +524,8 @@ export async function executeChat(input: {
               fetchImpl: input.fetchImpl,
               resolveHost: input.resolveHost,
               prepare: (selected) => {
+                assertToolProvider(request, selected.provider);
+                assertCapabilities(request, selected.capabilities);
                 adapter = adapterFor(selected.provider);
                 adapter.prepare(request, selected);
               },

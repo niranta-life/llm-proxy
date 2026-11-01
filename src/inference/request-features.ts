@@ -4,7 +4,7 @@ import type { Logger } from '../logger.js';
 import type { TokenUsage } from './adapter.js';
 import { invalidRequest } from './errors.js';
 import { isTaskCategory, type TaskCategory } from './task-categories.js';
-import type { ChatRequest } from './validate.js';
+import { argumentChars, messageText, type ChatRequest } from './validate.js';
 
 export { isTaskCategory };
 
@@ -30,6 +30,7 @@ const RULES: ReadonlyArray<{ category: TaskCategory; pattern: RegExp }> = [
 export type FeatureMessage = {
   role: string;
   content: string;
+  extraChars?: number;
 };
 
 export type FeatureExtractInput = {
@@ -71,14 +72,24 @@ export type StoredRequestFeature = ExtractedFeatures & {
   createdAt: string;
 };
 
+function toolChoiceRequires(request: ChatRequest): boolean {
+  const choice = request.optional.tool_choice;
+  if (choice === 'required') return true;
+  return typeof choice === 'object' && choice !== null;
+}
+
 export function featureInputFromChat(request: ChatRequest): FeatureExtractInput {
   return {
-    messages: request.messages,
+    messages: request.messages.map((message) => ({
+      role: message.role,
+      content: messageText(message),
+      extraChars: argumentChars(message),
+    })),
     stream: request.stream,
     requestedModel: request.model,
     taskHint: request.taskHint,
     structuredOutput: false,
-    toolRequired: false,
+    toolRequired: toolChoiceRequires(request),
   };
 }
 
@@ -89,7 +100,7 @@ export function extractRequestFeatures(input: FeatureExtractInput): ExtractedFea
   let conversationDepth = 0;
   const parts: string[] = [];
   for (const message of input.messages) {
-    inputSize += message.content.length;
+    inputSize += message.content.length + (message.extraChars ?? 0);
     parts.push(message.content);
     if (message.role === 'system') instructionPresent = true;
     if (message.role === 'user') conversationDepth += 1;

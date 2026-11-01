@@ -1,0 +1,174 @@
+(node:31269) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31292) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:31341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/routing-hardening.test.ts > routing hardening > ranks quality over cheaper unqualified models and records the reason codes
+SECTION quality {"winner":"h08g-quality","reasons":["lowest_qualified_cost","latency_tie_break"],"candidateCount":8,"ninthPolicy":400,"firstCacheHit":false,"secondCacheHit":true,"invalidSnapshotMiss":false,"invalidWinner":"h08g-tie","restoredWinner":"h08g-quality","dropped":"6ed9f8cf-4a36-4d02-beec-717dfe1acafe","estimate":null,"savingsKind":"estimate"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > ranks quality over cheaper unqualified models and records the reason codes 266ms
+(node:31341) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+stdout | test/routing-hardening.test.ts > routing hardening > promotes one serving policy per tenant and keeps forced and foreign traffic apart
+SECTION promotion {"judgeRejected":"unstable_judge","serving":1,"activationEpoch":2,"stale":"stale_activation","cohorts":{"baseline":2,"canary":2},"forced":"h08g-base","foreignDecision":404,"plainPromote":403,"segment":"segment_mismatch","beta":"h08g-beta"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > promotes one serving policy per tenant and keeps forced and foreign traffic apart 1464ms
+stdout | test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice
+SECTION multi-replica
+SECTION launch
+
+stdout | test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice
+SECTION launch {"deployment":["h08g-quality","h08g-quality"],"repeated":["h08g-quality","h08g-quality"],"foreign":[401,401],"restartedPid":31590,"restartedDeployment":"h08g-quality"}
+SECTION performance {"routingCpuSeconds":0.6199999999999999,"routingCpuLabel":{"routingCpu":"whole-process CPU from ps, not routing-only CPU","routingLatency":"nearest-rank percentile of stored computation_ms wall-clock rank time","addedLatency":"client wall time minus stored model_attempts.duration_ms for the same request","policyLookup":"client-observed GET policy time","activeStreams":"count of model_attempts with stream_status connecting or streaming","lockContention":"maximum ungranted pg_locks while delayed chats overlapped","predictedSavings":"shadow estimatedSavings stays an estimate"},"rssKb":[132368,144192,142528],"computationMs":{"p50":2,"p95":3,"p99":4,"samples":34},"clientChatMs":{"p50":75.1728750000002,"samples":12},"addedInferenceLatencyMs":{"p50":70.1728750000002,"p95":89.0716250000005,"samples":12},"evidenceCacheHits":25,"evidenceCacheDecisions":34,"evidenceCacheHitRate":0.7352941176470589,"policyLookupMs":59.9799579999999,"locksNotGranted":0,"lockSamples":47,"maxLocks":88,"deadlocksBefore":0,"deadlocksAfter":0,"throughputPerSecond":12.905705755767952,"successRate":1,"costByDeployment":{"h08g-base":{"amount":"0.75","count":5},"h08g-quality":{"amount":"1.56","count":26}},"realizedSavingsPerSuccess":0.09,"realizedSavingsLabel":"difference of stored attempt_costs unit amounts for h08g-base and h08g-quality","predictedSavingsLabel":"not realized"}
+LAUNCH model=gpt-h08g-quality decision-has-prompt=false
+LAUNCH repeat model=gpt-h08g-quality decision-has-prompt=false
+
+ ✓ test/routing-hardening.test.ts > routing hardening > keeps one routing key on three replicas and denies a foreign read twice 3256ms
+stdout | test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path
+SECTION failure-injection
+
+stdout | test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path
+DATABASE_OUTAGE ready=503 status=500 code=internal_error hits=0 deployment= restored=h08g-beta
+SECTION failure-injection {"partialStatus":"failed","timeout":504,"outageAttempts":1,"circuit":"circuit_open","budget":"budget_exceeded","fallback":"h08g-base","forced":"h08g-poor","streamCapacity":503,"activeStreams":1,"activeStreamsAfter":0,"budgetReadStatus":503,"budgetReadCode":"admission_unavailable","budgetReadHits":0,"invalidEvidenceDeployment":"h08g-tie","staleActivation":"stale_activation","workerCrashDeployment":"h08g-quality","workerCrashServing":1,"concurrentDeployment":"h08g-tie","lostPermissionDeployment":"h08g-base","databaseOutageStatus":500,"databaseOutageCode":"internal_error","databaseOutageHits":0,"databaseOutageRestored":"h08g-beta"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > keeps execution controls on the shipped chat path 4805ms
+stdout | test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row
+SECTION security
+
+stdout | test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row
+SECTION security {"modelDrift":"baseline_fallback","configDrift":"fresh_config_version","aged":"h08g-tie","agedReason":"evidence_stale","regressed":"h08g-tie","refresh":201,"residency":"baseline_unavailable","foreignPromotions":0,"migration":"034_openai_function_tools.sql"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > blocks a drifted model, a foreign row, and a rewritten audit row 3440ms
+stdout | test/routing-hardening.test.ts > routing hardening > rolls back to the stored baseline after the controller stops
+SECTION recovery {"propagationMs":63.256375000000844,"rollbackStatuses":[400,409,200],"restoredDeployment":"h08g-base","forcedDeployment":"h08g-poor","detectionMs":16.178415999998833,"rollbackMs":9.389375000002474,"stops":1,"guardAfter":"h08g-base"}
+
+ ✓ test/routing-hardening.test.ts > routing hardening > rolls back to the stored baseline after the controller stops 1265ms
+stdout | test/routing-hardening.test.ts > routing hardening providers > exercises every provider on the shipped adapters and keeps DGX on the mock host
+SECTION providers [{"provider":"openai","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"anthropic","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"vertex","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"xai","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"openrouter","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0},{"provider":"dgx","json":200,"streamDone":1,"timeout":504,"down":502,"cancelDone":0}]
+
+ ✓ test/routing-hardening.test.ts > routing hardening providers > exercises every provider on the shipped adapters and keeps DGX on the mock host 8871ms
+(node:31951) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/stream-integration.test.ts > OpenAI streaming > streams a chat completion the official SDK can read 97ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > frames one done marker and keeps stream=false as JSON 132ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > rejects streaming until both the tenant and the deployment allow it 459ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > cancels the upstream stream when the client disconnects 79ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > aborts a stalled downstream consumer 877ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends a stalled downstream write on the total and idle deadlines 2160ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > returns a normal HTTP error when the provider fails before the first event 51ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps the HTTP status and omits done when the provider fails after partial output 45ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not complete a stream that never sends done 44ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > completes when the provider omits usage 44ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > reassembles unicode split across upstream bytes 67ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > keeps parallel tenants on their own credentials 66ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not call upstream when persistence fails before the stream 35ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > does not retry when telemetry fails after bytes were sent 48ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > ends the stream on connect, idle, and total timeouts 2701ms
+ ✓ test/stream-integration.test.ts > OpenAI streaming > shows connecting and rejects one more stream at the active limit 5125ms
+(node:32039) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > keeps two providers and two tenants on their own credentials 1753ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > resolves auto and an explicit deployment without changing the explicit model 997ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > records the provider request, stop reason, and cache categories 809ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > sums metrics across both providers for one tenant 869ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > uses the rotated Anthropic credential on the next call only 948ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects unsupported Anthropic values before any upstream call 1077ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > maps provider 429, 500, and 529 without a second call or a leaked body 901ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > rejects an unexpected content block and does not fall back 774ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > does not call Anthropic when the deployment or the connection is disabled 1111ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > times out one Anthropic call and cancels one Anthropic call 1955ms
+ ✓ test/anthropic-integration.test.ts > Anthropic integration > makes no upstream call when persistence fails and does not retry after a telemetry failure 1543ms
+(node:32377) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/registry.test.ts > provider registry > keeps migrations 001 through 007 and adds the registry columns 37ms
+ ✓ test/registry.test.ts > provider registry > serves OpenAI, Anthropic, and an enabled Vertex deployment on one tenant 1217ms
+ ✓ test/registry.test.ts > provider registry > registers each new provider and rejects invalid configuration before a write 2691ms
+ ✓ test/registry.test.ts > provider registry > separates validation status from health and increments configuration version 1456ms
+ ✓ test/registry.test.ts > provider registry > isolates tenant configuration, validation, and credential references 875ms
+ ✓ test/registry.test.ts > provider registry > updates upstream model, replaces registry credentials, and confirms live after a succeeded call 1298ms
+(node:32463) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a successful request and attempt with reported usage 641ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > records a failed upstream response and does not retry 586ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream for an unsupported parameter 512ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > stores missing usage as missing and reports it in metrics 580ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > times out an upstream call after one request 851ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when initial persistence fails 540ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > returns a successful completion when telemetry persistence fails 548ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > cancels the single upstream call when the caller aborts 580ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > makes one upstream call for each concurrent accepted request 555ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when inference is disabled 752ms
+ ✓ test/chat-lifecycle.test.ts > chat lifecycle > does not call upstream when the tenant has no enabled deployment 524ms
+(node:32542) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > serves enabled xAI text and a stream on the approved host with that tenant key 1025ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > rejects an unsupported xAI field before the upstream call and does not retry 444ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > cancels an xAI call and keeps a stream failure from writing DONE 1183ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > sends stored OpenRouter restrictions and fails closed without a serving provider 1134ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > keeps two OpenRouter tenants on their own key, model, and routing rule 806ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > accepts a long OpenRouter stream when the final chunk names the selected provider 713ms
+ ✓ test/compatible-chat.test.ts > xAI and OpenRouter chat > does not serve DGX and still serves OpenAI through its own base URL 727ms
+(node:32596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/request-features-http.test.ts > request features over HTTP > records hinted and inferred tasks and hides them from the other tenant 458ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > keeps the same structure across stream, provider, and model choice 251ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > stores size only for a long prompt and rejects tools and structured output 115ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > pages without repeating ids, filters, and keeps concurrent chats apart 465ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > still succeeds when the extractor throws 96ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > returns the other row from the same millisecond on the next page 641ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > records the finished attempt when fallback credential open throws 1167ms
+ ✓ test/request-features-http.test.ts > request features over HTTP > keeps migration 016 readable after the additive file 1ms
+(node:32752) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/openai-contract.test.ts > OpenAI SDK contract > returns a compatible success, a compatible error, and GET /v1/models 1310ms
+(node:32765) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > keeps one completion id, the assistant role, and ordered text deltas 1ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > maps finish reasons and omits usage that was not requested or not reported 0ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > rejects tools, a non-assistant role, and a bad finish reason 0ms
+ ✓ test/stream-unit.test.ts > OpenAI chunk normalization > reassembles a UTF-8 character split across decoder writes 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > moves through connecting and streaming and completes only after finish and done 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > does not complete when the provider terminal event or done marker is missing 0ms
+ ✓ test/stream-unit.test.ts > stream state transitions > records each terminal status and each timeout 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > writes ordered frames and one done marker after a finish event 0ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > aborts a stalled consumer and removes the abort listener 31ms
+ ✓ test/stream-unit.test.ts > SSE writer backpressure > settles a stalled write on a stream deadline before the backpressure timer 42ms
+ ✓ test/stream-unit.test.ts > stream admission > keeps a tenant cap beside the process cap and drains open streams 217ms
+(node:32769) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/secret-redaction.test.ts > secret redaction > removes secrets, bearer tokens, and verifiers from a log event 21ms
+ ✓ test/secret-redaction.test.ts > secret redaction > request logs > does not write a presented tenant secret or verifier to the log 202ms
+(node:32779) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/validate-request.test.ts > request validation > accepts text messages and stream false 1ms
+ ✓ test/validate-request.test.ts > request validation > keeps stream=true and rejects it until that deployment allows streaming 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects empty tools, images, audio, and unknown parameters 1ms
+ ✓ test/validate-request.test.ts > request validation > rejects a supported parameter the deployment does not allow 0ms
+ ✓ test/validate-request.test.ts > static routing > resolves an alias and an explicit deployment name deterministically 0ms
+ ✓ test/validate-request.test.ts > static routing > skips a disabled deployment or connection 0ms
+ ✓ test/validate-request.test.ts > alias resolution > uses only the alias target that was supplied for that tenant 0ms
+ ✓ test/validate-request.test.ts > error normalization > hides upstream error text and maps timeout, cancellation, and rate limits 0ms
+ ✓ test/validate-request.test.ts > error normalization > leaves missing usage unset 0ms
+ ✓ test/validate-request.test.ts > metrics window > rejects an unbounded window 0ms
+(node:32786) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/request-features-extractor.test.ts > request feature extractor > uses a validated hint before the rules 1ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > accepts an extraction hint 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > infers reasoning when no hint is present 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > infers each remaining rule category 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > leaves an unmatched request unknown and ignores an invalid hint 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > keeps structure for a long prompt, streaming, and a multi-turn instruction 0ms
+ ✓ test/request-features-extractor.test.ts > request feature extractor > rejects an invalid task on the chat body and does not forward a valid one as a provider field 1ms
+
+ Test Files  12 passed (12)
+      Tests  97 passed (97)
+   Start at  01:44:42
+   Duration  106.96s (transform 359ms, setup 11ms, collect 1.81s, tests 100.45s, environment 1ms, prepare 320ms)
+
+(node:32788) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

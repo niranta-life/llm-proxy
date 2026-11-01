@@ -136,7 +136,7 @@ Explore technical documentation organized by intent:
 ## What is Not Included
 
 - Login, OAuth, SSO, user accounts, and saved caller state.
-- Tools, function calling, images, audio, embeddings, and MCP.
+- Images, audio, embeddings, and MCP. An OpenAI deployment can accept a function tool and return a tool call. The proxy does not execute the function.
 - An optimizer that promotes a policy without an operator.
 - An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI.
 - TLS on the Node.js listen port. Nginx in Compose terminates TLS on port 443. The Node.js port stays private.

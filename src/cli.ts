@@ -85,6 +85,9 @@ const CAPABILITIES = new Set([
   'n',
   'user',
   'response_format_text',
+  'tools',
+  'tool_choice',
+  'parallel_tool_calls',
 ]);
 
 type Flags = {
@@ -698,6 +701,12 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
+    const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls'];
+    if (provider !== 'openai' && capabilities.some((item) => toolCapabilities.includes(item))) {
+      logger.error('deployment arguments are invalid');
+      process.exitCode = 1;
+      return;
+    }
     if (provider === 'openrouter') {
       const created = await registerOpenRouterDeployment(pool, {
         tenantId,
@@ -777,8 +786,21 @@ async function runCommand(pool: Pool, config: Config, logger: Logger, command: s
       process.exitCode = 1;
       return;
     }
-    const configVersion = await setDeploymentCapabilities(pool, tenantId, name, capabilities);
-    process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, capabilities, configVersion })}\n`);
+    const toolCapabilities = ['tools', 'tool_choice', 'parallel_tool_calls'];
+    try {
+      const configVersion = await setDeploymentCapabilities(pool, tenantId, name, capabilities);
+      process.stdout.write(`${JSON.stringify({ tenantId, deployment: name, capabilities, configVersion })}\n`);
+    } catch (error) {
+      if (
+        capabilities.some((item) => toolCapabilities.includes(item))
+        && errorMessage(error).includes('capabilities are invalid')
+      ) {
+        logger.error('deployment arguments are invalid');
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
     return;
   }
 

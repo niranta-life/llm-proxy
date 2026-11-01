@@ -85,3 +85,63 @@ The certificate check reports `certificate valid` or `certificate expired`.
 The certificate check does not print the private key.
 
 The app command stays `node dist/index.js`.
+
+## Function calling
+
+The OpenAI backend accepts function tools.
+
+The application sends `get_order_status` or another function definition.
+
+The model can return `assistant.tool_calls`.
+
+Each tool call keeps the provider id.
+
+`finish_reason` is `tool_calls`.
+
+The application executes the function.
+
+The proxy does not call the function.
+
+The proxy does not run tool code.
+
+The application sends the result as a `tool` message.
+
+The `tool_call_id` must match the tool call.
+
+A later round can call a tool again.
+
+A deployment lists `tools` before a request can send tools.
+
+A deployment lists `tool_choice` before a request can send `tool_choice`.
+
+`tool_choice` can be `none`, `auto`, `required`, or one named function.
+
+A deployment lists `parallel_tool_calls` before a request can send that flag.
+
+The flag is a boolean.
+
+Other providers stay text only.
+
+A stream does not accept tools.
+
+`functions` and `function_call` stay refused.
+
+A request can send from 1 to 32 function tools.
+
+A function name has at most 64 characters.
+
+`parameters` must be an object schema.
+
+One schema is at most 8192 bytes.
+
+Schema depth is at most 8.
+
+Schema node count is at most 64.
+
+Logs do not store raw tool arguments.
+
+A tool round is not stored in a sample.
+
+Provider usage stays on the attempt.
+
+Tenant and model permissions stay in force.

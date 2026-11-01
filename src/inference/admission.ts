@@ -5,7 +5,7 @@ import type { Logger } from '../logger.js';
 import { addDecimal, canonicalDecimal, maxDecimal, multiplyDecimal, selectPrice, type PriceCandidate } from './cost.js';
 import { ProxyError, proxyError } from './errors.js';
 import type { ResolvedRoute } from './resolve.js';
-import type { ChatRequest } from './validate.js';
+import { argumentChars, messageText, type ChatRequest } from './validate.js';
 
 const ADMISSION_MESSAGES: Record<string, string> = {
   tenant_rate_limited: 'The request rate limit was reached.',
@@ -47,7 +47,7 @@ export function windowStart(ms: number): Date {
 
 export function inputBound(request: ChatRequest): number {
   let total = 0;
-  for (const message of request.messages) total += message.content.length;
+  for (const message of request.messages) total += messageText(message).length + argumentChars(message);
   return total;
 }
 

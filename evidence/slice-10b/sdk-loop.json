@@ -1,0 +1,167 @@
+{
+  "synthetic": true,
+  "proxyExecutedFunction": false,
+  "localExecutions": 2,
+  "transcript": [
+    {
+      "step": "tool_request",
+      "request": {
+        "model": "auto",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Check the order."
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_order_status",
+              "description": "Read one order status.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "The order identifier."
+                  }
+                },
+                "required": [
+                  "order_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "auto"
+      },
+      "response": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1700000000,
+        "model": "gpt-fn10b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call_order_1001",
+                  "type": "function",
+                  "function": {
+                    "name": "get_order_status",
+                    "arguments": "{\"order_id\":\"ord_1001\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 11,
+          "completion_tokens": 7,
+          "total_tokens": 18
+        }
+      }
+    },
+    {
+      "step": "tool_result",
+      "tool_call_id": "call_order_1001",
+      "content": "shipped",
+      "executedBy": "application"
+    },
+    {
+      "step": "final",
+      "response": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1700000000,
+        "model": "gpt-fn10b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "The order is shipped."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 11,
+          "completion_tokens": 7,
+          "total_tokens": 18
+        }
+      }
+    },
+    {
+      "step": "second_tool_request",
+      "response": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1700000000,
+        "model": "gpt-fn10b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call_order_1002",
+                  "type": "function",
+                  "function": {
+                    "name": "get_order_status",
+                    "arguments": "{\"order_id\":\"ord_1001\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 11,
+          "completion_tokens": 7,
+          "total_tokens": 18
+        }
+      }
+    },
+    {
+      "step": "second_tool_result",
+      "tool_call_id": "call_order_1002",
+      "content": "shipped",
+      "executedBy": "application"
+    },
+    {
+      "step": "second_final",
+      "response": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1700000000,
+        "model": "gpt-fn10b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "The order is still shipped."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 11,
+          "completion_tokens": 7,
+          "total_tokens": 18
+        }
+      }
+    }
+  ]
+}

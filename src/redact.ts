@@ -1,4 +1,4 @@
-const SENSITIVE_KEY = /(authorization|password|secret|token|verifier|credential|api[-_]?key|messages|prompt)/i;
+const SENSITIVE_KEY = /(authorization|password|secret|token|verifier|credential|api[-_]?key|messages|prompt|arguments|tool_calls|tool_call_id)/i;
 
 function redactString(value: string): string {
   return value
@@ -6,7 +6,8 @@ function redactString(value: string): string {
     .replace(/yck_[A-Za-z0-9_-]+/g, '[REDACTED]')
     .replace(/scrypt\$[A-Za-z0-9_$.-]+/g, '[REDACTED]')
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[REDACTED]')
-    .replace(/aes-256-gcm\$[A-Za-z0-9_$-]+/g, '[REDACTED]');
+    .replace(/aes-256-gcm\$[A-Za-z0-9_$-]+/g, '[REDACTED]')
+    .replace(/"arguments"\s*:\s*"(?:\\.|[^"\\])*"/g, '"arguments":"[REDACTED]"');
 }
 
 export function redact<T>(value: T, depth = 0): T {

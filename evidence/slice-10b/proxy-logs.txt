@@ -1,0 +1,27 @@
+{"time":"2026-11-01T09:44:32.570Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"0d5841bb-a9ed-4efd-849d-55b8a17b4638","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:32.623Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"71ad3bbd-a9f9-46e3-a088-63700cbeeecd","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:32.676Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"678203e1-be22-4b00-99ed-e750b9a8bca7","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:32.720Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"7afd75d5-5379-4850-9d70-7eb23ed813dc","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:32.763Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"dbf14410-08b7-46cd-8647-cdc5f6df41c7","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:32.806Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"a94f8758-411e-41b4-af5f-8fb47b3345be","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:33.041Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"17881d60-a85a-43d8-a3a3-02a6843ba688","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:33.142Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"cd4645f4-ef17-4595-9dda-279ae85b0908","deployment":"tool-chat","reason":"metadata_only"}
+
+{"time":"2026-11-01T09:44:33.193Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"e2d7caee-b369-4169-8a77-9113eb4535fa","deployment":"tool-chat","reason":"metadata_only"}
+
+{"time":"2026-11-01T09:44:33.193Z","level":"info","severity":"INFO","msg":"stream sample capture finished","message":"stream sample capture finished","requestId":"e2d7caee-b369-4169-8a77-9113eb4535fa","stored":false}
+
+{"time":"2026-11-01T09:44:33.236Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"18114bac-6240-4b81-bb93-642c48f2f26e","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:33.280Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"3bd227ea-d475-42a1-8913-f7b6cd4f0cf6","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:33.321Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"3453e56f-6eca-4df6-a507-f06de6639360","deployment":"tool-chat","reason":"tool_round"}
+
+{"time":"2026-11-01T09:44:33.364Z","level":"info","severity":"INFO","msg":"sample capture skipped","message":"sample capture skipped","requestId":"335c68fd-135e-42d0-9938-88301179f204","deployment":"tool-chat","reason":"tool_round"}

@@ -146,6 +146,62 @@ describe('OpenAI chunk normalization', () => {
     expect(renderChunk(reported, header, true)).not.toContain('completion_tokens');
   });
 
+  it('forwards indexed tool fragments and rejects a fragment before the call starts', () => {
+    const base = {
+      id: 'chatcmpl-1',
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: 'gpt-actual',
+    };
+    const opened = eventsFromOpenAiChunk(
+      {
+        ...base,
+        choices: [{
+          delta: {
+            tool_calls: [{ index: 0, id: 'call_order_1001', type: 'function', function: { name: 'get_order_status', arguments: '{"order_id":' } }],
+          },
+          finish_reason: null,
+        }],
+      },
+      initialChunkCursor(),
+      { allowTools: true },
+    );
+    expect(opened.events.some((event) => event.type === 'tool_delta' && event.index === 0 && event.id === 'call_order_1001')).toBe(true);
+    const finished = eventsFromOpenAiChunk(
+      {
+        ...base,
+        choices: [{
+          delta: { tool_calls: [{ index: 0, function: { arguments: '"ord_1001"}' } }] },
+          finish_reason: 'tool_calls',
+        }],
+      },
+      opened.cursor,
+      { allowTools: true },
+    );
+    const tool = finished.events.find((event) => event.type === 'tool_delta');
+    const done = finished.events.find((event) => event.type === 'finish');
+    expect(tool).toMatchObject({ index: 0, arguments: '"ord_1001"}' });
+    expect(done).toMatchObject({ finishReason: 'tool_calls' });
+    expect(finished.cursor.tools[0]?.arguments).toBe('{"order_id":"ord_1001"}');
+    expect(() =>
+      eventsFromOpenAiChunk(
+        {
+          ...base,
+          choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"a":1}' } }] }, finish_reason: null }],
+        },
+        initialChunkCursor(),
+        { allowTools: true },
+      ),
+    ).toThrow(/invalid/i);
+    expect(() =>
+      eventsFromOpenAiChunk(
+        { ...base, choices: [{ delta: { tool_calls: [] }, finish_reason: null }] },
+        initialChunkCursor(),
+        { allowTools: true },
+      ),
+    ).toThrow(/invalid/i);
+  });
+
   it('rejects tools, a non-assistant role, and a bad finish reason', () => {
     const base = {
       id: 'chatcmpl-1',

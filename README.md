@@ -22,7 +22,7 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 ### What Does It Provide?
 
 - **Standard Interface:** Drop-in OpenAI-compatible endpoints (`POST /v1/chat/completions` and `GET /v1/models`) supporting Server-Sent Events (SSE) streaming and unary modes.
-- **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. The application executes the function. The proxy does not execute the function. A stream does not accept tools. A live DGX host does not receive function tools.
+- **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. A stream returns each tool-call delta with its index, id, and function name. The application executes the function. The proxy does not execute the function. The proxy does not execute a partial argument fragment. A live DGX host does not receive function tools. A loopback DGX mock can stream the same tool call.
 - **Multi-Provider Adapters:** Native adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and private self-hosted endpoints (e.g., NVIDIA DGX).
 - **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets.
 - **Resilience Controls:** Configurable request deadlines, circuit breakers, and retry policies before any stream output begins.

@@ -430,7 +430,6 @@ npm test
 
 - A live call to a DGX host.
 - Input that is not text.
-- A stream of tool-call deltas.
 - A retry for every kind of error.
 - An optimizer that promotes a policy without an operator. Selection for `auto` stays off until you enable it for one tenant and one task segment.
 - OAuth, a login, saved caller state, and a user account.

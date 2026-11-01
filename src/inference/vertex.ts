@@ -12,6 +12,7 @@ import {
   type VertexClientSpec,
   type VertexGenerateClient,
 } from './vertex-client.js';
+import { requestUsesTools } from './validate.js';
 import { normalizeVertexError, normalizeVertexResponse, toVertexRequest } from './vertex-convert.js';
 import { raceAbort, streamVertexChat } from './vertex-stream.js';
 
@@ -164,6 +165,7 @@ export const vertexAdapter: ProviderAdapter & {
         fetchImpl: call.fetchImpl,
         retryAfter: () => call.attemptTrace?.retryAfter ?? null,
         onDispatched: call.onDispatched,
+        allowTools: requestUsesTools(call.request),
       })) {
         if (!noted) {
           noted = true;

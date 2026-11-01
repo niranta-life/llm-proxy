@@ -73,13 +73,13 @@ describe('request validation', () => {
     });
     expect(accepted.optional.tool_choice).toBe('auto');
     expect(accepted.optional.parallel_tool_calls).toBe(false);
-    expect(() =>
-      validateChatRequest({
-        ...textRequest,
-        stream: true,
-        tools: [{ type: 'function', function: { name: 'get_order_status' } }],
-      }),
-    ).toThrow(/tools is not supported/i);
+    const streamed = validateChatRequest({
+      ...textRequest,
+      stream: true,
+      tools: [{ type: 'function', function: { name: 'get_order_status' } }],
+    });
+    expect(streamed.stream).toBe(true);
+    expect(streamed.optional.tools).toHaveLength(1);
     expect(() =>
       validateChatRequest({
         model: 'auto',

@@ -45,6 +45,7 @@ export async function* streamOpenAiChat(input: {
   identity?: OpenRouterPolicy;
   onDispatched?: () => Promise<void>;
   stringBody?: boolean;
+  allowTools?: boolean;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
@@ -148,7 +149,7 @@ export async function* streamOpenAiChat(input: {
       throw normalizeUpstreamError(APIError.generate(502, undefined, '', undefined), false);
     }
     noteProvider(parsed);
-    const mapped = eventsFromOpenAiChunk(parsed, cursor);
+    const mapped = eventsFromOpenAiChunk(parsed, cursor, { allowTools: input.allowTools === true });
     cursor = mapped.cursor;
     const staged = mapped.events.flatMap((event) => stage({ type: 'event', event }));
     if (staged.length === 0 && released && held.length > 0) return held.splice(0, held.length);

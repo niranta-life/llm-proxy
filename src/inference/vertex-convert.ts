@@ -8,7 +8,7 @@ import {
   transportFor,
   type FailedAttemptFacts,
 } from './errors.js';
-import type { CanonicalEvent } from './stream.js';
+import { appendToolFragment, assertFinishedToolCalls, copyToolCalls, type CanonicalEvent, type StreamToolCall } from './stream.js';
 import {
   messageText,
   requestUsesTools,
@@ -77,6 +77,7 @@ export type VertexRequestBody = {
 export type VertexStreamCursor = {
   started: boolean;
   finished: boolean;
+  tools?: StreamToolCall[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -554,15 +555,20 @@ export function normalizeVertexResponse(
   };
 }
 
+function partsIncludeFunctionCall(parts: unknown): boolean {
+  return Array.isArray(parts) && parts.some((part) => isRecord(part) && part.functionCall !== undefined);
+}
+
 export function eventsFromVertexChunk(
   chunk: unknown,
   cursor: VertexStreamCursor,
   upstreamModel: string,
   createdSeconds: number,
+  options?: { allowTools?: boolean },
 ): { cursor: VertexStreamCursor; events: CanonicalEvent[] } {
   if (!isRecord(chunk)) invalidVertex(chunk);
   const events: CanonicalEvent[] = [];
-  const next = { ...cursor };
+  const next: VertexStreamCursor = { ...cursor, tools: copyToolCalls(cursor.tools) };
   const providerRequestId = safeProviderRequestId(chunk.responseId);
   const model = typeof chunk.modelVersion === 'string' && chunk.modelVersion.length > 0 && chunk.modelVersion.length <= 256
     ? chunk.modelVersion
@@ -584,12 +590,35 @@ export function eventsFromVertexChunk(
   if (candidate !== null) {
     const contentRecord = candidate.content;
     if (isRecord(contentRecord) && contentRecord.parts !== undefined) {
-      const text = visibleText(contentRecord.parts, chunk);
-      if (text.length > 0) events.push({ type: 'text_delta', text });
+      if (options?.allowTools === true && partsIncludeFunctionCall(contentRecord.parts)) {
+        const read = readVertexModelParts(contentRecord.parts, chunk);
+        if (read.content.length > 0) events.push({ type: 'text_delta', text: read.content });
+        const tools = next.tools ?? [];
+        for (const call of read.toolCalls) {
+          if (tools.some((existing) => existing.id === call.id)) invalidVertex(chunk);
+          events.push(appendToolFragment(tools, {
+            index: tools.length,
+            id: call.id,
+            name: call.function.name,
+            arguments: call.function.arguments,
+          }));
+        }
+        next.tools = tools;
+      } else {
+        const text = visibleText(contentRecord.parts, chunk);
+        if (text.length > 0) events.push({ type: 'text_delta', text });
+      }
     }
     if (typeof candidate.finishReason === 'string' && !next.finished) {
-      const mapped = mapVertexFinish(candidate.finishReason);
-      events.push({ type: 'finish', finishReason: mapped.finish, nativeReason: mapped.native });
+      const tools = next.tools ?? [];
+      if (tools.length > 0) {
+        if (candidate.finishReason !== 'STOP') invalidVertex(chunk);
+        assertFinishedToolCalls(tools);
+        events.push({ type: 'finish', finishReason: 'tool_calls', nativeReason: 'stop' });
+      } else {
+        const mapped = mapVertexFinish(candidate.finishReason);
+        events.push({ type: 'finish', finishReason: mapped.finish, nativeReason: mapped.native });
+      }
       next.finished = true;
     }
   } else if (blocked && !next.finished) {

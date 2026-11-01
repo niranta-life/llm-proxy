@@ -29,13 +29,22 @@ export type CanonicalEvent =
       cacheReadInputTokens?: number | null;
       thoughtsTokens?: number | null;
     }
-  | { type: 'finish'; finishReason: string; nativeReason?: string };
+  | { type: 'finish'; finishReason: string; nativeReason?: string }
+  | { type: 'tool_delta'; index: number; id?: string; name?: string; arguments: string };
+
+export type StreamToolCall = {
+  index: number;
+  id: string;
+  name: string;
+  arguments: string;
+};
 
 export type ChunkCursor = {
   id: string | null;
   model: string | null;
   created: number | null;
   started: boolean;
+  tools: StreamToolCall[];
 };
 
 export type StreamMachine = {
@@ -105,7 +114,7 @@ export class StreamShutdownError extends Error {
 }
 
 export function initialChunkCursor(): ChunkCursor {
-  return { id: null, model: null, created: null, started: false };
+  return { id: null, model: null, created: null, started: false, tools: [] };
 }
 
 export function initialStreamMachine(): StreamMachine {
@@ -170,9 +179,101 @@ function invalidChunk(): never {
   throw proxyError(502, 'server_error', 'invalid_upstream_response', null, 'The upstream model response was invalid.');
 }
 
+const MAX_STREAM_TOOL_CALLS = 16;
+const MAX_STREAM_TOOL_ARGUMENTS = 8192;
+const MAX_STREAM_TOOL_INDEX = 10_000;
+const STREAM_TOOL_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const STREAM_TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function copyToolCalls(calls: readonly StreamToolCall[] | undefined): StreamToolCall[] {
+  return (calls ?? []).map((call) => ({ ...call }));
+}
+
+export function appendToolFragment(
+  calls: StreamToolCall[],
+  fragment: { index: number; id?: string; name?: string; arguments?: string },
+): CanonicalEvent {
+  if (!Number.isInteger(fragment.index) || fragment.index < 0 || fragment.index > MAX_STREAM_TOOL_INDEX) invalidChunk();
+  const args = fragment.arguments ?? '';
+  if (args.length > MAX_STREAM_TOOL_ARGUMENTS) invalidChunk();
+  const existing = calls.find((call) => call.index === fragment.index);
+  if (existing === undefined) {
+    if (fragment.id === undefined || !STREAM_TOOL_ID.test(fragment.id)) invalidChunk();
+    if (fragment.name === undefined || !STREAM_TOOL_NAME.test(fragment.name)) invalidChunk();
+    if (calls.some((call) => call.id === fragment.id)) invalidChunk();
+    if (calls.length >= MAX_STREAM_TOOL_CALLS) invalidChunk();
+    calls.push({ index: fragment.index, id: fragment.id, name: fragment.name, arguments: args });
+    return { type: 'tool_delta', index: fragment.index, id: fragment.id, name: fragment.name, arguments: args };
+  }
+  if (fragment.id !== undefined && fragment.id !== existing.id) invalidChunk();
+  if (fragment.name !== undefined && fragment.name !== existing.name) invalidChunk();
+  if (existing.arguments.length + args.length > MAX_STREAM_TOOL_ARGUMENTS) invalidChunk();
+  existing.arguments += args;
+  return {
+    type: 'tool_delta',
+    index: fragment.index,
+    ...(fragment.id !== undefined ? { id: fragment.id } : {}),
+    ...(fragment.name !== undefined ? { name: fragment.name } : {}),
+    arguments: args,
+  };
+}
+
+export function assertFinishedToolCalls(calls: readonly StreamToolCall[]): void {
+  if (calls.length === 0 || calls.length > MAX_STREAM_TOOL_CALLS) invalidChunk();
+  const seen = new Set<string>();
+  for (const call of calls) {
+    if (!STREAM_TOOL_ID.test(call.id) || seen.has(call.id)) invalidChunk();
+    seen.add(call.id);
+    if (!STREAM_TOOL_NAME.test(call.name)) invalidChunk();
+    if (!completeToolArguments(call.arguments)) invalidChunk();
+  }
+}
+
+function completeToolArguments(value: string): boolean {
+  if (value.length === 0 || value.length > MAX_STREAM_TOOL_ARGUMENTS) return false;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+function readOpenAiToolCalls(delta: Record<string, unknown>, calls: StreamToolCall[], events: CanonicalEvent[]): void {
+  const raw = delta.tool_calls;
+  if (!Array.isArray(raw) || raw.length === 0) invalidChunk();
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item.index !== 'number') invalidChunk();
+    if (item.id !== undefined && typeof item.id !== 'string') invalidChunk();
+    if (item.type !== undefined && item.type !== 'function') invalidChunk();
+    let name: string | undefined;
+    let args: string | undefined;
+    if (item.function !== undefined) {
+      if (!isRecord(item.function)) invalidChunk();
+      if (item.function.name !== undefined) {
+        if (typeof item.function.name !== 'string') invalidChunk();
+        name = item.function.name;
+      }
+      if (item.function.arguments !== undefined) {
+        if (typeof item.function.arguments !== 'string') invalidChunk();
+        args = item.function.arguments;
+      }
+    }
+    const opening = calls.every((call) => call.index !== item.index);
+    if (opening && item.type !== 'function') invalidChunk();
+    events.push(appendToolFragment(calls, {
+      index: item.index,
+      ...(typeof item.id === 'string' ? { id: item.id } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(args !== undefined ? { arguments: args } : {}),
+    }));
+  }
+}
+
 export function eventsFromOpenAiChunk(
   value: unknown,
   cursor: ChunkCursor,
+  options?: { allowTools?: boolean },
 ): { events: CanonicalEvent[]; cursor: ChunkCursor } {
   if (!isRecord(value)) invalidChunk();
   if (value.object !== undefined && value.object !== 'chat.completion.chunk') invalidChunk();
@@ -187,6 +288,7 @@ export function eventsFromOpenAiChunk(
     model: cursor.model ?? model,
     created: cursor.created ?? created,
     started: cursor.started,
+    tools: copyToolCalls(cursor.tools),
   };
   if (next.id === null || next.model === null || next.created === null) invalidChunk();
 
@@ -202,15 +304,25 @@ export function eventsFromOpenAiChunk(
       if (!isRecord(choice)) invalidChunk();
       if (choice.delta !== undefined && choice.delta !== null) {
         if (!isRecord(choice.delta)) invalidChunk();
-        if ('tool_calls' in choice.delta || 'function_call' in choice.delta) invalidChunk();
+        if ('function_call' in choice.delta) invalidChunk();
         if (choice.delta.role !== undefined && choice.delta.role !== 'assistant') invalidChunk();
         if (choice.delta.content !== undefined) {
           if (typeof choice.delta.content !== 'string') invalidChunk();
           if (choice.delta.content.length > 0) events.push({ type: 'text_delta', text: choice.delta.content });
         }
+        if ('tool_calls' in choice.delta) {
+          if (options?.allowTools !== true) invalidChunk();
+          readOpenAiToolCalls(choice.delta, next.tools, events);
+        }
       }
       if (choice.finish_reason !== undefined && choice.finish_reason !== null) {
         if (typeof choice.finish_reason !== 'string' || !/^[a-z0-9_]{1,64}$/.test(choice.finish_reason)) {
+          invalidChunk();
+        }
+        if (next.tools.length > 0) {
+          if (choice.finish_reason !== 'tool_calls') invalidChunk();
+          assertFinishedToolCalls(next.tools);
+        } else if (choice.finish_reason === 'tool_calls') {
           invalidChunk();
         }
         events.push({ type: 'finish', finishReason: choice.finish_reason });
@@ -265,6 +377,23 @@ export function renderChunk(event: CanonicalEvent, header: SseHeader, includeUsa
       created: header.created,
       model: header.model,
       choices: [{ index: 0, delta: { content: event.text }, finish_reason: null }],
+    });
+  }
+  if (event.type === 'tool_delta') {
+    const call: Record<string, unknown> = { index: event.index };
+    if (event.id !== undefined) {
+      call.id = event.id;
+      call.type = 'function';
+    }
+    const fn: Record<string, string> = { arguments: event.arguments };
+    if (event.name !== undefined) fn.name = event.name;
+    call.function = fn;
+    return frame({
+      id: header.id,
+      object: 'chat.completion.chunk',
+      created: header.created,
+      model: header.model,
+      choices: [{ index: 0, delta: { tool_calls: [call] }, finish_reason: null }],
     });
   }
   return frame({

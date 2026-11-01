@@ -12,7 +12,7 @@ import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
 import { ProxyError, normalizeUpstreamError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy } from './errors.js';
 import { streamOpenAiChat, type UpstreamStreamItem } from './openai-stream.js';
 import type { StreamTimeouts } from './stream.js';
-import { type ChatMessage, type FunctionToolCall } from './validate.js';
+import { requestUsesTools, type ChatMessage, type FunctionToolCall } from './validate.js';
 
 export type TokenUsage = {
   promptTokens: number | null;
@@ -293,6 +293,7 @@ export const openAiAdapter: ProviderAdapter & {
       identity: call.route.provider === 'openrouter' ? policy : undefined,
       onDispatched: call.onDispatched,
       stringBody: compatible,
+      allowTools: requestUsesTools(call.request),
     });
   },
 };

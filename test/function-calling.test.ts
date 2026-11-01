@@ -187,6 +187,17 @@ describe('function tool validation', () => {
     });
     expect(parsed.optional.tools).toHaveLength(1);
     expect(parsed.optional.tool_choice).toEqual({ type: 'function', function: { name: 'get_order_status' } });
+    const streamed = validateChatRequest({
+      model: 'auto',
+      stream: true,
+      messages: [{ role: 'user', content: 'Check the order.' }],
+      tools: [orderTool],
+    });
+    expect(streamed.stream).toBe(true);
+    expect(() => assertToolProvider(streamed, 'openai')).not.toThrow();
+    expect(() => assertToolProvider(streamed, 'anthropic')).not.toThrow();
+    expect(() => assertToolProvider(streamed, 'dgx', { endpoint: 'https://127.0.0.1:9/v1' })).not.toThrow();
+    expect(() => assertToolProvider(streamed, 'dgx', { endpoint: 'https://dgx.lab.internal/v1' })).toThrow(/tools is not supported/i);
     expect(() => assertToolProvider(parsed, 'openai')).not.toThrow();
     expect(() => assertToolProvider(parsed, 'anthropic')).not.toThrow();
     expect(() => assertToolProvider(parsed, 'vertex')).not.toThrow();
@@ -714,15 +725,41 @@ describe('OpenAI function calling', () => {
     expect(plain.response.statusCode).toBe(400);
     expect(plain.body.error.param).toBe('tools');
     expect(mock.hits.length).toBe(plain.before);
-    const stream = await post(chatBody('auto', [{ role: 'user', content: 'Check the order.' }], { stream: true, tools: [orderTool] }));
-    expect(stream.response.statusCode).toBe(400);
-    expect(stream.body.error.code).toBe('unsupported_parameter');
-    expect(mock.hits.length).toBe(stream.before);
+    const streamBefore = mock.hits.length;
+    const stream = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+      const payload = chatBody('auto', [{ role: 'user', content: 'Check the order.' }], { stream: true, tools: [orderTool] });
+      const req = httpRequest(
+        {
+          hostname: '127.0.0.1',
+          port,
+          path: '/v1/chat/completions',
+          method: 'POST',
+          headers: {
+            ...authHeaders(tenant.tenantId, tenant.secret),
+            'content-length': Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          const parts: Buffer[] = [];
+          res.on('data', (chunk) => parts.push(Buffer.from(chunk)));
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, raw: Buffer.concat(parts).toString('utf8') }));
+        },
+      );
+      req.on('error', reject);
+      req.end(payload);
+    });
+    expect(stream.status).toBe(200);
+    expect(stream.raw).toContain('data: [DONE]');
+    expect(stream.raw).not.toContain('tool_calls');
+    expect(mock.hits.length).toBe(streamBefore + 1);
+    const streamUpstream = JSON.parse(mock.hits[streamBefore]?.body ?? '{}') as { tools?: unknown; stream?: boolean };
+    expect(streamUpstream.stream).toBe(true);
+    expect(Array.isArray(streamUpstream.tools)).toBe(true);
     apiResults.push({
       name: 'permissions',
       parallel: parallel.body.error.param,
       plain: plain.body.error.param,
-      stream: stream.response.statusCode,
+      stream: stream.status,
     });
   });
 

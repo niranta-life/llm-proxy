@@ -3,14 +3,19 @@ import type { ProviderCall } from './contract.js';
 import { deadlineKindOf, isCallerAbort } from './execution-policy.js';
 import { emptyAttemptFacts, ProxyError, proxyError, safeNativeReason, safeProviderRequestId, timeoutProxy, transportFor } from './errors.js';
 import {
+  appendToolFragment,
+  assertFinishedToolCalls,
+  copyToolCalls,
   createSseDecoder,
   jsonRequestStream,
   StreamShutdownError,
   StreamTimeoutError,
   type CanonicalEvent,
+  type StreamToolCall,
 } from './stream.js';
 import type { UpstreamStreamItem } from './openai-stream.js';
 import type { StreamTimeouts } from './stream.js';
+import { requestUsesTools } from './validate.js';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -34,7 +39,7 @@ const COUNTED_KEYS = [
   'cache_read_input_tokens',
 ] as const;
 
-export type AnthropicBlockKind = 'text' | 'thinking';
+export type AnthropicBlockKind = 'text' | 'thinking' | 'tool';
 
 export type AnthropicStreamCursor = {
   phase: 'open' | 'started' | 'stopped';
@@ -42,6 +47,7 @@ export type AnthropicStreamCursor = {
   model: string | null;
   created: number;
   blocks: Array<{ index: number; kind: AnthropicBlockKind; open: boolean }>;
+  tools: StreamToolCall[];
   stopReason: string | null;
   uncachedInputTokens: number | null;
   cacheCreationInputTokens: number | null;
@@ -70,6 +76,7 @@ export function initialAnthropicStreamCursor(createdSeconds: number): AnthropicS
     model: null,
     created: createdSeconds,
     blocks: [],
+    tools: [],
     stopReason: null,
     uncachedInputTokens: null,
     cacheCreationInputTokens: null,
@@ -82,6 +89,7 @@ function copyCursor(cursor: AnthropicStreamCursor): AnthropicStreamCursor {
   return {
     ...cursor,
     blocks: cursor.blocks.map((block) => ({ ...block })),
+    tools: copyToolCalls(cursor.tools),
   };
 }
 
@@ -179,13 +187,24 @@ function pushUsage(events: CanonicalEvent[], cursor: AnthropicStreamCursor): voi
   if (usage !== null) events.push(usage);
 }
 
-function applyStop(cursor: AnthropicStreamCursor, events: CanonicalEvent[], stopReason: unknown): void {
+function applyStop(cursor: AnthropicStreamCursor, events: CanonicalEvent[], stopReason: unknown, allowTools: boolean): void {
   if (stopReason === undefined || stopReason === null) return;
   if (typeof stopReason !== 'string') invalidStream();
   if (cursor.stopReason !== null) {
     if (cursor.stopReason !== stopReason) invalidStream();
     return;
   }
+  const tools = cursor.tools ?? [];
+  if (stopReason === 'tool_use') {
+    if (!allowTools || tools.length === 0) invalidStream();
+    assertFinishedToolCalls(tools);
+    const nativeReason = safeNativeReason(stopReason);
+    if (nativeReason === null) invalidStream();
+    cursor.stopReason = nativeReason;
+    events.push({ type: 'finish', finishReason: 'tool_calls', nativeReason });
+    return;
+  }
+  if (tools.length > 0) invalidStream();
   let finishReason: 'stop' | 'length' | 'content_filter';
   try {
     finishReason = mapAnthropicFinishReason(stopReason);
@@ -203,9 +222,23 @@ function rejectCitations(block: Record<string, unknown>): void {
   if (!Array.isArray(block.citations) || block.citations.length > 0) invalidStream();
 }
 
-function startBlock(cursor: AnthropicStreamCursor, events: CanonicalEvent[], index: number, block: unknown): void {
+function startBlock(
+  cursor: AnthropicStreamCursor,
+  events: CanonicalEvent[],
+  index: number,
+  block: unknown,
+  allowTools: boolean,
+): void {
   if (!isRecord(block) || typeof block.type !== 'string') invalidStream();
   if (cursor.blocks.some((item) => item.index === index)) invalidStream();
+  if (block.type === 'tool_use') {
+    if (!allowTools) invalidStream();
+    if (block.input !== undefined && !isRecord(block.input)) invalidStream();
+    if (typeof block.id !== 'string' || typeof block.name !== 'string') invalidStream();
+    cursor.blocks.push({ index, kind: 'tool', open: true });
+    events.push(appendToolFragment(cursor.tools, { index, id: block.id, name: block.name, arguments: '' }));
+    return;
+  }
   if (block.type === 'text' || block.type === 'refusal') {
     rejectCitations(block);
     cursor.blocks.push({ index, kind: 'text', open: true });
@@ -244,6 +277,12 @@ function onDelta(cursor: AnthropicStreamCursor, events: CanonicalEvent[], value:
     if (block.kind !== 'thinking') invalidStream();
     return;
   }
+  if (delta.type === 'input_json_delta') {
+    if (block.kind !== 'tool') invalidStream();
+    if (typeof delta.partial_json !== 'string') invalidStream();
+    events.push(appendToolFragment(cursor.tools, { index, arguments: delta.partial_json }));
+    return;
+  }
   invalidStream();
 }
 
@@ -267,6 +306,7 @@ export function eventsFromAnthropicEvent(
   value: unknown,
   cursor: AnthropicStreamCursor,
   permittedModel: string,
+  allowTools = false,
 ): AnthropicConvertResult {
   if (!isRecord(value) || typeof value.type !== 'string') invalidStream();
   if (value.type === 'error') providerStreamError(value);
@@ -289,8 +329,8 @@ export function eventsFromAnthropicEvent(
     const events: CanonicalEvent[] = [{ type: 'start', id, model: permittedModel, created: next.created }];
     if (message.usage !== undefined) applyUsage(next, message.usage);
     pushUsage(events, next);
-    applyStop(next, events, message.stop_reason);
-    message.content.forEach((block, index) => startBlock(next, events, index, block));
+    applyStop(next, events, message.stop_reason, allowTools);
+    message.content.forEach((block, index) => startBlock(next, events, index, block, allowTools));
     return { events, cursor: next, done: false };
   }
 
@@ -299,7 +339,7 @@ export function eventsFromAnthropicEvent(
   const events: CanonicalEvent[] = [];
 
   if (value.type === 'content_block_start') {
-    startBlock(next, events, readIndex(value.index), value.content_block);
+    startBlock(next, events, readIndex(value.index), value.content_block, allowTools);
     return { events, cursor: next, done: false };
   }
   if (value.type === 'content_block_delta') {
@@ -315,7 +355,7 @@ export function eventsFromAnthropicEvent(
   }
   if (value.type === 'message_delta') {
     if (!isRecord(value.delta)) invalidStream();
-    applyStop(next, events, value.delta.stop_reason);
+    applyStop(next, events, value.delta.stop_reason, allowTools);
     if (value.usage !== undefined) {
       applyUsage(next, value.usage);
       pushUsage(events, next);
@@ -333,6 +373,7 @@ export function itemsFromAnthropicData(
   data: string,
   cursor: AnthropicStreamCursor,
   permittedModel: string,
+  allowTools = false,
 ): AnthropicConvertResult {
   let parsed: unknown;
   try {
@@ -340,7 +381,7 @@ export function itemsFromAnthropicData(
   } catch {
     invalidStream();
   }
-  return eventsFromAnthropicEvent(parsed, cursor, permittedModel);
+  return eventsFromAnthropicEvent(parsed, cursor, permittedModel, allowTools);
 }
 
 function statusFailure(status: number, aborted: boolean, retryAfter: string | null): ReturnType<typeof proxyError> {
@@ -422,6 +463,7 @@ export async function* streamAnthropicChat(input: {
   };
   if (input.workspaceId !== null && input.workspaceId !== '') headers['anthropic-workspace-id'] = input.workspaceId;
 
+  const allowTools = requestUsesTools(input.request);
   const decoder = createSseDecoder();
   let cursor = initialAnthropicStreamCursor(Math.floor(Date.now() / 1000));
   let sawDone = false;
@@ -511,7 +553,7 @@ export async function* streamAnthropicChat(input: {
   }
 
   function itemsFromMessage(data: string): UpstreamStreamItem[] {
-    const mapped = itemsFromAnthropicData(data, cursor, input.upstreamModel);
+    const mapped = itemsFromAnthropicData(data, cursor, input.upstreamModel, allowTools);
     cursor = mapped.cursor;
     const items: UpstreamStreamItem[] = mapped.events.map((event) => ({ type: 'event', event }));
     if (mapped.done) items.push({ type: 'done' });

@@ -25,6 +25,7 @@ import { captureChatSample } from './samples.js';
 import type { SampleKeyManager } from './sample-crypto.js';
 import { appendVisibleDelta, createVisibleCapture, visibleCaptureText } from './stream-capture.js';
 import { finishAttempt, finishRequest, insertAttempt, insertPending, markStream } from './store.js';
+import { toolAttemptAudit, type ToolAttemptAudit } from './tool-adapter.js';
 import { recordSelection, type SelectionPlan } from './promotion-select.js';
 import { recordRoutingDecision } from './routing-policy-store.js';
 import { recordCanaryAssignment, reconcileCanary, type CanaryPlan } from './canary-rollout.js';
@@ -63,7 +64,7 @@ import {
   type StreamTimeouts,
   type TerminalStreamStatus,
 } from './stream.js';
-import type { ChatRequest } from './validate.js';
+import { assertCapabilities, assertToolProvider, requestUsesTools, type ChatRequest } from './validate.js';
 
 export type StreamHttp = FrameSocket & {
   hijack(): void;
@@ -181,7 +182,7 @@ export async function runChatStream(input: {
     try {
       const store = input.store;
       const created = await withTenant(input.runtimePool, input.tenantId, async (client) => {
-        const pending = await insertPending(client, input.tenantId, input.route);
+        const pending = await insertPending(client, input.tenantId, input.route, auditFor(input.request, input.route));
         await recordRoutingDecision(client, input.tenantId, pending.requestId, input.route);
         await recordSelection(client, input.tenantId, pending.requestId, input.selection);
         await recordCanaryAssignment(client, input.tenantId, pending.requestId, input.plan);
@@ -337,12 +338,12 @@ export async function runChatStream(input: {
             ? vertexAdapter.stream(call)
             : openAiAdapter.stream(call);
       for await (const item of iterable) {
-        if (input.signal.aborted) {
-          machine = reduceStream(machine, { type: 'client_abort' });
-          break;
-        }
         if (deadline.signal.reason instanceof StreamShutdownError) {
           machine = reduceStream(machine, { type: 'shutdown' });
+          break;
+        }
+        if (input.signal.aborted) {
+          machine = reduceStream(machine, { type: 'client_abort' });
           break;
         }
         if (item.type === 'done') {
@@ -416,10 +417,10 @@ export async function runChatStream(input: {
       if (error instanceof ProxyError && (error.code === 'circuit_open' || isAdmissionCode(error.code))) {
         machine = { ...machine, status: 'provider_failed' };
         providerCode = error.code ?? 'admission_unavailable';
-      } else if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
-      else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
+      } else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
         machine = reduceStream(machine, { type: 'shutdown' });
-      } else if (error instanceof SlowConsumerError) machine = reduceStream(machine, { type: 'backpressure_timeout' });
+      } else if (input.signal.aborted) machine = reduceStream(machine, { type: 'client_abort' });
+      else if (error instanceof SlowConsumerError) machine = reduceStream(machine, { type: 'backpressure_timeout' });
       else if (error instanceof StreamTimeoutError) machine = reduceStream(machine, { type: 'timeout', timer: error.timer });
       else {
         machine = reduceStream(machine, { type: 'provider_failure' });
@@ -435,10 +436,10 @@ export async function runChatStream(input: {
         chunkCount += 1;
       } catch (error) {
         failure = error;
-        if (input.signal.aborted) machine = { ...machine, status: 'client_aborted' };
-        else if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
+        if (error instanceof StreamShutdownError || deadline.signal.reason instanceof StreamShutdownError) {
           machine = { ...machine, status: 'interrupted' };
-        } else if (error instanceof SlowConsumerError) machine = { ...machine, status: 'slow_consumer' };
+        } else if (input.signal.aborted) machine = { ...machine, status: 'client_aborted' };
+        else if (error instanceof SlowConsumerError) machine = { ...machine, status: 'slow_consumer' };
         else if (error instanceof StreamTimeoutError) machine = { ...machine, status: 'timed_out' };
         else machine = { ...machine, status: 'provider_failed' };
       }
@@ -609,7 +610,15 @@ export async function runChatStream(input: {
           upstreamBaseUrl: input.upstreamBaseUrl,
           fetchImpl: input.fetchImpl,
           resolveHost: input.resolveHost,
-          prepare: (selected) => prepareProvider(input.request, selected),
+          prepare: (selected) => {
+            assertToolProvider(input.request, selected.provider, {
+              endpoint: selected.endpoint,
+              originProvider: input.route.provider,
+            });
+            assertCapabilities(input.request, selected.capabilities);
+            prepareProvider(input.request, selected);
+          },
+          audit: () => auditFor(input.request, next),
         });
         const previous = transport;
         transport = adopted.transport;
@@ -643,7 +652,7 @@ export async function runChatStream(input: {
     if (ordinal > ceiling) throw httpError(terminal, failure);
     try {
       attemptId = await withTenant(input.runtimePool, input.tenantId, (client) =>
-        insertAttempt(client, input.tenantId, requestId, input.route, ordinal),
+        insertAttempt(client, input.tenantId, requestId, input.route, ordinal, undefined, auditFor(input.request, input.route)),
       );
     } catch (error) {
       await closeStreamRequest(input, requestId);
@@ -673,6 +682,10 @@ export async function runChatStream(input: {
     releaseGate();
     await transport.release();
   }
+}
+
+function auditFor(request: ChatRequest, selected: ResolvedRoute): ToolAttemptAudit | null {
+  return requestUsesTools(request) ? toolAttemptAudit(selected.provider, selected.capabilities) : null;
 }
 
 function prepareProvider(request: ChatRequest, route: ResolvedRoute): void {

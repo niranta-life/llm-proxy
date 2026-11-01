@@ -964,7 +964,7 @@ describe('cross-provider function calling', () => {
         tools: [orderTool],
       });
       expect(stream.statusCode).toBe(400);
-      expect(stream.json().error.message).toBe('tools is not supported.');
+      expect(stream.json().error.message).toBe('Streaming is not supported.');
       expect(anthropicHits.length).toBe(beforeAnthropic);
       expect(vertexCalls.length).toBe(beforeVertex);
       expect(compatibleHits.length).toBe(beforeCompatible);

@@ -81,7 +81,15 @@ A property name starts with a letter or `_`.
 
 The deployment must list `parallel_tool_calls` before a request can send that flag.
 
-A stream cannot send tools.
+A stream can send function tools when streaming is enabled.
+
+Each streamed delta keeps its index, its id, and its function name.
+
+The proxy checks the joined arguments only when the call is complete.
+
+The proxy does not execute those arguments.
+
+A text-only stream still rejects a tool delta.
 
 `functions` and `function_call` stay refused.
 
@@ -171,7 +179,7 @@ An error body is an OpenAI error object:
 | 504 | `timeout` | The deployment timeout finished, or a stream timeout finished before the response headers. |
 | 529 | `overloaded` | Anthropic returned HTTP 529. |
 
-HTTP 400 covers `stream: true` when streaming is off. HTTP 400 covers tools on a stream. HTTP 400 covers tools when the deployment does not list them. HTTP 400 covers a schema or `tool_choice` the provider cannot represent. HTTP 400 covers function tools on a live DGX host. HTTP 400 covers an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
+HTTP 400 covers `stream: true` when streaming is off. HTTP 400 covers an empty `tools` array. HTTP 400 covers tools when the deployment does not list them. HTTP 400 covers a schema or `tool_choice` the provider cannot represent. HTTP 400 covers function tools on a live DGX host. HTTP 400 covers an image, audio, a response format other than text, and any field the deployment does not list. The proxy does not send that field upstream.
 
 These cases never call the provider:
 

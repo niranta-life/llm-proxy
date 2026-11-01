@@ -134,7 +134,45 @@ A live DGX host does not receive function tools.
 
 A loopback DGX mock can show the OpenAI tool body.
 
-A stream does not accept tools.
+A loopback DGX mock can stream a tool call.
+
+A stream accepts function tools on OpenAI, Anthropic, Vertex, xAI, and OpenRouter.
+
+Each streamed tool delta keeps its index, its id, and its function name.
+
+Argument fragments stay in provider order.
+
+Text deltas and tool deltas can interleave.
+
+More than one indexed call can arrive in one stream.
+
+A finished tool stream has `finish_reason` `tool_calls`.
+
+The proxy checks the joined arguments only when the call is complete.
+
+The joined arguments must be one JSON object.
+
+The joined arguments follow the same 8192-byte limit.
+
+The proxy does not execute a partial argument fragment.
+
+The proxy does not execute the completed arguments.
+
+Anthropic `input_json_delta` events become those public deltas.
+
+A Vertex function-call event in the accepted shape becomes those public deltas.
+
+A text-only stream still rejects a tool delta.
+
+A missing call id fails the stream.
+
+A fragment that arrives before its call starts fails the stream.
+
+Arguments that are not one JSON object fail the stream.
+
+That failure does not write `data: [DONE]`.
+
+At most 16 tool calls are accepted in one stream.
 
 A schema keyword or `tool_choice` the provider cannot represent is rejected before the provider call.
 

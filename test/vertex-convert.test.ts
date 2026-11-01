@@ -165,6 +165,44 @@ describe('vertex response conversion', () => {
     expect(second.events.map((event) => event.type)).toEqual(['text_delta', 'finish', 'usage']);
     expect(second.events[2]).toMatchObject({ promptTokens: 5, completionTokens: 2, totalTokens: 9, thoughtsTokens: 2 });
   });
+
+  it('maps a verified function call onto indexed tool deltas', () => {
+    const mapped = eventsFromVertexChunk(
+      {
+        responseId: 'resp-tool',
+        modelVersion: 'gemini-served',
+        candidates: [{
+          finishReason: 'STOP',
+          content: {
+            parts: [
+              { text: 'Checking.' },
+              { functionCall: { id: 'call_order_1001', name: 'get_order_status', args: { order_id: 'ord_1001' } } },
+              { functionCall: { id: 'call_ship_2002', name: 'ship_order', args: { shipment_id: 'shp_2002' } } },
+            ],
+          },
+        }],
+        usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 7, totalTokenCount: 18 },
+      },
+      { started: false, finished: false },
+      'configured',
+      50,
+      { allowTools: true },
+    );
+    expect(mapped.events.map((event) => event.type)).toEqual(['start', 'text_delta', 'tool_delta', 'tool_delta', 'finish', 'usage']);
+    expect(mapped.events[2]).toMatchObject({ index: 0, id: 'call_order_1001', name: 'get_order_status', arguments: '{"order_id":"ord_1001"}' });
+    expect(mapped.events[3]).toMatchObject({ index: 1, id: 'call_ship_2002', name: 'ship_order', arguments: '{"shipment_id":"shp_2002"}' });
+    expect(mapped.events[4]).toMatchObject({ type: 'finish', finishReason: 'tool_calls', nativeReason: 'stop' });
+    expect(() =>
+      eventsFromVertexChunk(
+        {
+          candidates: [{ finishReason: 'STOP', content: { parts: [{ functionCall: { id: 'call_order_1001', name: 'get_order_status', args: { order_id: 'ord_1001' } } }] } }],
+        },
+        { started: true, finished: false },
+        'configured',
+        50,
+      ),
+    ).toThrow(/invalid/i);
+  });
 });
 
 describe('vertex tool conversion', () => {

@@ -172,11 +172,7 @@ export function validateChatRequest(body: unknown): ChatRequest {
   }
   correlateToolMessages(messages, toolNames);
 
-  const parsed = { model: body.model, messages, stream, includeUsage, taskHint, optional };
-  if (parsed.stream && requestUsesTools(parsed)) {
-    throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
-  }
-  return parsed;
+  return { model: body.model, messages, stream, includeUsage, taskHint, optional };
 }
 
 export function requestUsesTools(request: ChatRequest): boolean {
@@ -205,9 +201,6 @@ export function assertToolProvider(
   options?: { endpoint?: string | null; originProvider?: string },
 ): void {
   if (!requestUsesTools(request)) return;
-  if (request.stream) {
-    throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
-  }
   if (options?.originProvider !== undefined && options.originProvider !== provider) {
     throw invalidRequest('tools', 'unsupported_parameter', 'tools is not supported.');
   }

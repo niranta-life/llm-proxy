@@ -6,7 +6,7 @@ Back to [README](../README.md)
 
 This page covers step 6 for streams. Streams also pass steps 4 and 5 before the first byte is sent. See the [request path](architecture.md#request-path).
 
-[llm-proxy](../README.md) can stream a text chat for OpenAI, Anthropic, Vertex, xAI, OpenRouter, and an approved DGX deployment. A stream does not accept tools. The proxy does not assemble tool-call deltas. Streaming stays off until you enable it for the tenant and for that deployment. The caller changes only `model`.
+[llm-proxy](../README.md) can stream a chat for OpenAI, Anthropic, Vertex, xAI, OpenRouter, and an approved DGX deployment. A function-tool stream returns tool-call deltas for those providers. A live DGX host does not receive function tools. A loopback DGX mock can stream a tool call. Streaming stays off until you enable it for the tenant and for that deployment. The caller changes only `model`.
 
 ```bash
 docker compose run --rm app node dist/cli.js set-tenant-streaming \
@@ -23,6 +23,8 @@ docker compose run --rm app node dist/cli.js set-deployment-streaming \
 
 A stream uses `text/event-stream`. Each event is a `chat.completion.chunk`. The completion id and the upstream model stay the same for that response. The first chunk has the assistant role. Later chunks have the text in order, then a chunk with the finish reason.
 
+A function-tool stream can also send `tool_calls` deltas. Each delta keeps the provider index, the call id, and the function name. Argument text arrives as fragments in provider order. Text deltas and tool deltas can interleave. The proxy checks that the joined arguments are one JSON object when the call is complete. The proxy does not execute those arguments. A finished tool stream has `finish_reason` `tool_calls`, then `data: [DONE]`. A text-only stream still rejects a tool delta. A missing call id, a fragment before the call starts, arguments that are not one JSON object, or arguments over 8192 bytes fail the stream. That failure does not write `data: [DONE]`.
+
 A usage chunk is sent only when `include_usage` is true and the provider sent at least one integer count. A later Anthropic usage count replaces the earlier count. The proxy does not add the counts together. A completed attempt stores those counts. For a provider other than DGX, a positive gap of `total - prompt - completion` is stored as `thoughts_tokens`. Cache counts are not subtracted. Those tokens bill at the thinking rate. When the thinking rate is unset, they bill at the output rate.
 
 A finished stream ends with one `data: [DONE]`, and only after the provider finish and the provider terminal event.
@@ -33,7 +35,9 @@ A finished stream ends with one `data: [DONE]`, and only after the provider fini
 
 A timeout does not write `[DONE]`. A failure after headers does not write `[DONE]` and does not change the HTTP status. The proxy does not store the raw event stream. It stores encrypted caller-visible text only when streaming capture is on and the stream completed. The default is off. Capture does not change the bytes that are forwarded. The stream slot is released when the response ends. The sample write runs after that release. A slow caller ends as `slow_consumer` and stores no sample. A caller abort ends as `client_aborted` and stores no sample. A stream that ends without the provider terminal event is `stream_truncated` and stores no sample. A buffer past the capture ceiling stores no sample. The caller still receives the forwarded bytes.
 
-An Anthropic stream sends each `text_delta` in content-block order. An empty text block adds no text. A `ping` adds no text. The proxy does not send `thinking_delta` or `signature_delta`. It rejects a serving model that is not the deployment model, a content block with type `fallback`, and a `tool_use` block. The stream is one HTTP request and does not use the Anthropic SDK stream helper. The proxy reads the event bytes and does not treat a missing terminal event as success.
+An Anthropic stream sends each `text_delta` in content-block order. An empty text block adds no text. A `ping` adds no text. The proxy does not send `thinking_delta` or `signature_delta`. It rejects a serving model that is not the deployment model and a content block with type `fallback`. A text-only stream rejects a `tool_use` block. A function-tool stream maps `tool_use` and `input_json_delta` onto the public tool deltas. The content-block index stays the public index. The stream is one HTTP request and does not use the Anthropic SDK stream helper. The proxy reads the event bytes and does not treat a missing terminal event as success.
+
+A Vertex function-call part in a stream becomes the same public tool deltas. The proxy does not invent a call id. A successful Vertex tool stream uses finish reason `STOP` upstream and `tool_calls` on the public stream.
 
 ## Stream status
 

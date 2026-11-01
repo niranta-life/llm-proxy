@@ -1,0 +1,76 @@
+{
+  "proxyExecutedFunction": false,
+  "localExecutions": 0,
+  "sdk": {
+    "index": 0,
+    "id": "call_order_1001",
+    "name": "get_order_status",
+    "arguments": "{\"order_id\":\"ord_1001\"}",
+    "finish": "tool_calls",
+    "done": true,
+    "text": ""
+  },
+  "upstream": [
+    {
+      "provider": "openai",
+      "stream": true,
+      "toolNames": [
+        "get_order_status"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "stream": true,
+      "toolNames": [
+        "get_order_status"
+      ]
+    },
+    {
+      "provider": "vertex",
+      "stream": true,
+      "toolNames": [
+        "get_order_status",
+        "ship_order"
+      ]
+    },
+    {
+      "provider": "xai",
+      "stream": true,
+      "toolNames": [
+        "get_order_status"
+      ]
+    },
+    {
+      "provider": "openrouter",
+      "stream": true,
+      "toolNames": [
+        "get_order_status"
+      ]
+    },
+    {
+      "provider": "dgx",
+      "stream": true,
+      "toolNames": [
+        "get_order_status"
+      ]
+    }
+  ],
+  "failuresWithoutDone": [
+    "missing function ID",
+    "out-of-order provider events",
+    "oversized arguments",
+    "incomplete JSON",
+    "stream cancellation",
+    "provider failure mid-call",
+    "backpressure",
+    "incomplete stream"
+  ],
+  "providers": [
+    "openai",
+    "anthropic",
+    "vertex",
+    "xai",
+    "openrouter",
+    "dgx"
+  ]
+}

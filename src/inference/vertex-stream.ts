@@ -49,6 +49,7 @@ export async function* streamVertexChat(input: {
   fetchImpl?: typeof fetch;
   retryAfter?: () => string | null;
   onDispatched?: () => Promise<void>;
+  allowTools?: boolean;
 }): AsyncGenerator<UpstreamStreamItem> {
   const controller = new AbortController();
   const abort = (): void => {
@@ -111,7 +112,9 @@ export async function* streamVertexChat(input: {
       if (step.done) break;
       clearTimeout(connectTimer);
       armIdle();
-      const mapped = eventsFromVertexChunk(step.value, cursor, input.request.model, createdSeconds);
+      const mapped = eventsFromVertexChunk(step.value, cursor, input.request.model, createdSeconds, {
+        allowTools: input.allowTools === true,
+      });
       cursor = mapped.cursor;
       for (const event of mapped.events) {
         yield { type: 'event', event: event satisfies CanonicalEvent };

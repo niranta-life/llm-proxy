@@ -326,4 +326,78 @@ describe('Anthropic stream conversion', () => {
       ),
     ).toThrow(ProxyError);
   });
+
+  it('maps input_json_delta onto an indexed tool call and still rejects tool_use on a text stream', () => {
+    let cursor = initialAnthropicStreamCursor(1_700_000_000);
+    cursor = eventsFromAnthropicEvent(
+      {
+        type: 'message_start',
+        message: {
+          id: 'msg_tool',
+          type: 'message',
+          role: 'assistant',
+          model: MODEL,
+          content: [],
+          stop_reason: null,
+          usage: { input_tokens: 11, output_tokens: 1 },
+        },
+      },
+      cursor,
+      MODEL,
+      true,
+    ).cursor;
+    const started = eventsFromAnthropicEvent(
+      {
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'tool_use', id: 'call_order_1001', name: 'get_order_status', input: {} },
+      },
+      cursor,
+      MODEL,
+      true,
+    );
+    expect(started.events[0]).toMatchObject({ type: 'tool_delta', index: 1, id: 'call_order_1001', name: 'get_order_status', arguments: '' });
+    const fragment = eventsFromAnthropicEvent(
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"order_id":"ord_1001"}' } },
+      started.cursor,
+      MODEL,
+      true,
+    );
+    expect(fragment.events[0]).toMatchObject({ type: 'tool_delta', index: 1, arguments: '{"order_id":"ord_1001"}' });
+    const finished = eventsFromAnthropicEvent(
+      { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 7 } },
+      fragment.cursor,
+      MODEL,
+      true,
+    );
+    expect(finished.events.some((event) => event.type === 'finish' && event.finishReason === 'tool_calls')).toBe(true);
+    const text = initialAnthropicStreamCursor(1_700_000_000);
+    const opened = eventsFromAnthropicEvent(
+      {
+        type: 'message_start',
+        message: {
+          id: 'msg_text',
+          type: 'message',
+          role: 'assistant',
+          model: MODEL,
+          content: [],
+          stop_reason: null,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        },
+      },
+      text,
+      MODEL,
+    );
+    expect(() =>
+      eventsFromAnthropicEvent(
+        {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'tool_use', id: 'call_order_1001', name: 'get_order_status', input: {} },
+        },
+        opened.cursor,
+        MODEL,
+      ),
+    ).toThrow(ProxyError);
+  });
 });

@@ -1,0 +1,45 @@
+{
+  "server": {
+    "id": "733b9bd7-dc85-4188-8d7f-cdafad7ebedc",
+    "serverKey": "paged",
+    "displayName": "Paged tools",
+    "endpoint": "http://127.0.0.1:62094/page",
+    "protocolMode": "modern",
+    "protocolVersion": "2026-07-28",
+    "connectionStatus": "ok",
+    "enabled": false,
+    "lastCheckedAt": "2026-11-01T16:41:54.963Z",
+    "lastError": null,
+    "catalogFingerprint": "a17d64d2a4e1ea44bd4839b867ce514a117d98fae06894866635662819e85c2c",
+    "catalogCachedAt": "2026-11-01T16:41:54.963Z",
+    "ttlMs": 300000,
+    "cacheScope": "public",
+    "catalogVersion": 1,
+    "cacheAgeMs": 0
+  },
+  "catalogVersion": 1,
+  "changed": true,
+  "fingerprint": "a17d64d2a4e1ea44bd4839b867ce514a117d98fae06894866635662819e85c2c",
+  "protocolVersion": "2026-07-28",
+  "ttlMs": 300000,
+  "cacheScope": "public",
+  "pages": 2,
+  "toolCalls": 0,
+  "tools": [
+    {
+      "remoteName": "tool0",
+      "namespacedName": "paged/tool0",
+      "description": "Tool 0"
+    },
+    {
+      "remoteName": "tool1",
+      "namespacedName": "paged/tool1",
+      "description": "Tool 1"
+    },
+    {
+      "remoteName": "tool2",
+      "namespacedName": "paged/tool2",
+      "description": "Tool 2"
+    }
+  ]
+}

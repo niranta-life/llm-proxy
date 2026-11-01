@@ -1,0 +1,154 @@
+{
+  "register": {
+    "server": {
+      "id": "08188562-9401-4d19-9601-6fea03d14f71",
+      "serverKey": "alpha",
+      "displayName": "Alpha search",
+      "endpoint": "http://127.0.0.1:62094/modern",
+      "protocolMode": "modern",
+      "protocolVersion": null,
+      "connectionStatus": "unknown",
+      "enabled": false,
+      "lastCheckedAt": null,
+      "lastError": null,
+      "catalogFingerprint": null,
+      "catalogCachedAt": null,
+      "ttlMs": null,
+      "cacheScope": null,
+      "catalogVersion": 0,
+      "cacheAgeMs": null
+    }
+  },
+  "test": {
+    "server": {
+      "id": "08188562-9401-4d19-9601-6fea03d14f71",
+      "serverKey": "alpha",
+      "displayName": "Alpha search",
+      "endpoint": "http://127.0.0.1:62094/modern",
+      "protocolMode": "modern",
+      "protocolVersion": "2026-07-28",
+      "connectionStatus": "ok",
+      "enabled": false,
+      "lastCheckedAt": "2026-11-01T16:41:54.902Z",
+      "lastError": null,
+      "catalogFingerprint": null,
+      "catalogCachedAt": null,
+      "ttlMs": null,
+      "cacheScope": null,
+      "catalogVersion": 0,
+      "cacheAgeMs": null
+    },
+    "toolCalls": 0
+  },
+  "legacy": {
+    "server": {
+      "id": "38e5f4d0-3612-4c18-87c0-c4566ea3cee8",
+      "serverKey": "oldsrv",
+      "displayName": "Old server",
+      "endpoint": "http://127.0.0.1:62094/legacy",
+      "protocolMode": "legacy",
+      "protocolVersion": "2025-11-25",
+      "connectionStatus": "ok",
+      "enabled": false,
+      "lastCheckedAt": "2026-11-01T16:41:56.377Z",
+      "lastError": null,
+      "catalogFingerprint": "13efa8bc13ff144c72cfff0a8304a453bb7c4c873fa7626982d23899fec8d42f",
+      "catalogCachedAt": "2026-11-01T16:41:56.377Z",
+      "ttlMs": 0,
+      "cacheScope": "private",
+      "catalogVersion": 1,
+      "cacheAgeMs": 0
+    },
+    "catalogVersion": 1,
+    "changed": true,
+    "fingerprint": "13efa8bc13ff144c72cfff0a8304a453bb7c4c873fa7626982d23899fec8d42f",
+    "protocolVersion": "2025-11-25",
+    "ttlMs": 0,
+    "cacheScope": "private",
+    "pages": 1,
+    "toolCalls": 0,
+    "tools": [
+      {
+        "remoteName": "legacy_search",
+        "namespacedName": "oldsrv/legacy_search",
+        "description": "Read a legacy record"
+      }
+    ]
+  },
+  "mismatch": {
+    "error": {
+      "message": "The protocol version does not match.",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": "mismatch"
+    }
+  },
+  "catalog": {
+    "catalog": [
+      {
+        "id": "84c27095-8171-4725-9919-9d39b95631de",
+        "serverId": "1d1984cd-75c4-4a24-b017-561318209a08",
+        "serverKey": "beta",
+        "remoteName": "search",
+        "namespacedName": "beta/search",
+        "description": "Search the catalog",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null,
+        "catalogVersion": 1,
+        "allowed": true,
+        "protocolVersion": "2026-07-28",
+        "fingerprint": "3b0a0fed234e08abd3652fbdd8a1cd9c8c15b2018623991da970e4f18df41765",
+        "cacheAgeMs": 1389,
+        "ttlMs": 300000,
+        "cacheScope": "public"
+      },
+      {
+        "id": "7d861634-37ad-461d-a577-cbea19ea4800",
+        "serverId": "fbf64a88-b8c9-42cc-8410-f4d097782016",
+        "serverKey": "gamma",
+        "remoteName": "search",
+        "namespacedName": "gamma/search",
+        "description": "Search the catalog",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null,
+        "catalogVersion": 1,
+        "allowed": true,
+        "protocolVersion": "2026-07-28",
+        "fingerprint": "e927e8167a96a2e2cbcf8c988fc1dbafb7e0e9755864e96a60b4b1a1920d7518",
+        "cacheAgeMs": 1361,
+        "ttlMs": 300000,
+        "cacheScope": "public"
+      }
+    ]
+  },
+  "health": {
+    "id": "b3c69149-7ee6-4191-871a-57c035ab4255",
+    "serverKey": "shown",
+    "displayName": "Shown",
+    "protocolMode": "modern",
+    "protocolVersion": "2026-07-28",
+    "connectionStatus": "ok",
+    "enabled": false,
+    "lastCheckedAt": "2026-11-01T16:41:56.437Z",
+    "lastError": null,
+    "catalogFingerprint": "09bb3f35321667e6bbcadcbb045ed51f4115580b22b4fcc470f7c3c1deaac6a5",
+    "cacheAgeMs": 208,
+    "ttlMs": 300000,
+    "cacheScope": "public",
+    "catalogVersion": 1
+  }
+}

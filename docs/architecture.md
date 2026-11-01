@@ -50,6 +50,9 @@ An embedding request names one deployment. It does not resolve alias `auto`. It 
 | `GET /v1/tenant` | The caller's own tenant. |
 | `POST /v1/chat/completions` | Chat completion, JSON or SSE. A function-tool stream returns tool-call deltas. |
 | `POST /v1/embeddings` | One embedding vector per text input. The deployment name selects the pin. |
+| `GET /internal/v1/mcp` | Tenant page for MCP registration, discovery, the tool catalog, permissions, enablement, and health. |
+| `POST /internal/v1/mcp/servers`, `POST /internal/v1/mcp/servers/{id}/discover` | Register one approved server and read its tool list. The credential is a protected reference. The route does not call a tool. |
+| `GET /internal/v1/mcp/catalog` | Enabled servers and allowed tools for the caller. |
 | `POST /v1/feedback` | One task result for one chat request. The body has no prompt and no model output. |
 | `GET /v1/models` | Enabled deployments and aliases for the tenant. |
 | `GET /internal/v1/metrics/summary`, `/attempts`, `/breakers`, `/costs` | Per-tenant metrics. See [Metrics](metrics.md). |

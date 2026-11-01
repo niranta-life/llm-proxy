@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
+import { registerMcpRoutes } from '../mcp/http.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
 import {
@@ -1624,6 +1625,15 @@ export function buildApp(deps: AppDeps): ProxyApp {
       }
     },
   );
+
+  registerMcpRoutes(app, {
+    logger: deps.logger,
+    runtimePool: deps.runtimePool,
+    credentialStore,
+    now: deps.now,
+    fetchImpl: deps.compatibleFetch,
+    authenticate: (headers) => authenticate(deps.authPool, headers),
+  });
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });

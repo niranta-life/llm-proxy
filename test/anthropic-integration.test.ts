@@ -315,6 +315,7 @@ describe('Anthropic integration', () => {
       '034_openai_function_tools.sql',
       '035_cross_provider_tools.sql',
       '036_embeddings.sql',
+      '037_mcp_catalog.sql',
     ]);
     const response = await harness.ctx.app.inject({
       method: 'POST',

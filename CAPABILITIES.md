@@ -76,7 +76,61 @@ Nginx rejects `/mcp` when `Authorization` is missing.
 
 Nginx forwards `/mcp` when both headers are present.
 
-The application does not implement MCP.
+The application does not serve an MCP session on `/mcp`.
+
+## MCP discovery
+
+A tenant registers an approved MCP server from the catalog page.
+
+The page is `GET /internal/v1/mcp`.
+
+The credential is stored as a protected reference.
+
+The runtime role does not read that reference.
+
+The modern path uses the official TypeScript MCP client over Streamable HTTP.
+
+That path speaks protocol version 2026-07-28.
+
+Discovery calls `server/discover` and `tools/list`.
+
+The client reads one page and the following page.
+
+The stored catalog keeps the protocol version, `ttlMs`, `cacheScope`, a fingerprint, and a cache age.
+
+A later refresh reports whether the catalog changed.
+
+Tool names are prefixed with the server key.
+
+A disabled server is omitted from the exposed catalog.
+
+A tool is omitted until the tenant allows it.
+
+The schema depth bound is 8.
+
+The schema size bound is 16384 bytes.
+
+The schema complexity bound is 64 nodes.
+
+The catalog bound is 32 tools.
+
+The client reads at most 8 pages. A cursor after that page is rejected.
+
+A malformed schema, a schema past a bound, or an external schema reference is rejected.
+
+The proxy does not fetch an external schema.
+
+An explicitly marked legacy server uses the compatibility adapter.
+
+A protocol mismatch does not switch to SSE, stdio, or an older handshake.
+
+The proxy does not call a discovered tool.
+
+The proxy does not launch a local executable.
+
+A redirect is refused.
+
+`http` is accepted only for the loopback mock. Every other endpoint must be `https`.
 
 `GET /health/ingress` reports Nginx readiness and application readiness.
 

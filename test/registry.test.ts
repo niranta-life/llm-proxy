@@ -106,6 +106,7 @@ describe('provider registry', () => {
       '034_openai_function_tools.sql',
       '035_cross_provider_tools.sql',
       '036_embeddings.sql',
+      '037_mcp_catalog.sql',
     ]);
     for (const [name, hash] of Object.entries(MIGRATION_SHA256)) {
       const body = readFileSync(join(projectRoot, 'migrations', name));

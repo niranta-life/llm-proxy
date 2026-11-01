@@ -23,6 +23,7 @@ Runs as a single lightweight Node.js container backed only by PostgreSQL 16.
 
 - **Standard Interface:** Drop-in OpenAI-compatible endpoints (`POST /v1/chat/completions`, `POST /v1/embeddings`, and `GET /v1/models`) supporting Server-Sent Events (SSE) streaming and unary chat.
 - **Embeddings:** `POST /v1/embeddings` returns one float vector per text input. The caller names one embedding deployment. A versioned contract pins the model, the dimension, and the normalization. OpenAI and approved Vertex text-embedding models are supported. A loopback private mock is supported. A live private host does not receive embeddings. The proxy does not log the input or the vectors. An embedding call does not enter chat routing.
+- **MCP catalog:** A tenant registers an approved MCP server and discovers its tools. The credential is a protected reference. The catalog page shows the tools, the permission, and the connection health. The proxy does not call a discovered tool.
 - **Function Tools:** Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request and return a tool call. A stream returns each tool-call delta with its index, id, and function name. The application executes the function. The proxy does not execute the function. The proxy does not execute a partial argument fragment. A live DGX host does not receive function tools. A loopback DGX mock can stream the same tool call.
 - **Multi-Provider Adapters:** Native adapters for OpenAI, Anthropic, xAI (Grok), Google Vertex AI, OpenRouter, and private self-hosted endpoints (e.g., NVIDIA DGX).
 - **Traffic Governance & Quotas:** Granular per-tenant quotas for rate limits (RPM/TPM), concurrent request caps, active streaming lease pools, and monthly spend budgets.
@@ -139,9 +140,10 @@ Explore technical documentation organized by intent:
 ## What is Not Included
 
 - Login, OAuth, SSO, user accounts, and saved caller state.
-- Images, audio, and MCP.
+- Images and audio.
+- Execution of a discovered MCP tool.
 - An optimizer that promotes a policy without an operator.
-- An HTTP admin UI. Tenants, providers, limits, and prices change through the CLI.
+- An HTTP admin UI for tenants, providers, limits, and prices. Those change through the CLI.
 - TLS on the Node.js listen port. Nginx in Compose terminates TLS on port 443. The Node.js port stays private.
 - A payment or billing collection flow.
 

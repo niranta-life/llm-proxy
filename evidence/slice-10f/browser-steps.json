@@ -1,0 +1,82 @@
+{
+  "preview": "The collaborative preview loaded the title MCP catalog. Snapshot, type, and evaluate then timed out.",
+  "chrome": "Headless Chrome completed registration, connection test, discovery, permission, enable, catalog, disable, and health.",
+  "steps": [
+    {
+      "step": "01-page.png",
+      "detail": "saved"
+    },
+    {
+      "step": "session",
+      "detail": "Credential is ready for this page."
+    },
+    {
+      "step": "register",
+      "detail": "Server browser is registered."
+    },
+    {
+      "step": "02-registered.png",
+      "detail": "saved"
+    },
+    {
+      "step": "test",
+      "detail": "Connection is ok. Protocol 2026-07-28."
+    },
+    {
+      "step": "03-connection.png",
+      "detail": "saved"
+    },
+    {
+      "step": "discover",
+      "detail": "Discovery stored version 1. Changed true."
+    },
+    {
+      "step": "04-discovered.png",
+      "detail": "saved"
+    },
+    {
+      "step": "allow",
+      "detail": "The tool is allowed."
+    },
+    {
+      "step": "05-allowed.png",
+      "detail": "saved"
+    },
+    {
+      "step": "enable",
+      "detail": "The server is enabled."
+    },
+    {
+      "step": "06-enabled.png",
+      "detail": "saved"
+    },
+    {
+      "step": "catalog",
+      "detail": "catalog has browser/search"
+    },
+    {
+      "step": "07-catalog.png",
+      "detail": "saved"
+    },
+    {
+      "step": "disable",
+      "detail": "The server is disabled."
+    },
+    {
+      "step": "08-disabled.png",
+      "detail": "saved"
+    },
+    {
+      "step": "health",
+      "detail": "{\n  \"id\": \"01c80509-7c2c-4c51-bab7-8ffbf69def1a\",\n  \"serverKey\": \"browser\",\n  \"displayName\": \"Browser search\",\n  \"protocolMode\": \"modern\",\n  \"protocolVersion\": \"2026-07-28\",\n  \"connectionStatus\": \"ok\",\n  \"enabled\": false,\n  \"lastCheckedAt\": \"2026-11-01T15:40:01.417Z\",\n  \"lastError\": null,\n  \"catalogFingerprint\": \"509aad7127a5f4912516bb4a8b3d96aa37bc8c3a9f450f76b35ed827ef9d3b74\",\n  \"cacheAgeMs\": 1202,\n  \"ttlMs\": 300000,\n  \"cacheScope\": \"public\",\n  \"catalogVersion\": 1\n}"
+    },
+    {
+      "step": "09-health.png",
+      "detail": "saved"
+    },
+    {
+      "step": "page",
+      "detail": "The visible page does not show a credential"
+    }
+  ]
+}

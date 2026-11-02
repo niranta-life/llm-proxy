@@ -26,7 +26,7 @@ const MARKER = 0.424242;
 const SAFE = [0.5, 0.25, -0.5, 0.125];
 const UNIT = [0.5, 0.5, 0.5, 0.5];
 const EFFECTIVE = '2026-01-01T00:00:00.000Z';
-const WINDOW = 'from=2026-10-20T00:00:00.000Z&to=2026-11-02T00:00:00.000Z';
+const WINDOW = `from=${new Date(Date.now() - 86_400_000).toISOString()}&to=${new Date(Date.now() + 86_400_000).toISOString()}`;
 const VERTEX_EMAIL = 'embed-bot@embed-vertex-proj.iam.gserviceaccount.com';
 const VERTEX_KEY = JSON.stringify({ client_email: VERTEX_EMAIL, private_key: `embed-${'k'.repeat(80)}` });
 

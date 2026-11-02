@@ -1,0 +1,115 @@
+{
+  "connection": {
+    "era": "modern",
+    "version": "2026-07-28",
+    "supportedVersions": [
+      "2026-07-28"
+    ],
+    "listChanged": false,
+    "instructions": "Read approved model data for this tenant. Inference and embedding stay off until the tenant approves them."
+  },
+  "discovery": {
+    "tools": [
+      "get_model_capabilities",
+      "list_models"
+    ]
+  },
+  "invocation": {
+    "models": [
+      "auto",
+      "chat-h",
+      "embed-h"
+    ],
+    "capabilities": [
+      "temperature",
+      "max_tokens"
+    ],
+    "extraRejected": true
+  },
+  "missingCredential": {
+    "status": 401,
+    "code": "invalid_api_key"
+  },
+  "wrongTenant": {
+    "status": 401,
+    "otherModels": 0
+  },
+  "methodMetadata": {
+    "method": -32020,
+    "name": -32020,
+    "claim": -32020
+  },
+  "malformed": {
+    "status": 400,
+    "code": -32700
+  },
+  "unsupportedVersion": {
+    "status": 400,
+    "code": -32022
+  },
+  "origin": {
+    "bad": 403,
+    "missing": 200,
+    "matched": 200,
+    "nullOrigin": 403
+  },
+  "sse": {
+    "get": 405,
+    "delete": 405,
+    "streamed": 9
+  },
+  "approved": {
+    "chat": "ok",
+    "embedding": {
+      "model": "embed-h",
+      "count": 1,
+      "dimension": 4
+    }
+  },
+  "budget": {
+    "payerCosts": 2,
+    "tight": "The budget limit was reached."
+  },
+  "outputLimit": {
+    "message": "The output is too large."
+  },
+  "recursion": {
+    "code": -32602,
+    "remoteHits": 0,
+    "providerSawText": true
+  },
+  "cancellation": {
+    "calls": 1,
+    "upstreamClosed": true
+  },
+  "concurrency": {
+    "fifth": 429,
+    "replica": 200
+  },
+  "replicas": {
+    "ports": [
+      "54112",
+      "54113"
+    ],
+    "tools": [
+      "list_models",
+      "get_model_capabilities",
+      "create_chat_completion",
+      "create_embedding"
+    ]
+  },
+  "limits": {
+    "tooLarge": 413,
+    "prompts": -32601,
+    "deniedRead": true
+  },
+  "browser": {
+    "launched": true,
+    "exposed": "list_modelsreadallowedget_model_capabilitiesreadallowedcreate_chat_completioninferenceapproval requiredcreate_embeddingembeddingapproval required",
+    "approved": "The tool is allowed."
+  },
+  "tls": {
+    "configured": true,
+    "liveIngress": false
+  }
+}

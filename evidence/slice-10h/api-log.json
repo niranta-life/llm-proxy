@@ -1,0 +1,16 @@
+{
+  "lines": [
+    "{\"time\":\"2026-11-02T00:31:52.736Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"credential rejected\",\"message\":\"credential rejected\"}",
+    "{\"time\":\"2026-11-02T00:31:52.737Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"credential rejected\",\"message\":\"credential rejected\"}",
+    "{\"time\":\"2026-11-02T00:31:52.758Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"credential rejected\",\"message\":\"credential rejected\"}",
+    "{\"time\":\"2026-11-02T00:31:52.828Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32020}",
+    "{\"time\":\"2026-11-02T00:31:52.850Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32020}",
+    "{\"time\":\"2026-11-02T00:31:52.872Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32020}",
+    "{\"time\":\"2026-11-02T00:31:52.918Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32022}",
+    "{\"time\":\"2026-11-02T00:31:52.941Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"credential rejected\",\"message\":\"credential rejected\"}",
+    "{\"time\":\"2026-11-02T00:31:53.360Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"embedding completed\",\"message\":\"embedding completed\",\"requestId\":\"4a8b8069-9f8c-4b55-8875-ea4fc92ed7da\",\"deployment\":\"embed-h\",\"vectorCount\":1,\"dimension\":4}",
+    "{\"time\":\"2026-11-02T00:31:53.566Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32602}",
+    "{\"time\":\"2026-11-02T00:31:53.904Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32020}",
+    "{\"time\":\"2026-11-02T00:31:54.090Z\",\"level\":\"info\",\"severity\":\"INFO\",\"msg\":\"mcp server rejected a request\",\"message\":\"mcp server rejected a request\",\"code\":-32601}"
+  ]
+}

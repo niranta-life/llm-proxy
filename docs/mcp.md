@@ -10,7 +10,7 @@ The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says th
 
 Nginx allows `/internal/` only for an approved client network. The HTML page does not check the tenant secret. Each JSON route checks `X-Tenant-Id` and the bearer token. Another tenant does not read the row.
 
-Nginx rejects `/mcp` when `X-Tenant-Id` or `Authorization` is missing. Nginx forwards `/mcp` when both headers are present. The application does not serve an MCP session on `/mcp`.
+Nginx rejects `/mcp` when `X-Tenant-Id` or `Authorization` is missing. Nginx forwards `/mcp` when both headers are present. `POST /mcp` serves MCP revision 2026-07-28 for an authenticated tenant. The server does not keep a protocol session. A GET does not open a session stream.
 
 ## Registration
 

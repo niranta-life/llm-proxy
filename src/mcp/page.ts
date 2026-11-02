@@ -91,6 +91,19 @@ export function mcpAdminPage(): string {
     </table>
   </section>
   <section>
+    <h2>Exposed tools</h2>
+    <p>These tools are available on /mcp for this tenant. A read tool is allowed. Inference and embedding stay off until you approve them.</p>
+    <div class="row">
+      <button type="button" id="approve-exposed">Approve tool</button>
+      <button type="button" id="deny-exposed" class="secondary">Deny tool</button>
+      <button type="button" id="refresh-exposed" class="secondary">Refresh exposed</button>
+    </div>
+    <table>
+      <thead><tr><th></th><th>Tool</th><th>Kind</th><th>Permission</th></tr></thead>
+      <tbody id="exposed-rows"></tbody>
+    </table>
+  </section>
+  <section>
     <h2>Executions</h2>
     <p>A read runs after the checks. A write waits for approval. Denial and cancellation do not call the tool.</p>
     <label for="execution-request">Request id</label>
@@ -119,6 +132,7 @@ export function mcpAdminPage(): string {
   let selectedServer = '';
   let selectedTool = '';
   let selectedExecution = '';
+  let selectedExposed = '';
   let executionIdentity = '';
   let knownTools = [];
 
@@ -241,6 +255,35 @@ export function mcpAdminPage(): string {
     }
     const executions = await call('GET', '/internal/v1/mcp/executions');
     fillExecutions(executions.executions);
+    await refreshExposed();
+  }
+
+  function fillExposed(tools) {
+    const body = document.querySelector('#exposed-rows');
+    body.replaceChildren();
+    for (const tool of tools) {
+      const row = document.createElement('tr');
+      const pick = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'exposed';
+      input.value = tool.name;
+      input.addEventListener('change', () => { selectedExposed = tool.name; });
+      if (tool.name === selectedExposed) input.checked = true;
+      pick.append(input);
+      row.append(pick);
+      for (const value of [tool.name, tool.kind, tool.permission]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      body.append(row);
+    }
+  }
+
+  async function refreshExposed() {
+    const listed = await call('GET', '/internal/v1/mcp/exposed');
+    fillExposed(listed.tools);
   }
 
   document.querySelector('#session-form').addEventListener('submit', (event) => {
@@ -390,6 +433,26 @@ export function mcpAdminPage(): string {
 
   document.querySelector('#refresh-executions').addEventListener('click', async () => {
     try { await refreshAll(); say('The execution list is current.'); } catch (error) { say(error.message); }
+  });
+
+  async function setExposed(approved) {
+    selectedExposed = selectedRadio('exposed') || selectedExposed;
+    if (!selectedExposed) { say('Select a tool.'); return; }
+    await call('POST', '/internal/v1/mcp/exposed', { name: selectedExposed, approved });
+    await refreshExposed();
+    say(approved ? 'The tool is allowed.' : 'The tool is denied.');
+  }
+
+  document.querySelector('#approve-exposed').addEventListener('click', async () => {
+    try { await setExposed(true); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#deny-exposed').addEventListener('click', async () => {
+    try { await setExposed(false); } catch (error) { say(error.message); }
+  });
+
+  document.querySelector('#refresh-exposed').addEventListener('click', async () => {
+    try { await refreshExposed(); say('The exposed list is current.'); } catch (error) { say(error.message); }
   });
 </script>
 </body>

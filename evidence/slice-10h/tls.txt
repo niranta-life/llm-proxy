@@ -1,0 +1,5 @@
+TLS terminates on port 443.
+The /mcp location rejects a request without X-Tenant-Id and Authorization.
+The /mcp location does not buffer and does not compress.
+The application port is not published.
+An HTTPS request did not reach this ingress. curl status 35. 

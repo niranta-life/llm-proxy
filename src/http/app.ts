@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import type { Pool } from 'pg';
 import { authenticate } from '../auth/authenticate.js';
 import { registerMcpRoutes } from '../mcp/http.js';
+import { registerMcpServer } from '../mcp/server-http.js';
 import { createCredentialStore, type ProviderCredentialStore } from '../credentials.js';
 import { createSampleKeyManager, type SampleKeyManager } from '../inference/sample-crypto.js';
 import {
@@ -1641,6 +1642,19 @@ export function buildApp(deps: AppDeps): ProxyApp {
     abortAfterDispatch: deps.abortAfterDispatch,
     authenticate: (headers) => authenticate(deps.authPool, headers),
   });
+  registerMcpServer(app, {
+    logger: deps.logger,
+    runtimePool: deps.runtimePool,
+    credentialStore,
+    inferenceEnabled: deps.inferenceEnabled,
+    upstreamBaseUrl: deps.upstreamBaseUrl,
+    streamGate,
+    vertexClientFactory: deps.vertexClientFactory,
+    fetchImpl: deps.compatibleFetch,
+    resolveHost: deps.privateResolve,
+    now: deps.now,
+    authenticate: (headers) => authenticate(deps.authPool, headers),
+  });
 
   app.setNotFoundHandler((_request, reply) => {
     reply.code(404).send({ error: 'not_found' });
@@ -1658,12 +1672,17 @@ export function buildApp(deps: AppDeps): ProxyApp {
         path.startsWith('/internal/v1/evaluation-controls') ||
         path.startsWith('/internal/v1/routing') ||
         path === '/v1/feedback' ||
-        path.startsWith('/v1/feedback?')) &&
+        path.startsWith('/v1/feedback?') ||
+        path === '/mcp') &&
       statusCode === 413
     ) {
       reply
         .code(413)
         .send(proxyError(413, 'invalid_request_error', 'request_too_large', null, 'The request is too large.').body());
+      return;
+    }
+    if (path === '/mcp' && statusCode === 400) {
+      reply.code(400).send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
       return;
     }
     deps.logger.error('request failed', { message: errorMessage(error) });

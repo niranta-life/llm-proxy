@@ -76,7 +76,13 @@ Nginx rejects `/mcp` when `Authorization` is missing.
 
 Nginx forwards `/mcp` when both headers are present.
 
-The application does not serve an MCP session on `/mcp`.
+`POST /mcp` serves MCP revision 2026-07-28 for an authenticated tenant.
+
+The transport is stateless Streamable HTTP.
+
+The response does not use a protocol session.
+
+A GET does not open a session stream.
 
 ## MCP discovery
 
@@ -167,6 +173,34 @@ The proxy does not execute an arbitrary function.
 The proxy does not execute a chat function tool.
 
 Discovery still does not call a tool.
+
+## MCP server
+
+`POST /mcp` lists `list_models` and `get_model_capabilities` for the authenticated tenant.
+
+`create_chat_completion` and `create_embedding` stay off until that tenant approves them.
+
+An approved call uses the existing model registry, budget, and cost record.
+
+A tool call cannot start another MCP call.
+
+The server does not expose administration or a secret.
+
+The server does not enable prompts, resources, sampling, tasks, elicitation, or subscriptions.
+
+The server does not execute an unapproved tool.
+
+The server does not execute a chat function.
+
+A present invalid Origin is rejected.
+
+Request size, output size, and concurrency are bounded.
+
+Cancellation stops the in-flight call.
+
+Nginx still terminates TLS and still rejects `/mcp` without the tenant headers.
+
+The catalog page shows these tools and their permissions.
 
 The catalog page shows the call, the permission, the approval, the failure, the latency, and the history.
 

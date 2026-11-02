@@ -4,13 +4,13 @@ Back to [README](../README.md)
 
 A tenant registers an approved MCP server, discovers its tools, and reads an authorized catalog. Discovery does not call a tool. A separate execution route calls one approved tool. This catalog is separate from [function tools](function-tools.md) on a chat. The proxy does not execute a chat function.
 
-The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool. An approved execution calls one approved tool. The page shows the call, the permission, the approval, the failure, the latency, and the history.
+The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool. An approved execution calls one approved tool. The page shows the call, the permission, the approval, the failure, the latency, and the history. The page also shows the tools exposed on `/mcp` and their permissions.
 
 ## Where it fits
 
 Nginx allows `/internal/` only for an approved client network. The HTML page does not check the tenant secret. Each JSON route checks `X-Tenant-Id` and the bearer token. Another tenant does not read the row.
 
-Nginx rejects `/mcp` when `X-Tenant-Id` or `Authorization` is missing. Nginx forwards `/mcp` when both headers are present. `POST /mcp` serves MCP revision 2026-07-28 for an authenticated tenant. The server does not keep a protocol session. A GET does not open a session stream.
+Nginx rejects `/mcp` when `X-Tenant-Id` or `Authorization` is missing. Nginx forwards `/mcp` when both headers are present. `POST /mcp` serves MCP revision 2026-07-28 for an authenticated tenant. The server does not keep a protocol session. A GET does not open a session stream. The tool list and the approval are in [Proxy server](#proxy-server).
 
 ## Registration
 
@@ -103,6 +103,32 @@ A timeout or a stop after dispatch stores an uncertain outcome. `POST /internal/
 Retained arguments and results are encrypted. The history does not return the credential, the execution identity, or the ciphertext. The runtime role does not read the ciphertext.
 
 A tool description is stored text. It does not add a call. The dispatched name is the approved remote name.
+
+## Proxy server
+
+`POST /mcp` serves MCP revision 2026-07-28. The official TypeScript SDK handles one request. The transport is stateless Streamable HTTP.
+
+Every request requires `X-Tenant-Id` and the bearer token. Nginx returns HTTP 401 `{"error":"ingress_unauthorized"}` when either header is missing. The application returns HTTP 401 `invalid_api_key` when the credential is wrong. Another tenant does not see this tenant's models.
+
+`MCP-Protocol-Version` must match the protocol claim in the request. `Mcp-Method` must match the JSON-RPC method. `Mcp-Name` must match the tool name when the method names a tool. A mismatch is JSON-RPC `-32020`. An unsupported protocol version is JSON-RPC `-32022`. Malformed JSON is JSON-RPC `-32700`.
+
+The server accepts `ping`, `server/discover`, `tools/list`, and `tools/call`. Another method is JSON-RPC `-32601`. The server does not enable prompts, resources, sampling, tasks, elicitation, or subscriptions.
+
+`tools/list` returns `list_models` and `get_model_capabilities` until the tenant changes a grant. `list_models` takes no arguments and returns the visible models. `get_model_capabilities` requires `model` and returns that model's capabilities.
+
+`create_chat_completion` and `create_embedding` stay off until the tenant approves them. An approved chat uses the existing chat path, budget, and cost record. The body names `model` and `messages`. `max_tokens` is optional. The result has `id`, `model`, and `content`. An approved embedding uses the existing embedding path. The body names `model` and `input`. The result has `model`, `count`, and `dimension`. It does not return the vector.
+
+A tool call cannot start another MCP call. That includes a call back to `/mcp` and a call to a registered remote MCP server. The refusal is JSON-RPC `-32602`. The server does not execute a chat function. The server does not expose administration or a secret.
+
+`GET /internal/v1/mcp/exposed` lists the four tools, the kind, and the permission. The permission is `allowed`, `denied`, or `approval required`. `POST /internal/v1/mcp/exposed` sets `approved` for one `name`. An unknown name is HTTP 400 `The tool is not available.` The catalog page shows the same list.
+
+A present Origin must use `http` or `https` and must match the request Host. Any other present Origin is HTTP 403 `origin_rejected`. A missing Origin is allowed.
+
+The request body limit is 65536 bytes. A larger body is HTTP 413. A tool result larger than 16384 bytes returns `The output is too large.` Concurrent calls stop at 4. The next call is HTTP 429 `concurrency_limit`.
+
+Cancellation aborts the in-flight call. The response is JSON-RPC `-32800` `The request was cancelled.`
+
+GET and DELETE return HTTP 405. The response does not set `Mcp-Session-Id`. A successful SDK response uses `text/event-stream`. Nginx does not buffer `/mcp` and does not compress it. TLS terminates on port 443. The application port is not published.
 
 ## What discovery does not do
 

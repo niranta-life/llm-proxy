@@ -202,6 +202,10 @@ Nginx still terminates TLS and still rejects `/mcp` without the tenant headers.
 
 The catalog page shows these tools and their permissions.
 
+`GET /internal/v1/mcp/exposed` reads the tools and the permission.
+
+`POST /internal/v1/mcp/exposed` sets one approval.
+
 The catalog page shows the call, the permission, the approval, the failure, the latency, and the history.
 
 The proxy does not launch a local executable.

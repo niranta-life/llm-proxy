@@ -22,7 +22,7 @@ When `parameters` is present, it is an object schema. The schema can use `type`,
 
 The proxy rejects `$ref`, combinators, `pattern`, `format`, and `strict: true`. `strict: false` is accepted.
 
-One schema is at most 8192 bytes. Schema depth is at most 8. Schema node count is at most 64.
+One schema is at most 8192 bytes. Schema depth is at most 8. Schema node count is at most 64. One schema has at most 32 properties. The proxy rejects a schema past those limits before the provider call. The message is `The schema is too large.`, `The schema is too deep.`, `The schema has too many nodes.`, or `The schema has too many properties.`
 
 A property name starts with a letter or `_`. It then uses letters, digits, `_`, or `-`, and it has at most 64 characters.
 

@@ -73,6 +73,10 @@ Schema depth is at most 8.
 
 Schema node count is at most 64.
 
+A schema has at most 32 properties.
+
+The proxy rejects a schema past those limits before the provider call.
+
 A property name starts with a letter or `_`.
 
 `tool_choice` can be `none`, `auto`, `required`, or one named function that is in `tools`.
@@ -190,6 +194,7 @@ These cases never call the provider:
 - A hard limit or a hard budget rejects the request.
 - A hard admission check cannot reach the database.
 - The breaker for that deployment is open.
+- A schema is past 8192 bytes, depth 8, 64 nodes, or 32 properties.
 
 A content block the proxy cannot represent and an unknown stop reason use `invalid_upstream_response`.
 

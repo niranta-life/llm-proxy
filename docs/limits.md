@@ -30,7 +30,7 @@ A budget mode is `observe`, `hard`, or `disabled`. The period is one UTC month. 
 
 `GET /internal/v1/budgets/usage` shows the allocated budget, the recognized expense, the active reservations, the remaining budget, and the cost status. `GET /internal/v1/limits` shows the limits. Both use the same tenant headers as chat.
 
-A hard budget rejects an unknown or unbounded cost before the upstream call. The estimate uses the highest of the input rate and the cache rates. A cache rate is a split of the prompt, not an extra prompt. A price with no external rate and no request fee is unknown.
+A hard budget rejects an unknown or unbounded cost before the upstream call. `POST /v1/embeddings` uses that budget check. A rejection does not call the upstream model. The estimate uses the highest of the input rate and the cache rates. A cache rate is a split of the prompt, not an extra prompt. A price with no external rate and no request fee is unknown.
 
 The reservation is the full estimate. A settled amount cannot exceed that reservation. An observation budget still allows the request when the estimate exceeds the remaining amount.
 

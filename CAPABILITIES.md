@@ -108,6 +108,8 @@ The stored catalog keeps the protocol version, `ttlMs`, `cacheScope`, a fingerpr
 
 A later refresh reports whether the catalog changed.
 
+That refresh still calls the server.
+
 Tool names are prefixed with the server key.
 
 A disabled server is omitted from the exposed catalog.
@@ -145,6 +147,18 @@ The tool and the schema version must be approved.
 The arguments must be a complete JSON object.
 
 A read tool runs after those checks.
+
+A disabled server is refused before a call.
+
+The response is HTTP 400.
+
+The message is `The server is not approved.`
+
+A tool that is not allowed is refused before a call.
+
+The response is HTTP 400.
+
+The message is `The tool is not approved.`
 
 A write tool waits for explicit approval.
 
@@ -346,6 +360,10 @@ Schema depth is at most 8.
 
 Schema node count is at most 64.
 
+A schema has at most 32 properties.
+
+The proxy rejects a schema past those limits before the provider call.
+
 Logs do not store raw tool arguments.
 
 A tool round is not stored in a sample.
@@ -393,6 +411,8 @@ An empty input, an over-long input, a bad dimension, a bad vector count, a non-f
 A successful attempt stores token counts, latency, and cost.
 
 A failed attempt stores the failure.
+
+A hard budget rejects the embedding before the upstream call.
 
 Logs do not contain the raw input or the vectors.
 

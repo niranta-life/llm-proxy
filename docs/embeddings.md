@@ -76,6 +76,8 @@ HTTP 502 covers an upstream failure, a vector count that does not match the inpu
 
 HTTP 503 `inference_disabled` means inference is off.
 
+HTTP 429 `budget_exceeded` means a hard budget rejected the request before the upstream call.
+
 ## Related
 
 - [Providers](providers.md)

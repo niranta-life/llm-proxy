@@ -68,7 +68,7 @@ A new tool is stored with `allowed` false. `POST /internal/v1/mcp/permissions` s
 
 The stored catalog keeps the protocol version, `ttlMs`, `cacheScope`, a fingerprint, and a cache age. `cacheScope` is `public` or `private`.
 
-A later discovery writes a new version only when the fingerprint changes. An unchanged catalog reports `changed` false and refreshes the cache time.
+A later discovery writes a new version only when the fingerprint changes. An unchanged catalog reports `changed` false and refreshes the cache time. That discovery still calls the server. It does not send `tools/call`.
 
 `GET /internal/v1/mcp/servers/{id}/tools` reads the stored tools for one server.
 
@@ -84,7 +84,7 @@ A later discovery writes a new version only when the fingerprint changes. An unc
 
 `POST /internal/v1/mcp/executions` calls one approved tool. The body names `serverId`, `remoteName`, `schemaVersion`, `requestId`, `toolCallId`, and `arguments`.
 
-The server must be enabled, modern, protocol `2026-07-28`, and connected. The credential must be active. The tool must be allowed. `schemaVersion` must be the stored catalog version. The arguments must match the stored object schema.
+The server must be enabled, modern, protocol `2026-07-28`, and connected. The credential must be active. The tool must be allowed. `schemaVersion` must be the stored catalog version. The arguments must match the stored object schema. A disabled server is HTTP 400 `The server is not approved.` The proxy does not call the tool. A tool that is not allowed is HTTP 400 `The tool is not approved.` The proxy does not call the tool.
 
 `POST /internal/v1/mcp/permissions` can set `effect` to `read` or `write`. A read runs after the checks. A write returns HTTP 202 and waits for approval. Write approval stays required.
 

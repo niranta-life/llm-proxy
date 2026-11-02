@@ -6,7 +6,7 @@ These figures are copied from recorded evidence. Each run used mock providers. T
 
 ## Where it fits
 
-This page lists the measured times, rates, and memory from those runs. Request counts and stream percentiles on a live proxy are in [Metrics](metrics.md). The canary stop and the guardrail stop are also in [Operations](operations.md).
+This page lists the measured times, rates, and memory from those runs. Request counts and stream percentiles on a live proxy are in [Metrics](metrics.md). The canary stop and the guardrail stop are also in [Operations](operations.md). Tool streams, schema checks, embeddings, and MCP discovery are in [Tool and embedding checks](#tool-and-embedding-checks).
 
 ## Mock stream load
 
@@ -114,6 +114,23 @@ The full suite passed 730 tests and skipped 5. It passed 70 files and skipped 3.
 | Stored cost | base 0.75 over 5 attempts; quality 1.56 over 26 attempts | Unit amounts 0.15 and 0.06. |
 | Realized savings | 0.09 per success | Difference of those stored unit amounts. |
 | Predicted savings | not realized | The shadow estimate on this run was null. |
+
+## Tool and embedding checks
+
+One mock run checked tool streams, one large schema, one embedding batch, MCP discovery, and two app processes. The providers were mocks. These figures are copied from that run. They are not a production service level.
+
+| Item | Value | Meaning |
+| --- | --- | --- |
+| Tool streams | 8 successes, 8 assembled calls | 8 concurrent streams. Wall time was 128.18620899999996 ms. RSS moved from 211730432 bytes to 271925248 bytes. |
+| Parallel tool calls | 5 requests, 6 assembled calls | Wall time was 66.31845900000008 ms. |
+| Large schema | 7873 bytes accepted, 8431 bytes rejected | The accepted request was HTTP 200. The rejected request was HTTP 400. Accepted time was 50.26458399999956 ms. Rejected time was 22.265416999999616 ms. The rejected schema did not reach the provider. |
+| Embedding batch | 8 inputs, dimension 4 | Prompt tokens were 32. Stored prompt tokens were 32. Stored duration was 5 ms. Client duration was 48.25362499999983 ms. Stored cost status was `estimated`. |
+| MCP discovery | 1 list call, then 2 | The second discovery reported `changed` false. Tool calls stayed 0. |
+| MCP execution | stored latency 3 ms | Client wall time was 48.83741700000019 ms. |
+| Two processes | survivor HTTP 200 | Each process held 2 database connections. The in-process pool total was 8. Resident set was 185968 KiB and 185648 KiB. |
+| Memory sample | 211730432 bytes, then 254296064 bytes | A later sample in the same run. Pool total was 8. Auth pool total was 7. |
+
+Inference was off on both processes. Stopping one process left the other process up. `GET /health/live` on the survivor returned HTTP 200.
 
 ## How to read the figures
 

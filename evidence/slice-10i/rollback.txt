@@ -1,0 +1,13 @@
+migrationFiles 40
+latest 040_mcp_server_tools.sql
+readiness 200
+drops []
+ready 034_openai_function_tools.sql 1
+ready 035_cross_provider_tools.sql 1
+ready 036_embeddings.sql 1
+ready 037_mcp_catalog.sql 1
+ready 038_mcp_execution.sql 1
+ready 039_rate_backend_epochs.sql 1
+ready 040_mcp_server_tools.sql 1
+An earlier image stays ready when its migration row remains.
+This tree drops no table and no column.

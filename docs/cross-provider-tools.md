@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request. The caller sends one OpenAI JSON body. The proxy converts that body for the provider. The caller changes `model`. The caller does not change the tool JSON.
+Anthropic, Vertex, xAI, and OpenRouter accept the same function-calling request. The caller sends one OpenAI JSON body. The proxy converts that body for the provider. Text in a tool result does not start another tool. It does not change the tenant. It does not change the deployment. The caller changes `model`. The caller does not change the tool JSON.
 
 The request bounds are in [Function tools](function-tools.md). The public result is in [Tool call results](tool-calls.md).
 

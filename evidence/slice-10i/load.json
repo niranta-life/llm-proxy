@@ -1,0 +1,71 @@
+{
+  "mcpDiscoveryCache": {
+    "firstListCalls": 1,
+    "secondListCalls": 2,
+    "changed": false,
+    "cacheAgeMs": 0,
+    "toolCalls": 0
+  },
+  "mcpExecutionLatency": {
+    "latencyMs": 3,
+    "wallMs": 48.83741700000019
+  },
+  "embeddingBatch": {
+    "count": 8,
+    "dimension": 4,
+    "promptTokens": 32,
+    "storedPromptTokens": 32,
+    "durationMs": 48.25362499999983,
+    "storedDurationMs": 5,
+    "costStatus": "estimated"
+  },
+  "streaming": {
+    "concurrency": 8,
+    "successes": 8,
+    "assembledCalls": 8,
+    "wallMs": 128.18620899999996,
+    "rssBytesBefore": 211730432,
+    "rssBytesAfter": 271925248
+  },
+  "parallelToolCalls": {
+    "requests": 5,
+    "assembledCalls": 6,
+    "wallMs": 66.31845900000008
+  },
+  "largeSchema": {
+    "acceptedBytes": 7873,
+    "acceptedStatus": 200,
+    "acceptedMs": 50.26458399999956,
+    "rejectedBytes": 8431,
+    "rejectedStatus": 400,
+    "rejectedMs": 22.265416999999616
+  },
+  "memory": {
+    "rssBytesBefore": 211730432,
+    "rssBytesAfter": 254296064,
+    "poolTotal": 8,
+    "authPoolTotal": 7
+  },
+  "tls": {
+    "plainMedianMs": 0.18452049999996234,
+    "tlsMedianMs": 0.29956250000032014,
+    "overheadMs": 0.1150420000003578,
+    "samples": 10,
+    "liveCurlStatus": 35,
+    "liveHttpCode": "000",
+    "liveIngress": false
+  },
+  "replicas": {
+    "pidA": 18794,
+    "pidB": 18795,
+    "rssKbA": 185968,
+    "rssKbB": 185648,
+    "bStatusAfterAKill": 200,
+    "aReachableAfterKill": false
+  },
+  "connections": {
+    "processA": 2,
+    "processB": 2,
+    "inProcessPool": 8
+  }
+}

@@ -30,6 +30,8 @@ The proxy serves the highest contract version. That version must name the curren
 
 A missing contract is rejected. A requested dimension that does not match the pin is rejected.
 
+A successful attempt stores the token counts, the latency, and the cost status. `GET /internal/v1/metrics/summary` reads those totals for a time window. It does not return the input or the vectors.
+
 The pinned dimension is an integer from 1 through 4096. OpenAI and Vertex dimensions must also fit the approved model.
 
 ## Approved models

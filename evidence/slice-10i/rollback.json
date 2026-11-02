@@ -1,0 +1,24 @@
+{
+  "files": 40,
+  "required": [
+    "034_openai_function_tools.sql",
+    "035_cross_provider_tools.sql",
+    "036_embeddings.sql",
+    "037_mcp_catalog.sql",
+    "038_mcp_execution.sql",
+    "039_rate_backend_epochs.sql",
+    "040_mcp_server_tools.sql"
+  ],
+  "readyRows": {
+    "034_openai_function_tools.sql": 1,
+    "035_cross_provider_tools.sql": 1,
+    "036_embeddings.sql": 1,
+    "037_mcp_catalog.sql": 1,
+    "038_mcp_execution.sql": 1,
+    "039_rate_backend_epochs.sql": 1,
+    "040_mcp_server_tools.sql": 1
+  },
+  "drops": [],
+  "latest": "040_mcp_server_tools.sql",
+  "readiness": 200
+}

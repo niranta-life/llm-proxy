@@ -81,7 +81,7 @@ export function mcpAdminPage(): string {
       <button type="button" id="refresh-catalog" class="secondary">Refresh catalog</button>
     </div>
     <table>
-      <thead><tr><th></th><th>Namespaced name</th><th>Allowed</th><th>Effect</th><th>Version</th></tr></thead>
+      <thead><tr><th></th><th>Namespaced name</th><th>Allowed</th><th>Effect</th><th>Version</th><th>Schema</th></tr></thead>
       <tbody id="tool-rows"></tbody>
     </table>
     <h2>Exposed catalog</h2>
@@ -182,6 +182,13 @@ export function mcpAdminPage(): string {
     }
   }
 
+  function schemaLabel(schema) {
+    if (!schema || typeof schema !== 'object') return '';
+    const kind = typeof schema.type === 'string' ? schema.type : '';
+    const names = schema.properties && typeof schema.properties === 'object' ? Object.keys(schema.properties).join(' ') : '';
+    return (kind + ' ' + names).trim();
+  }
+
   function fillTools(tools) {
     knownTools = tools;
     const body = document.querySelector('#tool-rows');
@@ -197,7 +204,7 @@ export function mcpAdminPage(): string {
       if (tool.remoteName === selectedTool) input.checked = true;
       pick.append(input);
       row.append(pick);
-      for (const value of [tool.namespacedName, String(tool.allowed), tool.effect || '', String(tool.catalogVersion)]) {
+      for (const value of [tool.namespacedName, String(tool.allowed), tool.effect || '', String(tool.catalogVersion), schemaLabel(tool.inputSchema)]) {
         const cell = document.createElement('td');
         cell.textContent = value;
         row.append(cell);

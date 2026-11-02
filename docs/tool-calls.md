@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-The proxy returns a tool call. It does not execute the call. The application executes the function and sends the result back. An approved MCP tool uses a separate route. The `/mcp` server does not execute a chat function. See [MCP catalog](mcp.md). The request shape is in [Function tools](function-tools.md). Provider mapping is in [Cross-provider tool calls](cross-provider-tools.md).
+The proxy returns a tool call. It does not execute the call. Text in a tool result does not start another tool. It does not change the tenant. It does not change the deployment. The application executes the function and sends the result back. An approved MCP tool uses a separate route. The `/mcp` server does not execute a chat function. See [MCP catalog](mcp.md). The request shape is in [Function tools](function-tools.md). Provider mapping is in [Cross-provider tool calls](cross-provider-tools.md).
 
 ## Unary result
 

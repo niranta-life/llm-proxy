@@ -1,0 +1,37 @@
+NODE:v24.22.1
+OPENSSL:OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)
+(node:6104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6143) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/nitin/Work/Y/llm-proxy
+
+runtime v24.22.1
+(node:6245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > refuses a spoofed forwarding header and another tenant credential 135ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > returns a tool call and then a final answer without executing the function 110ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > does not follow a prompt injection in a tool result 88ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > rejects a private or credentialed MCP endpoint before any call 84ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > shows the tool schema and keeps the tool unapproved until permission 228ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > does not follow a prompt injection in an MCP tool result 35ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > holds a write until approval and does not dispatch a replay 118ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > refuses invalid arguments and an unknown tool 47ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > denies a hard embedding budget before the provider call 37ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > returns an embedding batch whose stored usage matches the response 40ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > measures streaming, parallel tool calls, and a large schema 268ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > measures local TLS overhead and leaves the application port unpublished 72ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > runs two proxy processes that do not share memory 496ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > keeps each earlier migration ready and drops no table 14ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > lets an authorized MCP client call only a permitted read tool 101ms
+ ✓ test/tools-hardening.test.ts > tools embeddings and mcp hardening > drives the catalog page through configuration, permission, history, and recovery 3172ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  00:09:19
+   Duration  13.08s (transform 310ms, setup 1ms, collect 845ms, tests 7.54s, environment 0ms, prepare 33ms)
+
+(node:6418) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+EXIT:0

@@ -1,0 +1,127 @@
+{
+  "models": {
+    "status": 200,
+    "ids": [
+      "auto",
+      "embed-10i",
+      "tool-10i"
+    ]
+  },
+  "functionLoop": {
+    "first": 200,
+    "final": "The note stays on this route.",
+    "upstreamCalls": 2,
+    "mcpCalls": 0
+  },
+  "discovery": {
+    "changed": true,
+    "secondChanged": false,
+    "schemaType": "object"
+  },
+  "mcpRead": {
+    "status": "succeeded",
+    "latencyMs": 3,
+    "dispatchCount": 1
+  },
+  "embeddings": {
+    "status": 200,
+    "count": 8,
+    "dimension": 4,
+    "promptTokens": 32
+  },
+  "mcpServer": {
+    "tools": [
+      "get_model_capabilities",
+      "list_models"
+    ],
+    "models": [
+      "auto",
+      "embed-10i",
+      "tool-10i"
+    ]
+  },
+  "metrics": {
+    "window": {
+      "from": "2026-11-01T08:26:03.131Z",
+      "to": "2026-11-03T08:26:03.131Z"
+    },
+    "requests": {
+      "total": 20,
+      "succeeded": 20,
+      "failed": 0,
+      "pending": 0
+    },
+    "usage": {
+      "promptTokens": 241,
+      "completionTokens": 133,
+      "totalTokens": 374,
+      "responsesMissingUsage": 0
+    },
+    "latency": {
+      "samples": 20,
+      "sumMs": 272,
+      "maxMs": 29
+    },
+    "streaming": {
+      "requests": 8,
+      "completed": 8,
+      "cancelled": 0,
+      "errors": 0,
+      "truncated": 0,
+      "firstTextDeltaMs": {
+        "samples": 0,
+        "p50": null,
+        "p95": null
+      },
+      "durationMs": {
+        "samples": 8,
+        "p50": 21,
+        "p95": 29
+      },
+      "usage": {
+        "promptTokens": 88,
+        "completionTokens": 56,
+        "totalTokens": 144
+      }
+    },
+    "byProvider": [
+      {
+        "provider": "openai",
+        "requests": 20,
+        "completed": 20,
+        "cancelled": 0,
+        "errors": 0,
+        "truncated": 0,
+        "promptTokens": 241,
+        "completionTokens": 133,
+        "totalTokens": 374
+      }
+    ],
+    "byDeployment": [
+      {
+        "provider": "openai",
+        "deployment": "embed-10i",
+        "requests": 1,
+        "completed": 1,
+        "cancelled": 0,
+        "errors": 0,
+        "truncated": 0,
+        "promptTokens": 32,
+        "completionTokens": 0,
+        "totalTokens": 32
+      },
+      {
+        "provider": "openai",
+        "deployment": "tool-10i",
+        "requests": 19,
+        "completed": 19,
+        "cancelled": 0,
+        "errors": 0,
+        "truncated": 0,
+        "promptTokens": 209,
+        "completionTokens": 133,
+        "totalTokens": 342
+      }
+    ]
+  }
+}

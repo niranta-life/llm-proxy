@@ -15,6 +15,8 @@ X-Tenant-ID: <tenant-uuid>
 Authorization: Bearer <tenant-secret>
 ```
 
+`X-Forwarded-For`, `X-Real-IP`, `Forwarded`, and `X-Forwarded-Host` do not select the tenant. A bearer token for one tenant does not open another tenant.
+
 The secret is 32 random bytes with the prefix `yck_`. The CLI prints it once, on standard output. Logs go to standard error. The database stores a scrypt verifier, not the secret. You cannot rebuild the secret from the verifier.
 
 The verifier uses Node.js `crypto.scrypt` with `N=16384`, `r=8`, and `p=1`. The proxy does not use a native package for this check. For an unknown tenant, it still runs one dummy scrypt so an empty key list is not much faster than a list that has keys. That step is not a constant-time proof.

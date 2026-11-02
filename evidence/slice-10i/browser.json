@@ -1,0 +1,10 @@
+{
+  "launched": true,
+  "configuration": "registered",
+  "permission": "allowed",
+  "schema": "object note",
+  "history": "succeeded",
+  "metricsOnPage": true,
+  "errorRecovery": "The arguments are invalid.",
+  "consoleEvents": 0
+}

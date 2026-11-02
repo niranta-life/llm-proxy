@@ -1,0 +1,14 @@
+{
+  "embedding": {
+    "promptTokens": 32,
+    "totalTokens": 32,
+    "costStatus": "estimated"
+  },
+  "pageExecution": {
+    "status": "succeeded",
+    "namespaced_name": "page/read_note",
+    "dispatch_count": 1,
+    "latency_ms": 2,
+    "approval": "not_required"
+  }
+}

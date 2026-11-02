@@ -4,7 +4,7 @@ Back to [README](../README.md)
 
 A tenant registers an approved MCP server, discovers its tools, and reads an authorized catalog. Discovery does not call a tool. A separate execution route calls one approved tool. This catalog is separate from [function tools](function-tools.md) on a chat. The proxy does not execute a chat function.
 
-The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool. An approved execution calls one approved tool. The page shows the call, the permission, the approval, the failure, the latency, and the history. The page also shows the tools exposed on `/mcp` and their permissions.
+The page is `GET /internal/v1/mcp`. The title is `MCP catalog`. The page says that it does not call a tool. An approved execution calls one approved tool. The page shows the call, the permission, the approval, the failure, the schema, the latency, and the history. `GET /internal/v1/metrics/summary` is a separate metrics read. It does not replace that latency column. The page also shows the tools exposed on `/mcp` and their permissions.
 
 ## Where it fits
 
@@ -34,7 +34,7 @@ A body that names `command`, `args`, `cwd`, `stdio`, or `transport` is rejected 
 
 A remote endpoint uses `https`. `http` is accepted only for host `127.0.0.1` or `localhost`. That exception is the local mock.
 
-The URL has no userinfo, no query, and no hash. The proxy resolves the host and rejects a private, link-local, or metadata address.
+The URL has no userinfo, no query, and no hash. The proxy resolves the host and rejects a private, link-local, or metadata address. A credential in the URL, a file URL, or a private address is refused. The proxy does not call that endpoint.
 
 The client does not follow a redirect. A redirect is HTTP 502 `The endpoint redirected.`
 
@@ -102,7 +102,7 @@ A timeout or a stop after dispatch stores an uncertain outcome. `POST /internal/
 
 Retained arguments and results are encrypted. The history does not return the credential, the execution identity, or the ciphertext. The runtime role does not read the ciphertext.
 
-A tool description is stored text. It does not add a call. The dispatched name is the approved remote name.
+A tool description is stored text. It does not add a call. The dispatched name is the approved remote name. Text in a tool result does not start another tool. It does not change the tenant. It does not change the route.
 
 ## Proxy server
 

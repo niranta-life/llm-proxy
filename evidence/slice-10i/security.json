@@ -1,0 +1,70 @@
+{
+  "headerSpoof": {
+    "status": 200,
+    "models": [
+      "auto",
+      "embed-10i",
+      "tool-10i"
+    ],
+    "mismatchedCredential": 401,
+    "deployment": "tool-10i"
+  },
+  "toolResultInjection": {
+    "status": 200,
+    "extraToolCall": false,
+    "deployment": "tool-10i"
+  },
+  "mcpSsrf": {
+    "statuses": [
+      400,
+      400,
+      400,
+      400
+    ],
+    "outboundCalls": 0
+  },
+  "schema": {
+    "type": "object",
+    "allowedBefore": false,
+    "allowedAfter": true,
+    "toolCalls": 0
+  },
+  "mcpResultInjection": {
+    "status": "succeeded",
+    "dispatchCount": 1,
+    "writeCalls": 0
+  },
+  "writeApproval": {
+    "beforeDispatch": 0,
+    "afterDispatch": 1,
+    "replayed": true
+  },
+  "argumentValidation": {
+    "invalid": 400,
+    "unknown": 404,
+    "toolCalls": 0
+  },
+  "budget": {
+    "status": 429,
+    "code": "budget_exceeded",
+    "upstreamCalls": 0
+  },
+  "tls": {
+    "applicationPortPublished": false,
+    "liveIngress": false,
+    "liveCurlStatus": 35
+  },
+  "replicas": {
+    "distinctPids": true,
+    "inferenceOnReplica": false,
+    "survivorStatus": 200
+  },
+  "mcpServer": {
+    "tools": [
+      "get_model_capabilities",
+      "list_models"
+    ],
+    "inferenceTool": false,
+    "embeddingTool": false
+  }
+}

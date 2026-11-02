@@ -50,6 +50,8 @@ Nginx overwrites `X-Forwarded-Host`.
 
 Nginx overwrites `Forwarded`.
 
+A forwarding header does not select the tenant.
+
 Nginx does not buffer a `text/event-stream` response.
 
 Nginx does not compress a `text/event-stream` response.
@@ -156,6 +158,12 @@ The proxy does not retry that call.
 
 The result returns to the caller.
 
+Text in a tool result does not start another tool.
+
+It does not change the tenant.
+
+It does not change the route.
+
 The caller can submit that result when the run mode is continue and the policy allows one follow-up.
 
 That submit records one model request.
@@ -207,6 +215,8 @@ The catalog page shows these tools and their permissions.
 `POST /internal/v1/mcp/exposed` sets one approval.
 
 The catalog page shows the call, the permission, the approval, the failure, the latency, and the history.
+
+The catalog page shows the tool schema.
 
 The proxy does not launch a local executable.
 
@@ -385,6 +395,10 @@ A successful attempt stores token counts, latency, and cost.
 A failed attempt stores the failure.
 
 Logs do not contain the raw input or the vectors.
+
+`GET /internal/v1/metrics/summary` is a separate read.
+
+It does not return the input or the vectors.
 
 An embedding call does not store a chat sample.
 
